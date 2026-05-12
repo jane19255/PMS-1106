@@ -1,6 +1,5 @@
 const fb = new FirebaseService();
 
-// SAVE PATIENT TO FIREBASE
 async function savePatient() {
   const name = document.getElementById("name").value;
   const age = document.getElementById("age").value;
@@ -14,7 +13,6 @@ async function savePatient() {
   loadPatients();
 }
 
-// LOAD PATIENTS FROM FIREBASE
 async function loadPatients() {
   const list = document.getElementById("patientList");
   list.innerHTML = "";
@@ -26,5 +24,4 @@ async function loadPatients() {
   });
 }
 
-// AUTO LOAD WHEN PAGE OPEN
 window.onload = loadPatients;
