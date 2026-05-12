@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Patients</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Patient Management</h1>
+
+        <div class="card">
+            <input type="text" id="name" placeholder="Patient Name">
+            <input type="text" id="age" placeholder="Age">
+            <button onclick="savePatient()">Add Patient</button>
+        </div>
+
+        <div id="patientList"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <script src="../assets/js/firebase-config.js"></script>
+    <script src="../assets/js/FirebaseService.js"></script>
+    <script src="../assets/js/patients.js"></script>
+</body>
+
+</html>
