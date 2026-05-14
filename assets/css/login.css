@@ -1,0 +1,154 @@
+@import url("general.css");
+
+.container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;  
+    height: 100dvh;  
+}
+
+.left,
+.right {
+    flex: 1
+}
+
+.left {
+    background: linear-gradient(135deg, var(--primary-focus) 0%, var(--primary) 100%);
+    padding: 40px 64px;
+    color: white;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    height: 100%;
+}
+
+.left > div {
+    width: 500px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.left .fa-hospital-user {
+    font-size: 40px;
+    margin-bottom: 16px;
+}
+
+.left .title {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.left .description {
+    color: rgb(255 255 255 / 0.8);
+    line-height: 1.625;
+    margin-bottom: 24px;
+}
+
+.left .scope {
+    font-size: 14px;
+}
+
+.left .scope i {
+    margin-right: 12px;
+}
+
+.left .scope i:nth-child(-n+3) {
+    margin-bottom: 16px;
+}
+
+.left .version {
+    font-size: 14px;
+    color: rgb(255 255 255 / 0.6);
+    margin-top: auto;
+}
+
+.right {
+    background: var(--light-bg);
+    padding: 48px 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.right .card {
+    padding: 32px;
+    width: 500px;
+}
+
+.right .card .title {
+    font-weight: 700;
+    font-size: 22px;
+    text-align: center;
+}
+
+.right .card .description {
+    margin: 10px 0 32px 0;
+    line-height: 20px;
+}
+
+.right .card .field {
+    margin-bottom: 20px;
+}
+
+.right .card .action {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.right .card .action label {
+  display: flex;
+  gap: 8px;
+}
+
+.right .policy {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    font-size: 14px;
+    color: var(--secondary);
+}
+
+.right .policy p:hover {
+    color: #084fde;
+    cursor: pointer;
+}
+
+.modal .icon {
+    border-radius: 100%;
+    background: rgb(27 101 248 / 0.1);
+    height: 56px;
+    width: 58px;
+    text-align: center;
+    align-content: center;
+    justify-self: center;
+}
+
+.modal .icon i {
+    color: var(--primary-hover);
+    font-size: 20px;
+}
+
+.modal .title {
+    margin-top: 12px;
+    margin-bottom: 8px;
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.modal .field {
+    margin-bottom: 20px;
+}
+
+.modal .description {
+    margin-bottom: 24px;
+}
+
+.modal .description:last-child {
+    margin: 20px 0 0 0;
+}

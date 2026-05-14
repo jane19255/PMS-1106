@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Login</title>
+    <link rel="stylesheet" href="./assets/css/login.css">
+    <script src="https://kit.fontawesome.com/4897704fad.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="./assets/js/firebase-config.js"></script>
+    <script src="./assets/js/FirebaseService.js"></script>
+    <script src="./assets/js/general.js"></script>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="left">
+            <div>
+                <i class="fa-solid fa-hospital-user"></i>
+                <div class="title">CSCare Hospital System</div>
+                <div class="description">Feel like dying from starting a day of work? Someone really dying now. So move
+                    your
+                    ass and start working!</div>
+                <div class="scope">
+                    <i class="fa-solid fa-circle-check"></i>We work as one team, supporting every role<br>
+                    <i class="fa-solid fa-circle-check"></i>We keep care on track, one appointment at a time<br>
+                    <i class="fa-solid fa-circle-check"></i>We keep records safe, clear, and ready for care
+                </div>
+            </div>
+            <div class="version">Version 1.0.0 | CSC1106 Group XX</div>
+        </div>
+
+        <div class="right">
+            <div class="card">
+                <div class="title">Welcome Back</div>
+                <div class="description">Sign in to your staff account</div>
+                <div class="error-box">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    Invalid username or password. Please try again.
+                </div>
+                <div class="field">
+                    <label>Staff ID / Username</label>
+                    <input type="text" placeholder="Enter you staff ID / username">
+                </div>
+                <div class="field">
+                    <label>Password</label>
+                    <input type="text" placeholder="Enter you password">
+                </div>
+                <div class="action">
+                    <label class="remember"><input type="checkbox">Remember Me</label>
+                    <a href="#" onclick="openModal('pwdModal')">Forgot Password?</a>
+                </div>
+                <button type="button" class="loginBtn">Sign in</button>
+            </div>
+
+            <div class="policy">
+                <p>Privacy Policy</p>
+                <p>Terms of Service</p>
+                <p>Support</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="pwdModal" class="modal">
+
+        <div class="modal-content card">
+            <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+            <div class="icon"><i class="fa-solid fa-lock"></i></div>
+
+            <div class="title">Forgot Password</div>
+            <div class="description">Enter your registered email to reset your password</div>
+
+            <div class="error-box">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                Invalid email address. Please try again.
+            </div>
+
+            <div class="field">
+                <label>Email Address</label>
+                <input type="text" placeholder="example@csc.singaporehealth.sg">
+            </div>
+
+            <button onclick="showToast('Reset link send to your email!')">Send Reset Link</button>
+
+            <div class="description">Remember password?
+                <a href="#" onclick="closeModal(this)">Back to Login</a>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Toast -->
+    <div class="toast card" id="toast"></div>
+
+</body>
+
+</html>
