@@ -19,9 +19,8 @@
             <div>
                 <i class="fa-solid fa-hospital-user"></i>
                 <div class="title">CSCare Hospital System</div>
-                <div class="description">Feel like dying from starting a day of work? Someone really dying now. So move
-                    your
-                    ass and start working!</div>
+                <div class="description">Feel like dying from starting a day of work? Someone really dying now.
+                     So move your ass and start working!</div>
                 <div class="scope">
                     <i class="fa-solid fa-circle-check"></i>We work as one team, supporting every role<br>
                     <i class="fa-solid fa-circle-check"></i>We keep care on track, one appointment at a time<br>
@@ -35,23 +34,21 @@
             <div class="card">
                 <div class="title">Welcome Back</div>
                 <div class="description">Sign in to your staff account</div>
-                <div class="error-box">
-                    <i class="fa-solid fa-circle-exclamation"></i>
-                    Invalid username or password. Please try again.
-                </div>
+                <div class="error-box"></div>
                 <div class="field">
                     <label>Staff ID / Username</label>
                     <input type="text" placeholder="Enter you staff ID / username">
                 </div>
                 <div class="field">
                     <label>Password</label>
-                    <input type="text" placeholder="Enter you password">
+                    <input class="password" type="password" placeholder="Enter you password">
+                    <i class="fa-regular fa-eye-slash" onclick="showPassword(this)"></i>
                 </div>
                 <div class="action">
                     <label class="remember"><input type="checkbox">Remember Me</label>
                     <a href="#" onclick="openModal('pwdModal')">Forgot Password?</a>
                 </div>
-                <button type="button" class="loginBtn">Sign in</button>
+                <button type="button" class="loginBtn" onclick="verifyInput(this)">Sign in</button>
             </div>
 
             <div class="policy">
@@ -80,10 +77,10 @@
 
             <div class="field">
                 <label>Email Address</label>
-                <input type="text" placeholder="example@csc.singaporehealth.sg">
+                <input type="email" placeholder="example@csc.singaporehealth.sg">
             </div>
 
-            <button onclick="showToast('Reset link send to your email!')">Send Reset Link</button>
+            <button onclick="verifyInput(this)&&showToast('Reset link send to your email!')&&closeModal(this)">Send Reset Link</button>
 
             <div class="description">Remember password?
                 <a href="#" onclick="closeModal(this)">Back to Login</a>

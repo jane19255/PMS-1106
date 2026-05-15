@@ -137,6 +137,22 @@ input:focus-visible {
   border: 1px solid #084fde;
 }
 
+.field:has(input.password) {
+  position: relative;
+}
+
+input.password {
+  padding-right: 40px;
+}
+
+input.password + i {
+    position: absolute;
+    top: 37px;
+    left: 400px;
+    color: var(--secondary);
+    cursor: pointer;
+}
+
 /* Modal */
 .modal {
   display: none;
