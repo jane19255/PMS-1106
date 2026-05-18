@@ -67,7 +67,7 @@ function showToast(msg) {
 }
 
 function verifyInput(button) {
-    const parentDiv = button.closest("div.modal");
+    const parentDiv = button.closest("div.card");
     const errorBox = parentDiv.querySelector('.error-box');
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -39,11 +39,11 @@
                 
                 <div class="field">
                     <label class="required">Staff ID / Username</label>
-                    <input type="text" placeholder="Enter you staff ID / username">
+                    <input type="text" placeholder="Enter you staff ID / username" required>
                 </div>
                 <div class="field">
                     <label class="required">Password</label>
-                    <input class="password" type="password" placeholder="Enter you password">
+                    <input class="password" type="password" placeholder="Enter you password" required>
                     <i class="fa-regular fa-eye-slash" onclick="showPassword(this)"></i>
                 </div>
                 <div class="action">
@@ -77,7 +77,7 @@
 
                 <div class="field">
                     <label class="required">Email Address</label>
-                    <input type="email" placeholder="example@csc.singaporehealth.sg">
+                    <input type="email" placeholder="example@csc.singaporehealth.sg" required>
                 </div>
 
                 <button onclick="verifyInput(this)&&showToast('Reset link send to your email!')&&closeModal(this)&&clearInput(this)">Send
