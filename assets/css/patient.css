@@ -1,0 +1,142 @@
+@import url("HeaderFooter.css");
+@import url("general.css");
+
+#totalPatients .icon {
+    background-color: rgb(from var(--primary-focus) r g b / 10%);
+    color: var(--primary-focus);
+}
+
+#newPatients .icon,
+#visitsTab .upcoming .card .top .date {
+    background-color: rgb(from var(--success) r g b / 10%);
+    color: var(--success);
+}
+
+#activePatients .icon {
+    background-color: rgb(from var(--success) r g b / 10%);
+    color: var(--success);
+}
+
+#inactivePatients .icon,
+#visitsTab .past .card .top .date {
+    background-color: rgb(from var(--secondary) r g b / 10%);
+    color: var(--secondary);
+}
+
+.modal .tab-section {
+    display: flex;
+}
+
+.modal .tab-section .tab {
+    flex: 1;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    padding: 10px 0;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    color: var(--secondary);
+}
+
+.modal .tab-section .tab.selected {
+    border-bottom: 2px solid var(--primary-focus);
+    color: var(--primary-focus);
+}
+
+.modal .tab-content {
+    display: none;
+    max-height: 450px;
+    overflow: auto;
+    padding: 16px;
+}
+
+.modal .tab-content.show {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#detailsModal .tab-content .card {
+    padding: 12px;
+}
+
+#patientsTab .card div:first-child {
+    color: var(--secondary);
+    font-size: 12px;
+    font-weight: 550;
+    margin-bottom: 8px;
+}
+
+#patientsTab .card div.row {
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+#patientsTab .card div.row span:first-child {
+    font-weight: 500;
+}
+
+#visitsTab .title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}   
+
+#visitsTab .upcoming .card {
+    border-left: 4px solid var(--success);
+}
+
+#visitsTab .past .card {
+    border-left: 4px solid var(--secondary);
+}
+
+#visitsTab .card:hover {
+    cursor: pointer;
+    background: #f0f4f9;
+}
+
+#visitsTab .upcoming .title,
+#visitsTab .upcoming .navigation {
+    color: var(--success);
+}
+
+#visitsTab .past .title {
+    color: var(--secondary);
+}
+
+#visitsTab .card .top {
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+#visitsTab .card .top .date {
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 400;
+    border-radius: 4px;
+}
+
+#visitsTab .card .summary {
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+#visitsTab .card .navigation,
+#visitsTab .card .navigation:hover {
+    font-size: 12px;
+    font-weight: 400;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    text-decoration: none;
+}
+
+#visitsTab .card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}

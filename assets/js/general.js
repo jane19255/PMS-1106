@@ -1,21 +1,59 @@
+// Header and Footer
+document.addEventListener('DOMContentLoaded', function () {
+
+    fetch('header.html')
+        .then(r => r.text())
+        .then(html => {
+            const h = document.getElementById('header-placeholder');
+            if (h) h.innerHTML = html;
+
+            const pageTitle = document.title.split(" - ")[0].trim();
+            const navLinks = document.querySelectorAll(".mega-menu a");
+
+            navLinks.forEach(link => {
+                const linkText = link.textContent.trim();
+                if (linkText === pageTitle) {
+                    link.classList.add("selected");
+                }
+            });
+        });
+
+    fetch('footer.html')
+        .then(r => r.text())
+        .then(html => {
+            const f = document.getElementById('footer-placeholder');
+            if (f) f.innerHTML = html;
+        });
+
+    // Calendar disable future date
+    const today = new Date().toLocaleDateString('en-CA');
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+
+    dateInputs.forEach(input => {
+        input.setAttribute('max', today); 
+    });
+});
+
+function burgerMenu() {
+    const menu = document.querySelector(".mega-menu");
+    const btn = document.getElementById("menuBtn")
+    const icon = btn.classList.contains("fa-bars");
+
+    menu.classList.toggle("show");
+    btn.classList.toggle("fa-xmark", icon);
+    btn.classList.toggle("fa-bars", !icon);
+}
+
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
     modal.style.display = "flex";
+    document.documentElement.classList.add("no-scroll");
 }
 
 function closeModal(button) {
     const modal = button.closest('.modal');
     modal.style.display = "none";
-
-    const inputs = modal.querySelectorAll('input, textarea, select');
-    inputs.forEach(input => {
-        if (input.type === 'checkbox' || input.type === 'radio') {
-            input.checked = false; 
-        } else {
-            input.value = '';   
-        }
-    });
-
+    document.documentElement.classList.remove("no-scroll");
     return true;
 }
 
@@ -29,18 +67,26 @@ function showToast(msg) {
 }
 
 function verifyInput(button) {
-    const parentDiv = button.closest("div");
-    const inputs = parentDiv.querySelectorAll("input");
+    const parentDiv = button.closest("div.modal");
     const errorBox = parentDiv.querySelector('.error-box');
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const sgPhoneRegex = /^[89]\d{7}$/; // Starts with 8/9, 8 mumber
 
     let hasEmpty = false;
     let hasInvalidEmail = false;
+    let hasInvalidPhone = false;
 
     errorBox.style.display = 'none';
+    errorBox.innerHTML = '';
 
-    inputs.forEach(input => {
-        const value = input.value.trim();
+    const requiredInputs = parentDiv.querySelectorAll('input[required], textarea[required], select[required]');
+
+    requiredInputs.forEach(input => {
+        let value = input.value.trim();
+        if (input.type === 'tel') {
+            value = value.replace(/\s+/g, '');
+        }
 
         if (value === '') {
             hasEmpty = true;
@@ -51,11 +97,22 @@ function verifyInput(button) {
                 hasInvalidEmail = true;
             }
         }
+
+        if (input.type === 'tel' && value !== '') {
+            if (!sgPhoneRegex.test(value)) {
+                hasInvalidPhone = true;
+            }
+        }
     });
 
-    errorBox.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i>'
+    errorBox.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> ';
+
     if (hasEmpty) {
         errorBox.innerHTML += 'Please fill in all empty fields.';
+        errorBox.style.display = 'flex';
+        return false;
+    } else if (hasInvalidPhone) {
+        errorBox.innerHTML += 'Invalid phone number. Please try again.';
         errorBox.style.display = 'flex';
         return false;
     } else if (hasInvalidEmail) {
@@ -63,15 +120,31 @@ function verifyInput(button) {
         errorBox.style.display = 'flex';
         return false;
     }
+
     return true;
 }
 
 function showPassword(button) {
     const input = button.closest(".field").querySelector("input");
     const isPassword = input.type === "password";
-    
+
     input.type = isPassword ? "text" : "password";
 
     button.classList.toggle("fa-eye", isPassword);
     button.classList.toggle("fa-eye-slash", !isPassword);
+}
+
+function clearInput(button) {
+    const modal = button.closest('.modal');
+    const inputs = modal.querySelectorAll('input, textarea, select');
+
+    inputs.forEach(input => {
+        if (input.type === 'checkbox' || input.type === 'radio') {
+            input.checked = false;
+        } else if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
+        } else {
+            input.value = '';
+        }
+    });
 }
