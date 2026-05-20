@@ -62,17 +62,17 @@
 
         <div class="control card">
             <div class="search">
-                <input type="text" placeholder="Search patient ID / name">
+                <input type="text" placeholder="Search patient ID / name" id="searchInput" oninput="refreshPatientList()">
                 <i class="fa-solid fa-magnifying-glass"></i>
             </div>
             <button class="secondary filter" onclick="openModal('filterModal')"><i
                     class="fa-solid fa-filter"></i>Filter</button>
             <div class="custom-select">
-                <select>
-                    <option>Sort by Latest Registered</option>
-                    <option>Sort by Oldest Registered</option>
-                    <option>Sort by Name A-Z</option>
-                    <option>Sort by Name Z-A</option>
+                <select id="sortBy" onchange="refreshPatientList()">
+                    <option value="id">Patient ID</option>
+                    <option value="name">Name</option>
+                    <option value="dob">Date of Birth</option>
+                    <option value="status">Status</option>
                 </select>
             </div>
         </div>
@@ -84,249 +84,37 @@
                         <th>Patient ID</th>
                         <th>Full Name</th>
                         <th>Gender</th>
-                        <th>Age</th>
-                        <th>Registered Date</th>
+                        <th>Date of Birth</th>
+                        <th>Phone</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr>
-                        <td>PAT-001</td>
-                        <td>Off Jumpol</td>
-                        <td>Male</td>
-                        <td>24</td>
-                        <td>07 March 2026</td>
-                        <td><span class="status inactive">Inactive</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info" onclick="openModal('detailsModal')"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square" onclick="openModal('editPatientModal')"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-002</td>
-                        <td>Gun Atthaphan</td>
-                        <td>Female</td>
-                        <td>25</td>
-                        <td>19 August 2025</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-003</td>
-                        <td>Junior Panuwat</td>
-                        <td>Male</td>
-                        <td>22</td>
-                        <td>02 June 2025</td>
-                        <td><span class="status inactive">Inactive</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-004</td>
-                        <td>Mark Siwat</td>
-                        <td>Female</td>
-                        <td>23</td>
-                        <td>11 November 2025</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-005</td>
-                        <td>William Jakrapatr</td>
-                        <td>Male</td>
-                        <td>21</td>
-                        <td>13 May 2026</td>
-                        <td><span class="status inactive">Inactive</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-006</td>
-                        <td>Est Werawat</td>
-                        <td>Female</td>
-                        <td>20</td>
-                        <td>27 September 2025</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-008</td>
-                        <td>Sea Tawinan</td>
-                        <td>Female</td>
-                        <td>22</td>
-                        <td>30 April 2026</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-009</td>
-                        <td>Keng Harit</td>
-                        <td>Male</td>
-                        <td>23</td>
-                        <td>15 July 2025</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-010</td>
-                        <td>Namping Napasatkron</td>
-                        <td>Female</td>
-                        <td>21</td>
-                        <td>22 February 2026</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-011</td>
-                        <td>Tle Thanapon</td>
-                        <td>Male</td>
-                        <td>24</td>
-                        <td>09 October 2025</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-012</td>
-                        <td>Firstone Kanaphan</td>
-                        <td>Female</td>
-                        <td>20</td>
-                        <td>17 December 2025</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-013</td>
-                        <td>Auau Thanaphum</td>
-                        <td>Male</td>
-                        <td>25</td>
-                        <td>03 March 2026</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>PAT-014</td>
-                        <td>Save Worapong</td>
-                        <td>Male</td>
-                        <td>22</td>
-                        <td>26 August 2025</td>
-                        <td><span class="status active">Active</span></td>
-                        <td class="action">
-                            <div class="has-tooltip">
-                                <i class="view fa-solid fa-circle-info"></i>
-                                <span class="tooltip-text">View Details</span>
-                            </div>
-                            <div class="has-tooltip">
-                                <i class="edit fa-solid fa-pen-to-square"></i>
-                                <span class="tooltip-text">Edit Details</span>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
+                <tbody id="patientTableBody"></tbody>
             </table>
+
+            <div class="pagination">
+                <p id="pageInfo"></p>
+                <div>
+                    <div class="rowsPage">
+                        <span>Rows per page:</span>
+                        <select id="rowsPerPageSelect" onchange="pagination.changeRowsPerPage(this.value)">
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+
+                    <div class="controls">
+                        <button class="secondary" id="prevBtn" onclick="pagination.prev()"><i
+                                class="fa fa-chevron-left"></i></button>
+                        <span>Page:</span>
+                        <select id="pageSelect" onchange="pagination.goToPage(this.value)"></select>
+                        <button class="secondary" id="nextBtn" onclick="pagination.next()"><i
+                                class="fa fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="filterModal" class="modal">
@@ -338,10 +126,10 @@
                     <div class="field">
                         <label>Gender</label>
                         <div class="custom-select">
-                            <select>
-                                <option value="allGender">All Gender</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
+                            <select id="filter-gender">
+                                <option value="">All Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
                             </select>
                         </div>
                     </div>
@@ -349,10 +137,10 @@
                     <div class="field">
                         <label>Status</label>
                         <div class="custom-select">
-                            <select>
-                                <option value="allStatus">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
+                            <select id="filter-status">
+                                <option value="">All Status</option>
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
                             </select>
                         </div>
                     </div>
@@ -360,7 +148,7 @@
 
                 <div class="button-section">
                     <button class="secondary" onclick="clearInput(this)">Reset</button>
-                    <button onclick="closeModal(this)">Apply Filter</button>
+                    <button onclick="refreshPatientList(); closeModal(this); showToast('Filter applied!')">Apply Filter</button>
                 </div>
             </div>
         </div>
@@ -408,7 +196,7 @@
                         <div class="field">
                             <label class="required">Nationality</label>
                             <div class="custom-select">
-                                <select id="nationalityDropdown" required></select>
+                                <select id="add-nationality" required></select>
                             </div>
                         </div>
 
@@ -472,7 +260,7 @@
 
         <div id="detailsModal" class="modal">
             <div class="modal-box card">
-                <div class="top-title">Patient Details (PAT-001)</div>
+                <div class="top-title">Patient Details</div>
                 <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
 
                 <div class="tab-section">
@@ -486,24 +274,31 @@
                         <div>PATIENT INFORMATION</div>
                         <div class="row">
                             <span>Patient ID:</span>
-                            <span class="pid">PAT-001</span>
+                            <span id="view-pid"></span>
                         </div>
                         <div class="row">
                             <span>Full Name:</span>
-                            <span class="fullname">Off Jumpol</span>
+                            <span id="view-fullname"></span>
                         </div>
                         <div class="row">
                             <span>Gender:</span>
-                            <span class="gender">Male</span>
+                            <span id="view-gender"></span>
                         </div>
                         <div class="row">
                             <span>Date of Birth:</span>
-                            <span class="dob">24 September 1995</span>
+                            <span id="view-dob"></span>
+                        </div>
+                        <div class="row">
+                            <span>NRIC:</span>
+                            <span id="view-nric"></span>
+                        </div>
+                        <div class="row">
+                            <span>Nationality:</span>
+                            <span id="view-nationality"></span>
                         </div>
                         <div class="row">
                             <span>Status:</span>
-                            <span class="status inactive">Inactive</span> 
-                            (Never visit more than 6 months)
+                            <span id="view-status"></span>
                         </div>
                     </div>
 
@@ -511,15 +306,19 @@
                         <div>CONTACT INFORMATION</div>
                         <div class="row">
                             <span>Phone:</span>
-                            <span class="phone">+65 9123 4567</span>
+                            <span id="view-phone"></span>
                         </div>
                         <div class="row">
                             <span>Email:</span>
-                            <span class="email">off988@gmail.com</span>
+                            <span id="view-email"></span>
                         </div>
                         <div class="row">
                             <span>Address:</span>
-                            <span class="address">Blk 106, Punggol St 21, 456789</span>
+                            <span id="view-address"></span>
+                        </div>
+                        <div class="row">
+                            <span>Emergency Contact:</span>
+                            <span id="view-emergency"></span>
                         </div>
                     </div>
 
@@ -527,15 +326,15 @@
                         <div>MEDICAL INFORMATION</div>
                         <div class="row">
                             <span>Known Allergies:</span>
-                            <span class="phone">N.A.</span>
+                            <span id="view-allergies"></span>
                         </div>
                         <div class="row">
                             <span>Current Medications:</span>
-                            <span class="email">Metformin 500mg, Aspirin</span>
+                            <span id="view-medications"></span>
                         </div>
                         <div class="row">
                             <span>Existing Medical Conditions:</span>
-                            <span class="address">High blood pressure</span>
+                            <span id="view-conditions"></span>
                         </div>
                     </div>
 
@@ -544,60 +343,12 @@
                 <div id="visitsTab" class="tab-content">
                     <div class="upcoming">
                         <div class="title">Upcoming Visits</div>
-                        <div class="card-content">
-                            <div class="card" onclick="(window.location.href='Appointments.html')">
-                                <div class="top">
-                                    <div class="purpose">Surgery</div>
-                                    <div class="date">23 Sep 2026</div>
-                                </div>
-                                <div class="summary">Remove liver</div>
-                                <div class="navigation"><i class="fa-solid fa-calendar-check"></i>Go to Appointment
-                                </div>
-                            </div>
-
-                            <div class="card" onclick="(window.location.href='Appointments.html')">
-                                <div class="top">
-                                    <div class="purpose">Follow-up Consultation</div>
-                                    <div class="date">12 Aug 2026</div>
-                                </div>
-                                <div class="summary">Hypertension follow-up</div>
-                                <div class="navigation"><i class="fa-solid fa-calendar-check"></i>Go to Appointment
-                                </div>
-                            </div>
-                        </div>
+                        <div class="card-content" id="view-upcoming-visits"></div>
                     </div>
 
                     <div class="past">
                         <div class="title">Past Visits</div>
-                        <div class="card-content">
-
-                            <div class="card" onclick="(window.location.href='Medical-Records.html')">
-                                <div class="top">
-                                    <div class="purpose">Consultation</div>
-                                    <div class="date">07 May 2026</div>
-                                </div>
-                                <div class="summary">Hypertension follow-up</div>
-                                <div class="navigation"><i class="fa-solid fa-file-medical"></i>View Record</div>
-                            </div>
-
-                            <div class="card" onclick="(window.location.href='Medical-Records.html')">
-                                <div class="top">
-                                    <div class="purpose">Health Checkup</div>
-                                    <div class="date">15 April 2026</div>
-                                </div>
-                                <div class="summary">Full body screening</div>
-                                <div class="navigation"><i class="fa-solid fa-file-medical"></i>View Record</div>
-                            </div>
-
-                            <div class="card" onclick="(window.location.href='Medical-Records.html')">
-                                <div class="top">
-                                    <div class="purpose">Minor surgery</div>
-                                    <div class="date">07 Mar 2026</div>
-                                </div>
-                                <div class="summary">Skin lesion removal</div>
-                                <div class="navigation"><i class="fa-solid fa-file-medical"></i>View Record</div>
-                            </div>
-                        </div>
+                        <div class="card-content" id="view-past-visits"></div>
                     </div>
                 </div>
 
@@ -615,27 +366,28 @@
                 <div class="modal-content">
 
                     <div class="error-box"></div>
+                    <input type="hidden" id="edit-index">
 
                     <div class="row-section">
                         <div class="field">
                             <label class="required">First Name</label>
-                            <input type="text" placeholder="First Name" value="Off" required>
+                            <input type="text" id="edit-firstName" placeholder="First Name" required>
                         </div>
 
                         <div class="field">
                             <label class="required">Last Name</label>
-                            <input type="text" placeholder="Last Name" value="Jumpol" required>
+                            <input type="text" id="edit-lastName" placeholder="Last Name" required>
                         </div>
 
                         <div class="field">
                             <label class="required">Date of Birth</label>
-                            <input type="date" value="2018-07-22" required>
+                            <input type="date" id="edit-dob" required>
                         </div>
 
                         <div class="field">
                             <label class="required">Gender</label>
                             <div class="custom-select">
-                                <select required>
+                                <select id="edit-gender" required>
                                     <option value="male">Male</option>
                                     <option value="female">Female</option>
                                 </select>
@@ -644,64 +396,63 @@
 
                         <div class="field">
                             <label class="required">NRIC/FIN/Passport Number</label>
-                            <input type="text" placeholder="SXXXXXXXF" value="S1234562F" required>
+                            <input type="text" id="edit-nric" placeholder="SXXXXXXXF" required>
                         </div>
 
                         <div class="field">
                             <label class="required">Nationality</label>
                             <div class="custom-select">
-                                <select id="nationalityDropdown" required>
-                                    <option>Singapore</option>
-                                </select>
+                                <select id="edit-nationality" required></select>
                             </div>
                         </div>
 
                         <div class="field">
                             <label class="required">Phone Number</label>
-                            <input type="tel" maxlength="8" placeholder="e.g. 9123 4567"
-                                oninput="this.value = this.value.replace(/[^\d]/g, '')" value="91234567" required>
+                            <input type="tel" id="edit-phone" maxlength="8" placeholder="e.g. 9123 4567"
+                                oninput="this.value = this.value.replace(/[^\d]/g, '')" required>
                         </div>
 
                         <div class="field">
                             <label class="required">Email Address</label>
-                            <input type="email" placeholder="example@csc.singaporehealth.sg" value="off987@gmail.com" required>
+                            <input type="email" id="edit-email" placeholder="example@csc.singaporehealth.sg" required>
                         </div>
 
                         <div class="field">
                             <label>Emergency Contact</label>
-                            <input type="text" placeholder="Name" value="Gun">
+                            <input type="text" id="edit-emergencyName" placeholder="Name">
                         </div>
 
                         <div class="field">
                             <label style="color: white;">.</label>
-                            <input type="tel" maxlength="8" placeholder="e.g. 9123 4567"
-                                oninput="this.value = this.value.replace(/[^\d]/g, '')" value="93456789">
+                            <input type="tel" id="edit-emergencyPhone" maxlength="8" placeholder="e.g. 9123 4567"
+                                oninput="this.value = this.value.replace(/[^\d]/g, '')">
                         </div>
                     </div>
 
                     <div class="field">
                         <label>Home Address</label>
-                        <textarea type="textarea" rows="4"
-                            placeholder="Enter street, block, unit, and postal code">Blk 106, Punggol St 21, 123456</textarea>
+                        <textarea id="edit-address" rows="4"
+                            placeholder="Enter street, block, unit, and postal code"></textarea>
                     </div>
 
                     <div class="field">
                         <label>Known Allergies</label>
-                        <textarea type="textarea" rows="1"
-                            placeholder="e.g. Drug, food, or material allergies like latex">N.A.</textarea>
+                        <textarea id="edit-allergies" rows="1"
+                            placeholder="e.g. Drug, food, or material allergies like latex"></textarea>
                     </div>
 
                     <div class="field">
                         <label>Current Medications</label>
-                        <textarea type="textarea" rows="1"
-                            placeholder="e.g. Metformin 500mg, Aspirin, supplements">Metformin 500mg, Aspirin</textarea>
+                        <textarea id="edit-medications" rows="1"
+                            placeholder="e.g. Metformin 500mg, Aspirin, supplements"></textarea>
                     </div>
 
                     <div class="field">
                         <label>Existing Medical Conditions</label>
-                        <textarea type="textarea" rows="1"
-                            placeholder="e.g., Diabetes, Hypertension, Pregnancy status">High blood pressure</textarea>
+                        <textarea id="edit-conditions" rows="1"
+                            placeholder="e.g., Diabetes, Hypertension, Pregnancy status"></textarea>
                     </div>
+
                 </div>
 
                 <div class="button-section">

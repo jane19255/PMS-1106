@@ -24,14 +24,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const f = document.getElementById('footer-placeholder');
             if (f) f.innerHTML = html;
         });
-
-    // Calendar disable future date
-    const today = new Date().toLocaleDateString('en-CA');
-    const dateInputs = document.querySelectorAll('input[type="date"]');
-
-    dateInputs.forEach(input => {
-        input.setAttribute('max', today); 
-    });
 });
 
 function burgerMenu() {
@@ -147,4 +139,120 @@ function clearInput(button) {
             input.value = '';
         }
     });
+}
+
+function openTab(button, target) {
+    const targetTab = document.getElementById(target);
+    const selectedButton = document.querySelector(".tab-section .tab.selected");
+    const tabs = document.querySelectorAll(".tab-content");
+
+    selectedButton.classList.remove("selected");
+    tabs.forEach(tab => {
+        tab.classList.remove("show");
+    });
+
+    button.classList.add("selected");
+    targetTab.classList.add("show");
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+
+    return new Date(dateString).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+}
+
+class Pagination {
+    constructor(config) {
+        this.data = config.data || [];
+        this.rowsPerPage = parseInt(config.rowsPerPage || 5);
+        this.currentPage = 1;
+        this.renderRow = config.renderRow;
+        this.tbodyId = config.tbodyId;
+        this.pageInfoId = config.pageInfoId;
+        this.pageSelectId = config.pageSelectId;
+        this.prevBtnId = config.prevBtnId;
+        this.nextBtnId = config.nextBtnId;
+    }
+
+    get totalPages() {
+        return Math.ceil(this.data.length / this.rowsPerPage);
+    }
+
+    get paginatedData() {
+        const start = (this.currentPage - 1) * this.rowsPerPage;
+        const end = start + this.rowsPerPage;
+        return this.data.slice(start, end);
+    }
+
+    renderTable() {
+        const tbody = document.getElementById(this.tbodyId);
+        tbody.innerHTML = '';
+        this.paginatedData.forEach((item, idx) => {
+            tbody.innerHTML += this.renderRow(item, idx);
+        });
+        this.updateAll();
+    }
+
+    updateAll() {
+        this.updatePaginationUI();
+        this.toggleButtons();
+        this.updateInfo();
+    }
+
+    updatePaginationUI() {
+        const select = document.getElementById(this.pageSelectId);
+        select.innerHTML = '';
+        for (let i = 1; i <= this.totalPages; i++) {
+            const opt = document.createElement("option");
+            opt.value = i;
+            opt.textContent = `${i} of ${this.totalPages}`;
+            select.appendChild(opt);
+        }
+        select.value = this.currentPage;
+    }
+
+    toggleButtons() {
+        const prevBtn = document.getElementById(this.prevBtnId);
+        const nextBtn = document.getElementById(this.nextBtnId);
+
+        prevBtn.disabled = this.currentPage === 1;
+        nextBtn.disabled = this.currentPage === this.totalPages;
+    }
+
+    updateInfo() {
+        const start = (this.currentPage - 1) * this.rowsPerPage + 1;
+        const end = Math.min(this.currentPage * this.rowsPerPage, this.data.length);
+        document.getElementById(this.pageInfoId).innerText = `Showing ${start} - ${end} of ${this.data.length}`;
+    }
+
+    goToPage(page) {
+        this.currentPage = parseInt(page);
+        this.renderTable();
+    }
+
+    prev() {
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.renderTable();
+        }
+        this.toggleButtons();
+    }
+
+    next() {
+        if (this.currentPage < this.totalPages) {
+            this.currentPage++;
+            this.renderTable();
+        }
+        this.toggleButtons();
+    }
+
+    changeRowsPerPage(value) {
+        this.rowsPerPage = parseInt(value);
+        this.currentPage = 1;
+        this.renderTable();
+    }
 }
