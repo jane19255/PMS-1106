@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+
+{% block title %}Medical Report{% endblock title %}
+
+{% block content %}
+<section class="card report-card">
+    <h1>Medical Report</h1>
+    <p>Generated: {{ report.generated_at }}</p>
+    <p>Invoice: {{ report.invoice.id }}</p>
+    <p>Patient ID: {{ report.invoice.patient_id }}</p>
+    <p>Status: {{ report.invoice.status }}</p>
+
+    <h2>Billable Items</h2>
+    <ul>
+        {% for item in report.invoice.items %}
+        <li>{{ item.item_type }}: {{ item.name }} - ${{ item.cost }}</li>
+        {% endfor %}
+    </ul>
+
+    <p>Total: ${{ report.invoice.total }}</p>
+
+    <button type="button" onclick="window.print()">Print Report</button>
+    <p><a href="/billing/invoices/{{ report.invoice.id }}">Back to Invoice</a></p>
+</section>
+{% endblock content %}

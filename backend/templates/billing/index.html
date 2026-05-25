@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+
+{% block title %}Billing{% endblock title %}
+
+{% block content %}
+<h1>Billing</h1>
+
+<form class="card" action="/billing/invoices" method="post">
+    <input type="text" name="patient_id" placeholder="Patient ID">
+    <input type="text" name="appointment_id" placeholder="Appointment ID">
+    <input type="text" name="treatment_name" placeholder="Treatment name">
+    <input type="number" name="treatment_cost" placeholder="Treatment cost" min="0" step="0.01">
+    <input type="text" name="prescription_name" placeholder="Prescription name">
+    <input type="number" name="prescription_cost" placeholder="Prescription cost" min="0" step="0.01">
+    <button type="submit">Create Invoice</button>
+</form>
+
+<h2>Invoices</h2>
+
+{% if invoices | length == 0 %}
+<p>No invoices created yet.</p>
+{% endif %}
+
+{% for invoice in invoices %}
+<section class="card invoice-card">
+    <h3><a href="/billing/invoices/{{ invoice.id }}">{{ invoice.id }}</a></h3>
+    <p>Patient ID: {{ invoice.patient_id }}</p>
+    <p>Total: ${{ invoice.total }}</p>
+    <p>Status: {{ invoice.status }}</p>
+</section>
+{% endfor %}
+{% endblock content %}

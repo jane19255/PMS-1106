@@ -10,11 +10,11 @@
     <div class="container">
         <h1>Patient Management</h1>
 
-        <div class="card">
+        <form class="card" id="patientForm">
             <input type="text" id="name" placeholder="Patient Name">
             <input type="text" id="age" placeholder="Age">
-            <button onclick="savePatient()">Add Patient</button>
-        </div>
+            <button type="submit">Add Patient</button>
+        </form>
 
         <div id="patientList"></div>
     </div>
@@ -23,7 +23,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 
     <script src="../assets/js/firebase-config.js"></script>
-    <script src="../assets/js/FirebaseService.js"></script>
+    <script src="../../backend/FirebaseService.js"></script>
     <script src="../assets/js/patients.js"></script>
 </body>
 
