@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block title %}Invoice{% endblock title %}
+
+{% block content %}
+<h1>Invoice {{ invoice.id }}</h1>
+
+<section class="card invoice-card">
+    <p>Patient ID: {{ invoice.patient_id }}</p>
+    {% if invoice.appointment_id %}
+    <p>Appointment ID: {{ invoice.appointment_id }}</p>
+    {% endif %}
+    <p>Created: {{ invoice.created_at }}</p>
+    <p>Status: {{ invoice.status }}</p>
+
+    <h2>Items</h2>
+    <ul>
+        {% for item in invoice.items %}
+        <li>{{ item.item_type }}: {{ item.name }} - ${{ item.cost }}</li>
+        {% endfor %}
+    </ul>
+
+    <p>Subtotal: ${{ invoice.subtotal }}</p>
+    <p>Total: ${{ invoice.total }}</p>
+
+    {% if invoice.status != "Paid" %}
+    <form action="/billing/invoices/{{ invoice.id }}/pay" method="post">
+        <button type="submit">Mark as Paid</button>
+    </form>
+    {% endif %}
+
+    <p><a href="/billing/invoices/{{ invoice.id }}/report">View Medical Report</a></p>
+    <p><a href="/billing">Back to Billing</a></p>
+</section>
+{% endblock content %}

@@ -1,11 +1,11 @@
 body {
-    font-family: Arial;
+    font-family: Arial, sans-serif;
     padding: 30px;
     background: #f5f5f5;
 }
 
 .container {
-    max-width: 600px;
+    max-width: 760px;
     margin: auto;
 }
 
@@ -17,6 +17,7 @@ body {
 }
 
 input {
+    box-sizing: border-box;
     padding: 8px;
     width: 100%;
     margin: 5px 0;
@@ -30,6 +31,26 @@ button {
     border-radius: 4px;
 }
 
-#patientList {
-    margin-top: 20px;
+a {
+    color: #0277bd;
+}
+
+.invoice-card h3 {
+    margin-top: 0;
+}
+
+@media print {
+    body {
+        background: white;
+        padding: 0;
+    }
+
+    button,
+    a {
+        display: none;
+    }
+
+    .container {
+        max-width: none;
+    }
 }
