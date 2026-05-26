@@ -1,476 +1,645 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
+  <head>
     <title>Patients</title>
-    <link rel="stylesheet" href="../assets/css/patient.css">
+    <link rel="stylesheet" href="/assets/css/patient.css" />
     <script src="https://kit.fontawesome.com/4897704fad.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-    <script src="../assets/js/firebase-config.js"></script>
-    <script src="../assets/js/FirebaseService.js"></script>
-    <script src="../assets/js/general.js"></script>
-    <script src="../assets/js/patients.js"></script>
-</head>
 
-<body>
+    <script>
+      const firebaseConfig = {
+        apiKey: "{{ firebase_api_key }}",
+        authDomain: "{{ firebase_project_id }}.firebaseapp.com",
+        projectId: "{{ firebase_project_id }}",
+        storageBucket: "{{ firebase_project_id }}.appspot.com",
+      };
+      firebase.initializeApp(firebaseConfig);
+    </script>
 
-    <div id="header-placeholder"></div>
+    <script src="/assets/js/FirebaseService.js"></script>
+    <script src="/assets/js/general.js"></script>
+    <script src="/assets/js/patients.js"></script>
+  </head>
 
+  <body>
+    {% include "header.html" %}
     <main>
-        <div class="page-title">
-            <div>
-                <div class="title">Patient Management</div>
-                <div class="description">Register and manage all patient records & consultation visits</div>
-            </div>
-            <button onclick="openModal('addPatientModal')"><i class="fa-solid fa-plus"></i>Register New Patient</button>
+      <div class="page-title">
+        <div>
+          <div class="title">Patient Management</div>
+          <div class="description">
+            Register and manage all patient records & consultation visits
+          </div>
+        </div>
+        <button onclick="openModal('addPatientModal')">
+          <i class="fa-solid fa-plus"></i>Register New Patient
+        </button>
+      </div>
+
+      <div class="display">
+        <div class="card" id="totalPatients">
+          <div class="details">
+            <div class="data">Total Patients</div>
+            <div class="number">48</div>
+          </div>
+          <div class="icon"><i class="fa-solid fa-users"></i></div>
         </div>
 
-        <div class="display">
-            <div class="card" id="totalPatients">
-                <div class="details">
-                    <div class="data">Total Patients</div>
-                    <div class="number">48</div>
-                </div>
-                <div class="icon"><i class="fa-solid fa-users"></i></div>
-            </div>
-
-            <div class="card" id="newPatients">
-                <div class="details">
-                    <div class="data">New This Month</div>
-                    <div class="number">12</div>
-                </div>
-                <div class="icon"><i class="fa-solid fa-user-plus"></i></div>
-            </div>
-
-            <div class="card" id="activePatients">
-                <div class="details">
-                    <div class="data">Active</div>
-                    <div class="number">42</div>
-                </div>
-                <div class="icon"><i class="fa-solid fa-check"></i></div>
-            </div>
-
-            <div class="card" id="inactivePatients">
-                <div class="details">
-                    <div class="data">Inactive</div>
-                    <div class="number">6</div>
-                </div>
-                <div class="icon"><i class="fa-solid fa-user-slash"></i></div>
-            </div>
+        <div class="card" id="newPatients">
+          <div class="details">
+            <div class="data">New This Month</div>
+            <div class="number">12</div>
+          </div>
+          <div class="icon"><i class="fa-solid fa-user-plus"></i></div>
         </div>
 
-        <div class="control card">
-            <div class="search">
-                <input type="text" placeholder="Search patient ID / name" id="searchInput" oninput="refreshPatientList()">
-                <i class="fa-solid fa-magnifying-glass"></i>
+        <div class="card" id="activePatients">
+          <div class="details">
+            <div class="data">Active</div>
+            <div class="number">42</div>
+          </div>
+          <div class="icon"><i class="fa-solid fa-check"></i></div>
+        </div>
+
+        <div class="card" id="inactivePatients">
+          <div class="details">
+            <div class="data">Inactive</div>
+            <div class="number">6</div>
+          </div>
+          <div class="icon"><i class="fa-solid fa-user-slash"></i></div>
+        </div>
+      </div>
+
+      <div class="control card">
+        <div class="search">
+          <input
+            type="text"
+            placeholder="Search patient ID / name"
+            id="searchInput"
+            oninput="refreshPatientList()"
+          />
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </div>
+        <button class="secondary filter" onclick="openModal('filterModal')">
+          <i class="fa-solid fa-filter"></i>Filter
+        </button>
+        <div class="custom-select">
+          <select id="sortBy" onchange="refreshPatientList()">
+            <option value="id">Patient ID</option>
+            <option value="name">Name</option>
+            <option value="dob">Date of Birth</option>
+            <option value="status">Status</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-list">
+        <table>
+          <thead>
+            <tr>
+              <th>Patient ID</th>
+              <th>Full Name</th>
+              <th>Gender</th>
+              <th>Date of Birth</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="patientTableBody"></tbody>
+        </table>
+
+        <div class="pagination">
+          <p id="pageInfo"></p>
+          <div>
+            <div class="rowsPage">
+              <span>Rows per page:</span>
+              <select
+                id="rowsPerPageSelect"
+                onchange="pagination.changeRowsPerPage(this.value)"
+              >
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+              </select>
             </div>
-            <button class="secondary filter" onclick="openModal('filterModal')"><i
-                    class="fa-solid fa-filter"></i>Filter</button>
-            <div class="custom-select">
-                <select id="sortBy" onchange="refreshPatientList()">
-                    <option value="id">Patient ID</option>
-                    <option value="name">Name</option>
-                    <option value="dob">Date of Birth</option>
-                    <option value="status">Status</option>
+
+            <div class="controls">
+              <button
+                class="secondary"
+                id="prevBtn"
+                onclick="pagination.prev()"
+              >
+                <i class="fa fa-chevron-left"></i>
+              </button>
+              <span>Page:</span>
+              <select
+                id="pageSelect"
+                onchange="pagination.goToPage(this.value)"
+              ></select>
+              <button
+                class="secondary"
+                id="nextBtn"
+                onclick="pagination.next()"
+              >
+                <i class="fa fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="filterModal" class="modal">
+        <div class="modal-box card">
+          <div class="top-title">Filter Patients</div>
+          <div class="close" onclick="closeModal(this)">
+            <i class="fa-solid fa-xmark"></i>
+          </div>
+
+          <div class="modal-content">
+            <div class="field">
+              <label>Gender</label>
+              <div class="custom-select">
+                <select id="filter-gender">
+                  <option value="">All Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
                 </select>
+              </div>
             </div>
-        </div>
 
-        <div class="table-list">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Patient ID</th>
-                        <th>Full Name</th>
-                        <th>Gender</th>
-                        <th>Date of Birth</th>
-                        <th>Phone</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="patientTableBody"></tbody>
-            </table>
-
-            <div class="pagination">
-                <p id="pageInfo"></p>
-                <div>
-                    <div class="rowsPage">
-                        <span>Rows per page:</span>
-                        <select id="rowsPerPageSelect" onchange="pagination.changeRowsPerPage(this.value)">
-                            <option value="3">3</option>
-                            <option value="5">5</option>
-                            <option value="10">10</option>
-                        </select>
-                    </div>
-
-                    <div class="controls">
-                        <button class="secondary" id="prevBtn" onclick="pagination.prev()"><i
-                                class="fa fa-chevron-left"></i></button>
-                        <span>Page:</span>
-                        <select id="pageSelect" onchange="pagination.goToPage(this.value)"></select>
-                        <button class="secondary" id="nextBtn" onclick="pagination.next()"><i
-                                class="fa fa-chevron-right"></i></button>
-                    </div>
-                </div>
+            <div class="field">
+              <label>Status</label>
+              <div class="custom-select">
+                <select id="filter-status">
+                  <option value="">All Status</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
             </div>
+          </div>
+
+          <div class="button-section">
+            <button class="secondary" onclick="clearInput(this)">Reset</button>
+            <button
+              onclick="
+                refreshPatientList();
+                closeModal(this);
+                showToast('Filter applied!');
+              "
+            >
+              Apply Filter
+            </button>
+          </div>
         </div>
+      </div>
 
-        <div id="filterModal" class="modal">
-            <div class="modal-box card">
-                <div class="top-title">Filter Patients</div>
-                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+      <div id="addPatientModal" class="modal">
+        <div class="modal-box card">
+          <div class="top-title">Register New Patient</div>
+          <div class="close" onclick="closeModal(this)">
+            <i class="fa-solid fa-xmark"></i>
+          </div>
 
-                <div class="modal-content">
-                    <div class="field">
-                        <label>Gender</label>
-                        <div class="custom-select">
-                            <select id="filter-gender">
-                                <option value="">All Gender</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                            </select>
-                        </div>
-                    </div>
+          <div class="modal-content">
+            <div class="error-box"></div>
 
-                    <div class="field">
-                        <label>Status</label>
-                        <div class="custom-select">
-                            <select id="filter-status">
-                                <option value="">All Status</option>
-                                <option value="Active">Active</option>
-                                <option value="Inactive">Inactive</option>
-                            </select>
-                        </div>
-                    </div>
+            <div class="row-section">
+              <div class="field">
+                <label class="required">First Name</label>
+                <input
+                  type="text"
+                  id="reg-firstname"
+                  placeholder="First Name"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label class="required">Last Name</label>
+                <input
+                  type="text"
+                  id="reg-lastname"
+                  placeholder="Last Name"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label class="required">Date of Birth</label>
+                <input type="date" id="reg-dob" required />
+              </div>
+
+              <div class="field">
+                <label class="required">Gender</label>
+                <div class="custom-select">
+                  <select id="reg-gender" required>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
                 </div>
+              </div>
 
-                <div class="button-section">
-                    <button class="secondary" onclick="clearInput(this)">Reset</button>
-                    <button onclick="refreshPatientList(); closeModal(this); showToast('Filter applied!')">Apply Filter</button>
+              <div class="field">
+                <label class="required">NRIC/FIN/Passport Number</label>
+                <input
+                  type="text"
+                  id="reg-nric"
+                  placeholder="SXXXXXXXF"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label class="required">Nationality</label>
+                <div class="custom-select">
+                  <select id="add-nationality" required></select>
                 </div>
+              </div>
+
+              <div class="field">
+                <label class="required">Phone Number</label>
+                <input
+                  type="tel"
+                  id="reg-phone"
+                  maxlength="8"
+                  placeholder="e.g. 9123 4567"
+                  oninput="this.value = this.value.replace(/[^\d]/g, '')"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label class="required">Email Address</label>
+                <input
+                  type="email"
+                  id="reg-email"
+                  placeholder="example@csc.singaporehealth.sg"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label>Emergency Contact</label>
+                <input type="text" id="reg-emergencyname" placeholder="Name" />
+              </div>
+
+              <div class="field">
+                <label style="color: white">.</label>
+                <input
+                  type="tel"
+                  id="reg-emergencyphone"
+                  maxlength="8"
+                  placeholder="e.g. 9123 4567"
+                  oninput="this.value = this.value.replace(/[^\d]/g, '')"
+                />
+              </div>
             </div>
-        </div>
 
-        <div id="addPatientModal" class="modal">
-            <div class="modal-box card">
-                <div class="top-title">Register New Patient</div>
-                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
-
-                <div class="modal-content">
-
-                    <div class="error-box"></div>
-
-                    <div class="row-section">
-                        <div class="field">
-                            <label class="required">First Name</label>
-                            <input type="text" placeholder="First Name" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Last Name</label>
-                            <input type="text" placeholder="Last Name" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Date of Birth</label>
-                            <input type="date" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Gender</label>
-                            <div class="custom-select">
-                                <select required>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">NRIC/FIN/Passport Number</label>
-                            <input type="text" placeholder="SXXXXXXXF" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Nationality</label>
-                            <div class="custom-select">
-                                <select id="add-nationality" required></select>
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Phone Number</label>
-                            <input type="tel" maxlength="8" placeholder="e.g. 9123 4567"
-                                oninput="this.value = this.value.replace(/[^\d]/g, '')" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Email Address</label>
-                            <input type="email" placeholder="example@csc.singaporehealth.sg" required>
-                        </div>
-
-                        <div class="field">
-                            <label>Emergency Contact</label>
-                            <input type="text" placeholder="Name">
-                        </div>
-
-                        <div class="field">
-                            <label style="color: white;">.</label>
-                            <input type="tel" maxlength="8" placeholder="e.g. 9123 4567"
-                                oninput="this.value = this.value.replace(/[^\d]/g, '')">
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label>Home Address</label>
-                        <textarea type="textarea" rows="4"
-                            placeholder="Enter street, block, unit, and postal code"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Known Allergies</label>
-                        <textarea type="textarea" rows="1"
-                            placeholder="e.g. Drug, food, or material allergies like latex"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Current Medications</label>
-                        <textarea type="textarea" rows="1"
-                            placeholder="e.g. Metformin 500mg, Aspirin, supplements"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Existing Medical Conditions</label>
-                        <textarea type="textarea" rows="1"
-                            placeholder="e.g., Diabetes, Hypertension, Pregnancy status"></textarea>
-                    </div>
-                </div>
-
-                <div class="button-section">
-                    <button class="secondary" onclick="clearInput(this)">Reset</button>
-                    <button class="secondary" onclick="closeModal(this)&&clearInput(this)">Cancel</button>
-                    <button
-                        onclick="verifyInput(this)&&showToast('New patient added!')&&closeModal(this)&&clearInput(this)"><i
-                            class="fas fa-save"></i>Save New Patient</button>
-                </div>
+            <div class="field">
+              <label>Home Address</label>
+              <textarea
+                id="reg-address"
+                rows="4"
+                placeholder="Enter street, block, unit, and postal code"
+              ></textarea>
             </div>
-        </div>
 
-        <div id="detailsModal" class="modal">
-            <div class="modal-box card">
-                <div class="top-title">Patient Details</div>
-                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
-
-                <div class="tab-section">
-                    <div class="tab selected" onclick="openTab(this, 'patientsTab')">Patients Details</div>
-                    <div class="tab" onclick="openTab(this, 'visitsTab')">Visits</div>
-                </div>
-
-                <div id="patientsTab" class="tab-content show">
-
-                    <div class="personal-info card">
-                        <div>PATIENT INFORMATION</div>
-                        <div class="row">
-                            <span>Patient ID:</span>
-                            <span id="view-pid"></span>
-                        </div>
-                        <div class="row">
-                            <span>Full Name:</span>
-                            <span id="view-fullname"></span>
-                        </div>
-                        <div class="row">
-                            <span>Gender:</span>
-                            <span id="view-gender"></span>
-                        </div>
-                        <div class="row">
-                            <span>Date of Birth:</span>
-                            <span id="view-dob"></span>
-                        </div>
-                        <div class="row">
-                            <span>NRIC:</span>
-                            <span id="view-nric"></span>
-                        </div>
-                        <div class="row">
-                            <span>Nationality:</span>
-                            <span id="view-nationality"></span>
-                        </div>
-                        <div class="row">
-                            <span>Status:</span>
-                            <span id="view-status"></span>
-                        </div>
-                    </div>
-
-                    <div class="contact-info card">
-                        <div>CONTACT INFORMATION</div>
-                        <div class="row">
-                            <span>Phone:</span>
-                            <span id="view-phone"></span>
-                        </div>
-                        <div class="row">
-                            <span>Email:</span>
-                            <span id="view-email"></span>
-                        </div>
-                        <div class="row">
-                            <span>Address:</span>
-                            <span id="view-address"></span>
-                        </div>
-                        <div class="row">
-                            <span>Emergency Contact:</span>
-                            <span id="view-emergency"></span>
-                        </div>
-                    </div>
-
-                    <div class="medical-info card">
-                        <div>MEDICAL INFORMATION</div>
-                        <div class="row">
-                            <span>Known Allergies:</span>
-                            <span id="view-allergies"></span>
-                        </div>
-                        <div class="row">
-                            <span>Current Medications:</span>
-                            <span id="view-medications"></span>
-                        </div>
-                        <div class="row">
-                            <span>Existing Medical Conditions:</span>
-                            <span id="view-conditions"></span>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div id="visitsTab" class="tab-content">
-                    <div class="upcoming">
-                        <div class="title">Upcoming Visits</div>
-                        <div class="card-content" id="view-upcoming-visits"></div>
-                    </div>
-
-                    <div class="past">
-                        <div class="title">Past Visits</div>
-                        <div class="card-content" id="view-past-visits"></div>
-                    </div>
-                </div>
-
-                <div class="button-section">
-                    <button onclick="closeModal(this)">Close</button>
-                </div>
+            <div class="field">
+              <label>Known Allergies</label>
+              <textarea
+                id="reg-allergies"
+                rows="1"
+                placeholder="e.g. Drug, food, or material allergies like latex"
+              ></textarea>
             </div>
-        </div>
 
-        <div id="editPatientModal" class="modal">
-            <div class="modal-box card">
-                <div class="top-title">Edit Patient Information</div>
-                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
-
-                <div class="modal-content">
-
-                    <div class="error-box"></div>
-                    <input type="hidden" id="edit-index">
-
-                    <div class="row-section">
-                        <div class="field">
-                            <label class="required">First Name</label>
-                            <input type="text" id="edit-firstName" placeholder="First Name" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Last Name</label>
-                            <input type="text" id="edit-lastName" placeholder="Last Name" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Date of Birth</label>
-                            <input type="date" id="edit-dob" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Gender</label>
-                            <div class="custom-select">
-                                <select id="edit-gender" required>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">NRIC/FIN/Passport Number</label>
-                            <input type="text" id="edit-nric" placeholder="SXXXXXXXF" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Nationality</label>
-                            <div class="custom-select">
-                                <select id="edit-nationality" required></select>
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Phone Number</label>
-                            <input type="tel" id="edit-phone" maxlength="8" placeholder="e.g. 9123 4567"
-                                oninput="this.value = this.value.replace(/[^\d]/g, '')" required>
-                        </div>
-
-                        <div class="field">
-                            <label class="required">Email Address</label>
-                            <input type="email" id="edit-email" placeholder="example@csc.singaporehealth.sg" required>
-                        </div>
-
-                        <div class="field">
-                            <label>Emergency Contact</label>
-                            <input type="text" id="edit-emergencyName" placeholder="Name">
-                        </div>
-
-                        <div class="field">
-                            <label style="color: white;">.</label>
-                            <input type="tel" id="edit-emergencyPhone" maxlength="8" placeholder="e.g. 9123 4567"
-                                oninput="this.value = this.value.replace(/[^\d]/g, '')">
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label>Home Address</label>
-                        <textarea id="edit-address" rows="4"
-                            placeholder="Enter street, block, unit, and postal code"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Known Allergies</label>
-                        <textarea id="edit-allergies" rows="1"
-                            placeholder="e.g. Drug, food, or material allergies like latex"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Current Medications</label>
-                        <textarea id="edit-medications" rows="1"
-                            placeholder="e.g. Metformin 500mg, Aspirin, supplements"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Existing Medical Conditions</label>
-                        <textarea id="edit-conditions" rows="1"
-                            placeholder="e.g., Diabetes, Hypertension, Pregnancy status"></textarea>
-                    </div>
-
-                </div>
-
-                <div class="button-section">
-                    <button class="secondary" onclick="clearInput(this)">Reset</button>
-                    <button class="secondary" onclick="closeModal(this)">Cancel</button>
-                    <button onclick="verifyInput(this)&&showToast('Changes saved!')&&closeModal(this)"><i
-                            class="fas fa-save"></i>Save Changes</button>
-                </div>
+            <div class="field">
+              <label>Current Medications</label>
+              <textarea
+                id="reg-medications"
+                rows="1"
+                placeholder="e.g. Metformin 500mg, Aspirin, supplements"
+              ></textarea>
             </div>
+
+            <div class="field">
+              <label>Existing Medical Conditions</label>
+              <textarea
+                id="reg-conditions"
+                rows="1"
+                placeholder="e.g., Diabetes, Hypertension, Pregnancy status"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="button-section">
+            <button class="secondary" onclick="clearInput(this)">Reset</button>
+            <button
+              class="secondary"
+              onclick="closeModal(this) && clearInput(this)"
+            >
+              Cancel
+            </button>
+
+            <button type="button" onclick="submitNewPatient(this)">
+              <i class="fas fa-save"></i>Save New Patient
+            </button>
+          </div>
         </div>
+      </div>
 
-        <!-- Toast -->
-        <div class="toast card" id="toast"></div>
+      <div id="detailsModal" class="modal">
+        <div class="modal-box card">
+          <div class="top-title">Patient Details</div>
+          <div class="close" onclick="closeModal(this)">
+            <i class="fa-solid fa-xmark"></i>
+          </div>
 
+          <div class="tab-section">
+            <div class="tab selected" onclick="openTab(this, 'patientsTab')">
+              Patients Details
+            </div>
+            <div class="tab" onclick="openTab(this, 'visitsTab')">Visits</div>
+          </div>
+
+          <div id="patientsTab" class="tab-content show">
+            <div class="personal-info card">
+              <div>PATIENT INFORMATION</div>
+              <div class="row">
+                <span>Patient ID:</span>
+                <span id="view-pid"></span>
+              </div>
+              <div class="row">
+                <span>Full Name:</span>
+                <span id="view-fullname"></span>
+              </div>
+              <div class="row">
+                <span>Gender:</span>
+                <span id="view-gender"></span>
+              </div>
+              <div class="row">
+                <span>Date of Birth:</span>
+                <span id="view-dob"></span>
+              </div>
+              <div class="row">
+                <span>NRIC:</span>
+                <span id="view-nric"></span>
+              </div>
+              <div class="row">
+                <span>Nationality:</span>
+                <span id="view-nationality"></span>
+              </div>
+              <div class="row">
+                <span>Status:</span>
+                <span id="view-status"></span>
+              </div>
+            </div>
+
+            <div class="contact-info card">
+              <div>CONTACT INFORMATION</div>
+              <div class="row">
+                <span>Phone:</span>
+                <span id="view-phone"></span>
+              </div>
+              <div class="row">
+                <span>Email:</span>
+                <span id="view-email"></span>
+              </div>
+              <div class="row">
+                <span>Address:</span>
+                <span id="view-address"></span>
+              </div>
+              <div class="row">
+                <span>Emergency Contact:</span>
+                <span id="view-emergency"></span>
+              </div>
+            </div>
+
+            <div class="medical-info card">
+              <div>MEDICAL INFORMATION</div>
+              <div class="row">
+                <span>Known Allergies:</span>
+                <span id="view-allergies"></span>
+              </div>
+              <div class="row">
+                <span>Current Medications:</span>
+                <span id="view-medications"></span>
+              </div>
+              <div class="row">
+                <span>Existing Medical Conditions:</span>
+                <span id="view-conditions"></span>
+              </div>
+            </div>
+          </div>
+
+          <div id="visitsTab" class="tab-content">
+            <div class="upcoming">
+              <div class="title">Upcoming Visits</div>
+              <div class="card-content" id="view-upcoming-visits"></div>
+            </div>
+
+            <div class="past">
+              <div class="title">Past Visits</div>
+              <div class="card-content" id="view-past-visits"></div>
+            </div>
+          </div>
+
+          <div class="button-section">
+            <button onclick="closeModal(this)">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="editPatientModal" class="modal">
+        <div class="modal-box card">
+          <div class="top-title">Edit Patient Information</div>
+          <div class="close" onclick="closeModal(this)">
+            <i class="fa-solid fa-xmark"></i>
+          </div>
+
+          <div class="modal-content">
+            <div class="error-box"></div>
+            <input type="hidden" id="edit-index" />
+
+            <div class="row-section">
+              <div class="field">
+                <label class="required">First Name</label>
+                <input
+                  type="text"
+                  id="edit-firstName"
+                  placeholder="First Name"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label class="required">Last Name</label>
+                <input
+                  type="text"
+                  id="edit-lastName"
+                  placeholder="Last Name"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label class="required">Date of Birth</label>
+                <input type="date" id="edit-dob" required />
+              </div>
+              <div class="field">
+                <label class="required">Gender</label>
+                <div class="custom-select">
+                  <select id="edit-gender" required>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label class="required">NRIC/FIN/Passport Number</label>
+                <input
+                  type="text"
+                  id="edit-nric"
+                  placeholder="SXXXXXXXF"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label class="required">Nationality</label>
+                <div class="custom-select">
+                  <select id="edit-nationality" required></select>
+                </div>
+              </div>
+              <div class="field">
+                <label class="required">Phone Number</label>
+                <input
+                  type="tel"
+                  id="edit-phone"
+                  maxlength="8"
+                  placeholder="e.g. 9123 4567"
+                  oninput="this.value = this.value.replace(/[^\d]/g, '')"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label class="required">Email Address</label>
+                <input
+                  type="email"
+                  id="edit-email"
+                  placeholder="example@csc.singaporehealth.sg"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label>Emergency Contact</label>
+                <input type="text" id="edit-emergencyName" placeholder="Name" />
+              </div>
+              <div class="field">
+                <label style="color: white">.</label>
+                <input
+                  type="tel"
+                  id="edit-emergencyPhone"
+                  maxlength="8"
+                  placeholder="e.g. 9123 4567"
+                  oninput="this.value = this.value.replace(/[^\d]/g, '')"
+                />
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Home Address</label>
+              <textarea
+                id="edit-address"
+                rows="4"
+                placeholder="Enter street, block, unit, and postal code"
+              ></textarea>
+            </div>
+
+            <div class="field">
+              <label>Known Allergies</label>
+              <textarea
+                id="edit-allergies"
+                rows="1"
+                placeholder="e.g. Drug, food, or material allergies like latex"
+              ></textarea>
+            </div>
+
+            <div class="field">
+              <label>Current Medications</label>
+              <textarea
+                id="edit-medications"
+                rows="1"
+                placeholder="e.g. Metformin 500mg, Aspirin, supplements"
+              ></textarea>
+            </div>
+
+            <div class="field">
+              <label>Existing Medical Conditions</label>
+              <textarea
+                id="edit-conditions"
+                rows="1"
+                placeholder="e.g., Diabetes, Hypertension, Pregnancy status"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="button-section">
+            <button class="secondary" onclick="clearInput(this)">Reset</button>
+            <button class="secondary" onclick="closeModal(this)">Cancel</button>
+            <button class="btn-primary" onclick="saveEditedPatient(this)">
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast card" id="toast"></div>
+      <script>
+        document.addEventListener("DOMContentLoaded", function () {
+          const nationalities = [
+            "Singapore",
+            "Malaysia",
+            "Indonesia",
+            "Thailand",
+            "Philippines",
+            "Vietnam",
+            "China",
+            "India",
+            "Japan",
+            "South Korea",
+            "United States",
+            "United Kingdom",
+            "Australia",
+            "New Zealand",
+            "Others",
+          ];
+
+          const addSelect = document.getElementById("add-nationality");
+          const editSelect = document.getElementById("edit-nationality");
+
+          function populateDropdown(selectElement) {
+            if (!selectElement) return;
+
+            // Add a default blank option so it triggers the 'required' validation properly
+            selectElement.innerHTML =
+              '<option value="" disabled selected>Select Nationality</option>';
+
+            nationalities.forEach((nation) => {
+              const option = document.createElement("option");
+              option.value = nation;
+              option.textContent = nation;
+              selectElement.appendChild(option);
+            });
+          }
+
+          populateDropdown(addSelect);
+          populateDropdown(editSelect);
+        });
+      </script>
     </main>
 
-    <div id="footer-placeholder"></div>
-
-</body>
-
+    {% include "footer.html" %}
+  </body>
 </html>
