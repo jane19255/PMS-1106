@@ -42,6 +42,7 @@ async fn main() -> Result<(), std::io::Error> {
             }))
             .configure(handlers::auth::routes)
             .configure(handlers::patients::routes)
+            .configure(handlers::appointments::routes)
             
             // 🚨 THE ULTIMATE TRIPWIRE: Catch any 404 and print it to the terminal!
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
