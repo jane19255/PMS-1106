@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Billing</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Billing</h1>
+
+        <form class="card" id="invoiceForm">
+            <input type="text" id="patientId" placeholder="Patient ID">
+            <input type="text" id="treatmentName" placeholder="Treatment name">
+            <input type="number" id="treatmentCost" placeholder="Treatment cost" min="0" step="0.01">
+            <input type="text" id="prescriptionName" placeholder="Prescription name">
+            <input type="number" id="prescriptionCost" placeholder="Prescription cost" min="0" step="0.01">
+            <button type="submit">Create Invoice</button>
+        </form>
+
+        <div class="card report-card" id="reportCard">
+            <h2>Medical Report</h2>
+            <div id="reportContent">Create an invoice to generate a report.</div>
+            <button type="button" id="printReportButton">Print Report</button>
+        </div>
+
+        <h2>Invoices</h2>
+        <div id="invoiceList"></div>
+    </div>
+
+    <script src="../assets/js/billing.js"></script>
+</body>
+
+</html>

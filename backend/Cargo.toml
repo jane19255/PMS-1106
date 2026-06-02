@@ -10,3 +10,8 @@ chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 tera = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
+dotenv = "0.15"
+reqwest = { version = "0.11", features = ["json"] }
+firebase-auth = "0.5.1"
+serde_json = "1"
+urlencoding = "2"
