@@ -4,7 +4,7 @@ use serde_json::json;
 use tera::{Context, Tera};
 
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
-use crate::handlers::auth::{require_auth, require_auth_and_permission, AppAction};
+use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use crate::models::{Patient, PatientView, SupabasePatientRow, UpdatePatient};
 
 pub fn routes(cfg: &mut web::ServiceConfig) {
@@ -19,18 +19,33 @@ pub async fn patients_page(
     req: HttpRequest,
     tera: web::Data<Tera>,
     firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
-    let _uid = match require_auth(&req, &firebase_auth).await {
-        Ok(uid) => uid,
-        Err(redirect) => return redirect,
-    };
+    if let Err(rejection) = require_auth_and_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::ViewPatient,
+    )
+    .await
+    {
+        return rejection;
+    }
 
     let mut ctx = Context::new();
-    ctx.insert("firebase_api_key", &std::env::var("FIREBASE_API_KEY").unwrap_or_default());
-    ctx.insert("firebase_project_id", &std::env::var("FIREBASE_PROJECT_ID").unwrap_or_default());
+    ctx.insert(
+        "firebase_api_key",
+        &std::env::var("FIREBASE_API_KEY").unwrap_or_default(),
+    );
+    ctx.insert(
+        "firebase_project_id",
+        &std::env::var("FIREBASE_PROJECT_ID").unwrap_or_default(),
+    );
 
     match tera.render("Patients.html", &ctx) {
-        Ok(html) => HttpResponse::Ok().content_type("text/html; charset=utf-8").body(html),
+        Ok(html) => HttpResponse::Ok()
+            .content_type("text/html; charset=utf-8")
+            .body(html),
         Err(e) => {
             eprintln!("Template error: {e}");
             HttpResponse::InternalServerError().body("Template rendering failed")

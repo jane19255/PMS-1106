@@ -23,8 +23,7 @@ impl FirebaseRestDb {
     }
 
     pub async fn get_document(&self, collection: &str, doc_id: &str) -> Result<String, reqwest::Error> {
-        let url = format!("/{}/{}", collection, doc_id);
-        let url = format!("{}{}", self.base_url(), url);
+        let url = format!("{}/{}/{}", self.base_url(), collection, doc_id);
         let response = self.http_client.get(&url).send().await?;
         Ok(response.text().await?)
     }
@@ -75,15 +74,13 @@ impl SupabaseRestDb {
         let url = url.trim().trim_end_matches('/').to_string();
         let key = key.trim().to_string();
 
-        // Keep this masked debug line until Supabase is confirmed working.
-        // It helps catch the common case where .env still contains the placeholder,
-        // quotes, spaces, or a key from another Supabase project.
-        println!(
-            "Supabase config loaded: url={}, key_prefix={}, key_len={}",
-            url,
-            key.chars().take(18).collect::<String>(),
-            key.len()
-        );
+        if key.starts_with("sb_publishable_") {
+            eprintln!(
+                "Warning: SUPABASE_KEY is a publishable key. For this backend-only Supabase design, use a Supabase secret key in .env."
+            );
+        }
+
+        println!("Supabase config loaded successfully.");
 
         Self {
             url,
@@ -97,20 +94,10 @@ impl SupabaseRestDb {
     }
 
     fn authed(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        let builder = builder
+        builder
             .header("apikey", &self.key)
-            .header("Content-Type", "application/json");
-
-        // Legacy anon/service_role keys are JWTs, so send them as Bearer tokens.
-        // New sb_publishable_/sb_secret_ keys are opaque API keys. For Supabase REST,
-        // the gateway accepts the apikey header and can translate it internally.
-        // If Authorization is required by a local/self-hosted gateway, duplicating the
-        // same opaque key is also supported by Supabase gateway behavior.
-        if self.key.starts_with("sb_publishable_") || self.key.starts_with("sb_secret_") {
-            builder.header("Authorization", format!("Bearer {}", &self.key))
-        } else {
-            builder.header("Authorization", format!("Bearer {}", &self.key))
-        }
+            .header("Authorization", format!("Bearer {}", &self.key))
+            .header("Content-Type", "application/json")
     }
 
     async fn read_response(response: reqwest::Response) -> Result<String, String> {

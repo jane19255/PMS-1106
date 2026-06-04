@@ -1,0 +1,162 @@
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: white;
+    padding: 0 24px;
+    z-index: 2000; 
+    box-sizing: border-box;
+}
+
+.top-header {
+    display: flex;
+    justify-content: space-between;
+    height: 64px;
+    align-items: center;
+}
+
+.top-header .logo,
+.top-header .relative .profile {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.top-header .logo i {
+    font-size: 24px;
+    color: var(--primary-focus);
+}
+
+.top-header .logo .title {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--primary-focus);
+}
+
+.top-header .relative {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.top-header .relative .search-bar {
+    position: relative;
+}
+
+.top-header .relative .search-bar input {
+    padding-left: 36px;
+    border-radius: 50px;
+}
+
+.top-header .relative .search-bar i {
+    position: absolute;
+    top: 13px;
+    left: 12px;
+    color: var(--secondary);
+}
+
+.top-header .relative i.fa-bell {
+    font-size: 18px;
+}
+
+.top-header .relative .profile img {
+    height: 36px;
+    width: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.top-header .relative .profile .identity .name {
+    font-size: 14px;
+}
+
+.top-header .relative .profile .identity .roles {
+    font-size: 12px;
+    color: var(--secondary);
+}
+
+#menuBtn {
+    display: none;
+    cursor: pointer;
+    color: var(--primary-hover);
+}
+
+.mega-menu {
+    display: flex;
+    border-top: 1px solid rgb(241 245 249);
+}
+
+.mega-menu a {
+    padding: 12px 20px;
+    font-size: 16px;
+    text-decoration: none;
+    color: black;
+}
+
+.mega-menu a:hover {
+    background: #EFF6FF;
+    color: var(--primary-hover);
+}
+.mega-menu a.selected,
+.mega-menu a.selected:hover {
+    background: white;
+    color: var(--primary-focus);
+    border-bottom: 2px solid var(--primary-focus);
+}
+
+.mega-menu a.disable,
+.mega-menu a.disable:hover {
+    background: white;
+    color: var(--secondary);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.mega-menu a i {
+    margin-right: 4px;
+}
+
+footer {
+    padding: 16px 0;
+    text-align: center;
+    font-size: 14px;
+    color: var(--secondary);
+    background: white;
+}
+
+main {
+    flex: 1 0 auto;
+    padding: 110px 120px 24px;
+}
+
+@media only screen and (max-width: 1000px) {
+    nav {
+        flex-direction: column;
+    }
+
+    .mega-menu a.selected,
+    .mega-menu a.selected:hover {
+        border: none;
+    }
+
+    .mega-menu,
+    .top-header .search-bar,
+    .top-header .fa-bell {
+        display: none;
+    }
+
+    .mega-menu.show {
+        display: flex;
+    }
+
+    #menuBtn {
+        display: block;
+    }
+
+    main {
+        padding: 90px 0 24px;
+        margin: 0 auto;
+    }
+}

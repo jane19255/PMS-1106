@@ -1,6 +1,17 @@
-firebase-config.js
+# Environment / secrets
 .env
-pms.db
+.env.*
+!.env.example
+
+# Rust build output
 target/
+backend/target/
+
+# macOS junk
 .DS_Store
-.DS_Store
+**/.DS_Store
+__MACOSX/
+
+# Editor / logs
+.vscode/
+*.log
