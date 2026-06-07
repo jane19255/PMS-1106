@@ -1,2 +1,255 @@
 @import url("HeaderFooter.css");
 @import url("general.css");
+
+main {
+    padding-top: 150px;
+}
+
+#todayAppointments .icon,
+.badge-completed {
+    background-color: rgb(from var(--primary-hover) r g b / 10%);
+    color: var(--primary-hover);
+}
+
+#patientArrived .icon,
+.badge-ready {
+    background-color: rgb(from var(--success) r g b / 10%);
+    color: var(--success);
+}
+
+#pendingViral .icon,
+.badge-pendingvital {
+    background-color: rgb(from var(--warning) r g b / 10%);
+    color: var(--warning);
+}
+
+#noshow .icon,
+.badge-noshow {
+    background-color: rgb(from var(--danger) r g b / 10%);
+    color: var(--danger);
+}
+
+.tag-vacant,
+.tag-occupied {
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: var(--radius);
+}
+
+.tag-vacant {
+    background-color: rgb(from var(--primary) r g b / 10%);
+    color: var(--primary);
+}
+
+.tag-occupied {
+    background-color: rgb(from var(--success) r g b / 10%);
+    color: var(--success);
+}
+
+main>.card {
+    margin-bottom: 24px;
+}
+
+td .btn {
+    padding: 6px 6px 6px 10px;
+    border-radius: 6px;
+    border: none;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: center;
+    color: white;
+}
+
+button.btn-arrive,
+button.btn-arrive:hover {
+    background: var(--primary);
+}
+
+button.btn-vitals,
+button.btn-vitals:hover {
+    background: var(--warning);
+}
+
+button.btn-sendRoom,
+button.btn-sendRoom:hover {
+    background: var(--success);
+}
+
+button.btn.disabled,
+button.btn.disabled:hover {
+    background: var(--secondary);
+    opacity: 20%;
+    cursor: not-allowed;
+}
+
+.badge {
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-notarrive {
+    background-color: rgb(from var(--secondary) r g b / 10%);
+    color: var(--secondary);
+}
+
+/* Calendar */
+.flatpickr-calendar {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 0;
+    background: var(--light-bg);
+    box-shadow: none;
+    border-radius: var(--radius);
+}
+
+.dark .flatpickr-calendar {
+    background-color: rgb(from var(--primary) r g b / 5%);
+}
+
+.flatpickr-innerContainer,
+.flatpickr-rContainer,
+.flatpickr-days {
+    width: 100%;
+    display: block;
+}
+
+.flatpickr-months .flatpickr-prev-month svg,
+.flatpickr-months .flatpickr-next-month svg {
+    height: 20px;
+    width: 20px;
+}
+
+.dayContainer {
+    width: 100%;
+    min-width: 100%;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    place-items: center;
+}
+
+.flatpickr-weekdays {
+    margin: 8px 0;
+}
+
+span.flatpickr-weekday {
+    font-size: 14px;
+    color: var(--text);
+}
+
+.flatpickr-months .flatpickr-prev-month svg,
+.flatpickr-months .flatpickr-next-month svg {
+    fill: var(--text);
+}
+
+.flatpickr-months .flatpickr-prev-month:hover svg,
+.flatpickr-months .flatpickr-next-month:hover svg {
+    fill: var(--primary);
+}
+
+.flatpickr-day {
+    min-width: 80%;
+    height: 45px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+    border-radius: var(--radius);
+    border: none;
+    color: var(--text);
+}
+
+.flatpickr-day.today,
+.flatpickr-day.today:hover,
+.flatpickr-day.today:focus {
+    background-color: rgb(from var(--primary) r g b / 20%);
+    color: var(--text);
+}
+
+.flatpickr-day:hover,
+.flatpickr-day:focus,
+.flatpickr-day.nextMonthDay:hover,
+.flatpickr-day.prevMonthDay:hover,
+.flatpickr-day.prevMonthDay:focus,
+.flatpickr-day.nextMonthDay:focus {
+    background-color: rgb(from var(--secondary) r g b / 10%);
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover,
+.flatpickr-day.selected:focus {
+    background: var(--primary-hover);
+    color: white;
+}
+
+.flatpickr-months .flatpickr-month,
+.flatpickr-current-month {
+    height: 50px;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    margin-right: 20px;
+    padding: 8px;
+    border-radius: var(--radius);
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.numInputWrapper span {
+    left: 60px
+}
+
+.flatpickr-current-month input.cur-year {
+    padding: 8px;
+}
+
+.flatpickr-current-month .numInputWrapper {
+    border-radius: var(--radius);
+    color: var(--text)
+}
+
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    height: 40px;
+    border-radius: 50%;
+    padding: 10px 12px 10px 10px;
+    position: relative;
+    top: 8px;
+}
+
+.middle {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.middle .title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+#appBody td:nth-child(4) {
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+@media only screen and (max-width: 1000px) {
+    main {
+        padding: 40px;
+        padding-top: 90px;
+    }
+}
+
+@media only screen and (max-width: 1250px) {
+    .middle {
+        grid-template-columns: none;
+        grid-template-rows: 1fr;
+    }
+}

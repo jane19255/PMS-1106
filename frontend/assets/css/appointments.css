@@ -1,2 +1,248 @@
 @import url("HeaderFooter.css");
 @import url("general.css");
+
+#addNewPatientTab {
+    padding: 14px;
+    padding-bottom: 0;
+    margin-bottom: 20px;
+    background: var(--hover);
+    display: none;
+}
+
+#addNewPatientTab.show {
+    display: grid;
+}
+
+.field:has(select#patientsList) {
+    margin-bottom: 4px;
+}
+
+.stepper {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 24px;
+}
+
+.stepper .step-item {
+    text-align: center;
+    width: 90px;
+}
+
+.stepper .step-item .step-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background-color: rgb(from var(--primary) r g b / 10%);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    margin: auto;
+    margin-bottom: 8px;
+}
+
+.stepper .step-item.active .step-circle {
+    color: var(--primary-hover);
+    border: 1px solid var(--primary-focus);
+}
+
+.stepper .step-item.completed .step-circle {
+    background-color: var(--primary-focus);
+    color: white;
+}
+
+.stepper .step-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.step-content.card {
+    padding: 0;
+    border: none;
+    display: none;
+    box-shadow: none;
+}
+
+.step-content.active {
+    display: block;
+}
+
+.modal .custom-select select {
+    padding: 12px 12px 12px 40px;
+}
+
+.modal .custom-select i {
+    position: absolute;
+    top: 15px;
+    left: 12px;
+    color: var(--gray);
+}
+
+.timeslot .tab-content {
+    display: none;
+}
+
+.timeslot .tab-content.show {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.timeslot .slot {
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.timeslot .slot.selected {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.timeslot .slot.disable {
+    color: var(--border);
+    cursor: not-allowed;
+}
+
+#addAppointmentModal .title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+#aptSummary,
+#editAptSummary  {
+    margin-bottom: 20px;
+}
+
+.btn-back {
+    display: none;
+}
+
+#aptSummary div:first-child,
+#detailsModal .modal-content .card div:first-child,
+#editAptSummary div:first-child {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--secondary);
+    margin-bottom: 8px;
+}
+
+#addAppointmentModal #aptSummary span,
+#detailsModal .modal-content .card span,
+#editModal #editAptSummary span {
+    font-size: 14px;
+}
+
+#addAppointmentModal #aptSummary span:first-child,
+#detailsModal .modal-content .card span:first-child,
+#editModal #editAptSummary span:first-child {
+    font-weight: 500;
+}
+
+.modal-content {
+    padding: 16px 16px 0 16px;
+}
+
+#detailsModal .card {
+    margin-bottom: 16px;
+}
+
+.level {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+}
+
+.level > div {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.level >div.selected {
+    font-weight: 500;
+}
+
+#cancelledAppointments .icon,
+.priority.emergency,
+.level .emergency {
+    background-color: rgb(from var(--danger) r g b / 10%);
+    color: var(--danger);
+}
+
+.level .emergency:hover {
+    background-color: rgb(from var(--danger) r g b / 20%);
+}
+
+.level .emergency.selected {
+    border: 1px solid var(--danger);
+}
+
+.level .urgent,
+.priority.urgent  {
+    background-color: rgb(from var(--warning) r g b / 10%);
+    color: var(--warning);
+}
+
+.level .urgent:hover {
+    background-color: rgb(from var(--warning) r g b / 20%);
+}
+
+.level .urgent.selected {
+    border: 1px solid var(--warning);
+}
+
+#upcomingAppointments .icon,
+.priority.normal,
+.level .normal {
+    background-color: rgb(from var(--success) r g b / 10%);
+    color: var(--success);
+}
+
+.level .normal:hover {
+    background-color: rgb(from var(--success) r g b / 20%);
+}
+
+.level .normal.selected {
+    border: 1px solid var(--success);
+}
+
+#todayAppointments .icon,
+#completedAppointments .icon,
+.priority.followup,
+.level .follow-up {
+    background-color: rgb(from var(--primary) r g b / 10%);
+    color: var(--primary);
+}
+
+.level .follow-up:hover {
+    background-color: rgb(from var(--primary) r g b / 20%);
+}
+
+.level .follow-up.selected {
+    border: 1px solid var(--primary);
+}
+
+.priority {
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+@media only screen and (max-width: 1000px) {
+    main {
+        padding: 40px;
+        padding-top: 90px;
+    }
+}
