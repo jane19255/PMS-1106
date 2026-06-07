@@ -3,10 +3,11 @@ header {
     top: 0;
     left: 0;
     width: 100%;
-    background: white;
+    background: var(--card-bg);
     padding: 0 24px;
-    z-index: 2000; 
+    z-index: 2000;
     box-sizing: border-box;
+    border-bottom: 1px solid var(--border);
 }
 
 .top-header {
@@ -85,30 +86,35 @@ header {
 
 .mega-menu {
     display: flex;
-    border-top: 1px solid rgb(241 245 249);
+    border-top: 1px solid var(--card-bg);
 }
 
 .mega-menu a {
     padding: 12px 20px;
     font-size: 16px;
     text-decoration: none;
-    color: black;
+    color: var(--text);
 }
 
 .mega-menu a:hover {
-    background: #EFF6FF;
+    background: var(--hover);
     color: var(--primary-hover);
 }
+
+.dark .mega-menu a:hover {
+    color: white;
+}
+
 .mega-menu a.selected,
 .mega-menu a.selected:hover {
-    background: white;
+    background: var(--card-bg);
     color: var(--primary-focus);
     border-bottom: 2px solid var(--primary-focus);
 }
 
 .mega-menu a.disable,
 .mega-menu a.disable:hover {
-    background: white;
+    background: var(--card-bg);
     color: var(--secondary);
     cursor: not-allowed;
     pointer-events: none;
@@ -123,7 +129,7 @@ footer {
     text-align: center;
     font-size: 14px;
     color: var(--secondary);
-    background: white;
+    background: var(--card-bg);
 }
 
 main {

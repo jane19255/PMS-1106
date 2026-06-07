@@ -45,23 +45,38 @@ function openModal(modalId) {
 function closeModal(button) {
     const modal = button.closest('.modal');
     modal.style.display = "none";
+    modal.querySelectorAll('.error-box').forEach(box => {
+        box.style.display = 'none';
+    });
     document.documentElement.classList.remove("no-scroll");
     return true;
 }
 
-function showToast(msg) {
+function showToast(msg, status) {
     const toast = document.getElementById('toast');
-    toast.innerHTML = "<i class='fa-solid fa-check-circle'></i>" + msg;
+    if (status === "success") {
+        toast.innerHTML = "<i class='fa-solid fa-check-circle'></i>"
+    } else if (status === "warning") {
+        toast.innerHTML = "<i class='fa-solid fa-triangle-exclamation'></i>"
+    } else {
+        toast.innerHTML = "<i class='fa-solid fa-circle-exclamation'></i>"
+    }
+    toast.innerHTML += msg;
 
     toast.classList.add("show");
     setTimeout(() => { toast.classList.remove("show"); }, 3000);
     return true;
 }
 
-function verifyInput(button) {
-    const parentDiv = button.closest("div.card");
-    const errorBox = parentDiv.querySelector('.error-box');
+function verifyInput(ele) {
 
+    let parentDiv;
+    if (ele && ele.nodeType) {
+        parentDiv = ele.closest("div.card");
+    } else {
+        parentDiv = document.querySelector(ele);
+    }
+    const errorBox = parentDiv.querySelector('.error-box');
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const sgPhoneRegex = /^[89]\d{7}$/; // Starts with 8/9, 8 mumber
 

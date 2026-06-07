@@ -1,17 +1,29 @@
 :root {
     --primary: #1b65f8;
     --primary-hover: #084fde;
-    --primary-focus: #0749ce;
+    --primary-focus: #0941b0;
     --secondary: #64748b;
+    --gray: #64748B;
     --success: #22C55E;
     --warning: #F97316;
     --danger: #EF4444;
     --muted: #64748B;
     --light-bg: #eff6ffc7;
     --card-bg: #ffffff;
+    --text: #1f2937;
+    --hover:#e6eef8;
     --border: #dfdfdf;
     --radius: 12px;
     --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.dark {
+    --light-bg: #0f172a;
+    --card-bg: #1e293b;
+    --text: #f8fafc;
+    --hover:#334155;
+    --muted: #94a3b8;
+    --border: #334155;
 }
 
 * {
@@ -32,6 +44,7 @@ body {
     overflow: auto;
     display: flex;
     flex-direction: column;
+    color: var(--text);
 }
 
 .card {
@@ -73,8 +86,8 @@ button:not(.secondary):active {
 }
 
 button.secondary {
-    background: white;
-    color: black;
+    background: var(--card-bg);
+    color: var(--text);
     border: 1px solid var(--border);
 }
 
@@ -162,6 +175,21 @@ select {
     font-size: 14px;
     outline: none;
     text-overflow: ellipsis;
+    background: var(--card-bg);
+    color: var(--text);
+}
+
+.field:has(input[type="checkbox"]) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+input[type="checkbox"] {position: relative;top: 2px;}
+
+.field:has(input[type="checkbox"]) label {
+    margin-right: 8px;
 }
 
 input:focus,
@@ -194,7 +222,7 @@ input.password+i {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    padding-right: 28px;
+    padding-right: 30px;
     width: stretch;
 }
 
@@ -204,7 +232,7 @@ input.password+i {
     font-size: 12px;
     position: absolute;
     right: 12px;
-    top: 14px;
+    top: 16px;
     pointer-events: none;
 }
 
@@ -238,7 +266,7 @@ input.password+i {
 
 .modal-content .row-section {
     display: grid;
-    grid-template-columns: auto auto;
+    grid-template-columns: 1fr 1fr;
     column-gap: 16px;
 }
 
@@ -284,14 +312,15 @@ input.password+i {
 /* Toast */
 .toast {
     visibility: hidden;
-    min-width: 250px;
-    margin-left: -125px;
-    text-align: center;
+    min-width: fit-content;
     padding: 12px 16px;
     position: fixed;
     z-index: 2000;
-    left: 50%;
     top: 120px;
+    display: flex;
+    justify-self: center;
+    align-items: center;
+    gap: 8px;
     font-size: 14px;
     font-weight: 500;
     box-shadow: --var(--shadow);
@@ -304,8 +333,19 @@ input.password+i {
 }
 
 .toast i {
+    margin-top: 3px;
+}
+
+.toast i.fa-check-circle {
     color: var(--success);
-    margin-right: 8px;
+}
+
+.toast i.fa-triangle-exclamation {
+    color: var(--warning);
+}
+
+.toast i.fa-circle-exclamation {
+    color: var(--danger);
 }
 
 @-webkit-keyframes fadein {
@@ -447,7 +487,7 @@ input.password+i {
 .table-list {
     overflow: hidden;
     border-radius: var(--radius);
-    background: white;
+    background: var(--card-bg);
 }
 
 .table-list table {
@@ -480,7 +520,7 @@ input.password+i {
 }
 
 .table-list .action .view {
-    color: var(--primary-focus);
+    color: var(--primary-hover);
     cursor: pointer;
 }
 
@@ -539,6 +579,28 @@ span.status.active {
 span.status.inactive {
     background-color: rgb(from var(--secondary) r g b / 10%);
     color: var(--secondary);
+}
+
+/* Tab */
+.modal .tab-section {
+    display: flex;
+}
+
+.modal .tab-section .tab {
+    flex: 1;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    padding: 10px 0;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    color: var(--secondary);
+}
+
+.modal .tab-section .tab.selected {
+    border-bottom: 2px solid var(--primary-focus);
+    color: var(--primary-focus);
 }
 
 @media only screen and (max-width: 1000px) {

@@ -148,7 +148,7 @@
 
                 <div class="button-section">
                     <button class="secondary" onclick="clearInput(this)">Reset</button>
-                    <button onclick="refreshPatientList(); closeModal(this); showToast('Filter applied!')">Apply Filter</button>
+                    <button onclick="refreshPatientList(); closeModal(this); showToast('Filter applied!', 'success')">Apply Filter</button>
                 </div>
             </div>
         </div>
@@ -252,7 +252,7 @@
                     <button class="secondary" onclick="clearInput(this)">Reset</button>
                     <button class="secondary" onclick="closeModal(this)&&clearInput(this)">Cancel</button>
                     <button
-                        onclick="verifyInput(this)&&showToast('New patient added!')&&closeModal(this)&&clearInput(this)"><i
+                        onclick="verifyInput(this)&&showToast('New patient added!', 'success')&&closeModal(this)&&clearInput(this)"><i
                             class="fas fa-save"></i>Save New Patient</button>
                 </div>
             </div>
@@ -458,7 +458,7 @@
                 <div class="button-section">
                     <button class="secondary" onclick="clearInput(this)">Reset</button>
                     <button class="secondary" onclick="closeModal(this)">Cancel</button>
-                    <button onclick="verifyInput(this)&&showToast('Changes saved!')&&closeModal(this)"><i
+                    <button onclick="verifyInput(this)&&showToast('Changes saved!', 'success')&&closeModal(this)"><i
                             class="fas fa-save"></i>Save Changes</button>
                 </div>
             </div>
