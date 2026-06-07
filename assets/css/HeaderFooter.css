@@ -20,6 +20,7 @@ header {
 .top-header .logo,
 .top-header .relative .profile {
     display: flex;
+    padding: 4px 8px;
     gap: 8px;
     align-items: center;
 }
@@ -122,6 +123,85 @@ header {
 
 .mega-menu a i {
     margin-right: 4px;
+}
+
+/* Dropdown */
+.dropdown {
+    position: relative;
+    display: inline-block;
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: -20px;
+    z-index: 2500;
+    background-color: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    width: 220px;
+}
+
+.dropdown-item {
+    display: flex;
+    gap: 8px;
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-size: 16px;
+    color: var(--text);
+    transition: background-color 0.2s ease;
+}
+
+.dropdown-item i {
+    margin-top: 4px;
+}
+
+.dropdown-item.logout:hover {
+    color: var(--danger);
+}
+
+.dropdown-item:hover {
+    background: var(--hover);
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+/* Dark theme toggle button */
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background-color: var(--border);
+    border-radius: 24px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-left: auto;
+}
+
+.toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.toggle-switch.active {
+    background-color: var(--primary);
+}
+
+.toggle-switch.active::after {
+    transform: translateX(20px);
 }
 
 footer {

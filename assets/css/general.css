@@ -108,8 +108,8 @@ button:disabled {
     bottom: -25px;
     left: 50%;
     transform: translateX(-50%);
-    background: #1f2937;
-    color: white;
+    background: var(--text);
+    color: var(--light-bg);
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 12px;

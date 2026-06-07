@@ -16,6 +16,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     link.classList.add("selected");
                 }
             });
+
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            darkModeToggle.addEventListener('click', () => {
+                darkModeToggle.classList.toggle('active');
+                document.body.classList.toggle('dark');
+            });
         });
 
     fetch('footer.html')

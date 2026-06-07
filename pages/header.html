@@ -9,14 +9,29 @@
                 <input type="text" placeholder="Search patient, appointment, staff...">
                 <i class="fa-solid fa-magnifying-glass"></i>
             </div>
-            <i class="fa-solid fa-bell"></i>
-            <div class="profile">
-                <img src="https://i.mydramalist.com/kAOejw_5c.jpg">
-                <div class="identity">
-                    <div class="name">Jimmy Jitaraphol</div>
-                    <div class="roles">Doctor</div>
+            <div class="dropdown">
+                <div class="profile">
+                    <img src="https://i.mydramalist.com/kAOejw_5c.jpg">
+                    <div class="identity">
+                        <div class="name">Jimmy Jitaraphol</div>
+                        <div class="roles">Doctor</div>
+                    </div>
+                </div>
+
+                <div class="dropdown-content">
+                    <div class="dropdown-item">
+                        <i class="fa-regular fa-moon"></i>
+                        <span>Dark Theme</span>
+                        <div class="toggle-switch" id="darkModeToggle"></div>
+                    </div>
+                    <div class="dropdown-item logout">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                        <span>Logout</span>
+                    </div>
+
                 </div>
             </div>
+
 
             <i id="menuBtn" class="fa-solid fa-bars" onclick="burgerMenu()"></i>
         </div>

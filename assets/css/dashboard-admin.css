@@ -105,6 +105,10 @@ button.btn.disabled:hover {
     border-radius: var(--radius);
 }
 
+.dark .flatpickr-calendar {
+    background-color: rgb(from var(--primary) r g b / 5%);
+}
+
 .flatpickr-innerContainer,
 .flatpickr-rContainer,
 .flatpickr-days {
@@ -132,7 +136,17 @@ button.btn.disabled:hover {
 
 span.flatpickr-weekday {
     font-size: 14px;
-    color: var(--primary-focus);
+    color: var(--text);
+}
+
+.flatpickr-months .flatpickr-prev-month svg,
+.flatpickr-months .flatpickr-next-month svg {
+    fill: var(--text);
+}
+
+.flatpickr-months .flatpickr-prev-month:hover svg,
+.flatpickr-months .flatpickr-next-month:hover svg {
+    fill: var(--primary);
 }
 
 .flatpickr-day {
@@ -184,7 +198,7 @@ span.flatpickr-weekday {
 .flatpickr-current-month .flatpickr-monthDropdown-months {
     font-size: 16px;
     font-weight: 500;
-    color: var(--primary-focus);
+    color: var(--text);
 }
 
 .numInputWrapper span {
@@ -197,6 +211,7 @@ span.flatpickr-weekday {
 
 .flatpickr-current-month .numInputWrapper {
     border-radius: var(--radius);
+    color: var(--text)
 }
 
 .flatpickr-months .flatpickr-prev-month,

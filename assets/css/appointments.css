@@ -103,7 +103,6 @@
 
 .timeslot .slot.selected {
     background: var(--primary);
-    color: var(--card-bg);
     border-color: var(--primary);
 }
 
