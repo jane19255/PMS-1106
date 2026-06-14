@@ -40,12 +40,15 @@ pub enum AppAction {
     ManageMedicines,
 
     ManageUsers,
+
+    ManageDoctorAppt,
 }
 
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/login", web::get().to(login_page));
     cfg.route("/dashboard", web::get().to(dashboard_page));
-    cfg.route("/settings", web::get().to(settings_page));
+    cfg.route("/doctor-dashboard", web::get().to(doctorDashboard_page));
+    cfg.route("/staff", web::get().to(staffs_page));
     cfg.route("/appointments", web::get().to(appointments_page));
     cfg.route("/records", web::get().to(records_page));
     cfg.route("/session", web::post().to(create_session));
@@ -88,7 +91,24 @@ pub async fn dashboard_page(
     render_template(&tera, "dashboard.html")
 }
 
-pub async fn settings_page(
+// pub async fn settings_page(
+//     req: HttpRequest,
+//     tera: web::Data<Tera>,
+//     firebase_auth: web::Data<FirebaseAuth>,
+//     firestore_db: web::Data<FirebaseRestDb>,
+// ) -> impl Responder {
+//     render_protected_page(
+//         req,
+//         tera,
+//         firebase_auth,
+//         Some(firestore_db),
+//         "Settings.html",
+//         Some(AppAction::ManageUsers),
+//     )
+//     .await
+// }
+
+pub async fn doctorDashboard_page(
     req: HttpRequest,
     tera: web::Data<Tera>,
     firebase_auth: web::Data<FirebaseAuth>,
@@ -99,8 +119,8 @@ pub async fn settings_page(
         tera,
         firebase_auth,
         Some(firestore_db),
-        "Settings.html",
-        Some(AppAction::ManageUsers),
+        "Doctor-Dashboard.html",
+        Some(AppAction::ManageDoctorAppt),
     )
     .await
 }
@@ -135,6 +155,23 @@ pub async fn records_page(
         Some(firestore_db),
         "Medical-Records.html",
         Some(AppAction::ViewMedicalRecords),
+    )
+    .await
+}
+
+pub async fn staffs_page(
+    req: HttpRequest,
+    tera: web::Data<Tera>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    render_protected_page(
+        req,
+        tera,
+        firebase_auth,
+        Some(firestore_db),
+        "Staffs.html",
+        Some(AppAction::ManageUsers),
     )
     .await
 }

@@ -1,2 +1,170 @@
 @import url("HeaderFooter.css");
 @import url("general.css");
+
+
+#patientInfo {
+    display: grid;
+    grid-template-columns: 1fr 4fr;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+#patientInfo img {
+    height: 160px;
+    width: 160px;
+    border-radius: 50%;
+    margin: 0 auto;
+}
+
+#patientInfo .info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 32px;
+}
+
+.card .info-item p:last-child,
+.history-body p {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.card .info-item p:first-child,
+.history-body p:first-child {
+    font-size: 14px;
+    color: var(--secondary);
+}
+
+.card .title {
+    margin-bottom: 18px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+#vital-row,
+.hist-data {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+}
+
+#vital-row input {
+    background-color: rgb(from var(--secondary) r g b / 10%);
+}
+
+#treat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 20px;
+}
+
+.pres-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.custom-select select {
+    padding: 12px 12px 12px 40px;
+}
+
+.custom-select i {
+    position: absolute;
+    top: 15px;
+    left: 12px;
+    color: var(--gray);
+}
+
+input[type="checkbox"] {
+    top: 0;
+}
+
+#addPrescriptTab {
+    display: none;
+}
+
+#addPrescriptTab.show {
+    display: flex;
+    flex-direction: column;
+}
+
+#addPrescriptTab .title-btn {
+    display: flex;
+    justify-content: space-between;
+}
+
+#addPrescriptTab .title-btn p {
+    font-weight: 500;
+}
+
+#addPrescriptTab .title-btn button {
+    background: var(--success);
+}
+
+#saveRecBtn {
+    margin-left: auto;
+}
+
+#addMRtab {
+    margin-bottom: 24px;
+}
+
+#prevRecord .title i {
+    margin-right: 8px;
+    color: var(--primary);
+}
+
+.history-card {
+    border: 1px solid var(--border);
+    border-top-left-radius: var(--radius);
+    border-top-right-radius: var(--radius);
+    margin-bottom: 16px;
+}
+
+.history-card:last-child {
+    margin: 0;
+}
+
+.history-head {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    background-color: rgb(from var(--hover) r g b / 50%);
+}
+
+.history-head:hover {
+    background: var(--hover);
+}
+
+.history-head span {
+    font-weight: 500;
+}
+
+.history-head button {
+    padding: 5px 9px;
+    font-size: 12px;
+    margin-right: 8px;
+}
+
+.history-head span:last-child::before {
+    content: '|';
+    color: var(--text);
+    margin: 0 4px;
+}
+
+.hist-data {
+    grid-column: 1 / -1;
+}
+
+.history-body {
+    display: none;
+    padding: 18px;
+}
+
+.history-body.open {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}

@@ -1,0 +1,27 @@
+@import url("HeaderFooter.css");
+@import url("general.css");
+
+#detailsModal .modal-content {
+    padding: 16px 16px 0 16px;
+}
+
+#detailsModal .modal-content .card {
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+#detailsModal .modal-content .card div:first-child {
+    color: var(--secondary);
+    font-size: 12px;
+    font-weight: 550;
+    margin-bottom: 8px;
+}
+
+#detailsModal .card div.row {
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+#detailsModal .card div.row span:first-child {
+    font-weight: 500;
+}
