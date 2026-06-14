@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Patients</title>
-    <link rel="stylesheet" href="../assets/css/patient.css">
+    <title>Staffs</title>
+    <link rel="stylesheet" href="../assets/css/staffs.css">
     <script src="https://kit.fontawesome.com/4897704fad.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
     <script src="../assets/js/firebase-config.js"></script>
     <script src="../assets/js/FirebaseService.js"></script>
     <script src="../assets/js/general.js"></script>
-    <script src="../assets/js/patients.js"></script>
+    <script src="../assets/js/staffs.js"></script>
 </head>
 
 <body>
@@ -22,57 +22,22 @@
     <main>
         <div class="page-title">
             <div>
-                <div class="title">Patient Management</div>
-                <div class="description">Register and manage all patient records & consultation visits</div>
+                <div class="title">Staff Management</div>
+                <div class="description">Add and manage all clinic staff info</div>
             </div>
-            <button onclick="openModal('addPatientModal')"><i class="fa-solid fa-plus"></i>Register New Patient</button>
-        </div>
-
-        <div class="display">
-            <div class="card" id="totalPatients">
-                <div class="details">
-                    <div class="data">Total Patients</div>
-                    <div class="number">48</div>
-                </div>
-                <div class="icon"><i class="fa-solid fa-users"></i></div>
-            </div>
-
-            <div class="card" id="newPatients">
-                <div class="details">
-                    <div class="data">New This Month</div>
-                    <div class="number">12</div>
-                </div>
-                <div class="icon"><i class="fa-solid fa-user-plus"></i></div>
-            </div>
-
-            <div class="card" id="activePatients">
-                <div class="details">
-                    <div class="data">Active</div>
-                    <div class="number">42</div>
-                </div>
-                <div class="icon"><i class="fa-solid fa-check"></i></div>
-            </div>
-
-            <div class="card" id="inactivePatients">
-                <div class="details">
-                    <div class="data">Inactive</div>
-                    <div class="number">6</div>
-                </div>
-                <div class="icon"><i class="fa-solid fa-user-slash"></i></div>
-            </div>
+            <button onclick="openModal('addStaffModal')"><i class="fa-solid fa-plus"></i>Add New Staff</button>
         </div>
 
         <div class="control card">
             <div class="search">
-                <input type="text" placeholder="Search patient ID / name" id="searchInput"
-                    oninput="refreshPatientList()">
+                <input type="text" placeholder="Search staff ID / name" id="searchInput" oninput="refreshStaffList()">
                 <i class="fa-solid fa-magnifying-glass"></i>
             </div>
             <button class="secondary filter" onclick="openModal('filterModal')"><i
                     class="fa-solid fa-filter"></i>Filter</button>
             <div class="custom-select">
-                <select id="sortBy" onchange="refreshPatientList()">
-                    <option value="id">Patient ID</option>
+                <select id="sortBy" onchange="refreshStaffList()">
+                    <option value="id">Staff ID</option>
                     <option value="name">Name</option>
                     <option value="dob">Date of Birth</option>
                     <option value="status">Status</option>
@@ -84,16 +49,17 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Patient ID</th>
+                        <th>Staff ID</th>
                         <th>Full Name</th>
                         <th>Gender</th>
+                        <th>Roles</th>
                         <th>Date of Birth</th>
                         <th>Phone</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody id="patientTableBody"></tbody>
+                <tbody id="staffTableBody"></tbody>
             </table>
 
             <div class="pagination">
@@ -103,7 +69,7 @@
                         <span>Rows per page:</span>
                         <select id="rowsPerPageSelect" onchange="pagination.changeRowsPerPage(this.value)">
                             <option value="3">3</option>
-                            <option value="5">5</option>
+                            <option value="5" selected>5</option>
                             <option value="10">10</option>
                         </select>
                     </div>
@@ -122,17 +88,17 @@
 
         <div id="filterModal" class="modal">
             <div class="modal-box card">
-                <div class="top-title">Filter Patients</div>
+                <div class="top-title">Filter Staffs</div>
                 <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
 
                 <div class="modal-content">
                     <div class="field">
-                        <label>Gender</label>
+                        <label>Roles</label>
                         <div class="custom-select">
-                            <select id="filter-gender">
-                                <option value="">All Gender</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
+                            <select id="filter-role">
+                                <option value="">All Roles</option>
+                                <option value="Receptionist">Receptionist</option>
+                                <option value="Doctor">Doctor</option>
                             </select>
                         </div>
                     </div>
@@ -152,15 +118,15 @@
                 <div class="button-section">
                     <button class="secondary" onclick="clearInput(this)">Reset</button>
                     <button
-                        onclick="refreshPatientList(); closeModal(this); showToast('Filter applied!', 'success')">Apply
+                        onclick="refreshStaffList(); closeModal(this); showToast('Filter applied!', 'success')">Apply
                         Filter</button>
                 </div>
             </div>
         </div>
 
-        <div id="addPatientModal" class="modal">
+        <div id="addStaffModal" class="modal">
             <div class="modal-box card">
-                <div class="top-title">Register New Patient</div>
+                <div class="top-title">Add New Staff</div>
                 <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
 
                 <div class="modal-content">
@@ -199,9 +165,12 @@
                         </div>
 
                         <div class="field">
-                            <label class="required">Nationality</label>
+                            <label class="required">Roles</label>
                             <div class="custom-select">
-                                <select id="add-nationality" required></select>
+                                <select id="add-role" required>
+                                    <option>Receptionist</option>
+                                    <option>Doctor</option>
+                                </select>
                             </div>
                         </div>
 
@@ -215,17 +184,6 @@
                             <label class="required">Email Address</label>
                             <input type="email" placeholder="example@csc.singaporehealth.sg" required>
                         </div>
-
-                        <div class="field">
-                            <label>Emergency Contact</label>
-                            <input type="text" placeholder="Name">
-                        </div>
-
-                        <div class="field">
-                            <label style="color: white;">.</label>
-                            <input type="tel" maxlength="8" placeholder="e.g. 9123 4567"
-                                oninput="this.value = this.value.replace(/[^\d]/g, '')">
-                        </div>
                     </div>
 
                     <div class="field">
@@ -233,48 +191,24 @@
                         <textarea type="textarea" rows="4"
                             placeholder="Enter street, block, unit, and postal code"></textarea>
                     </div>
-
-                    <div class="field">
-                        <label>Known Allergies</label>
-                        <textarea type="textarea" rows="1"
-                            placeholder="e.g. Drug, food, or material allergies like latex"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Current Medications</label>
-                        <textarea type="textarea" rows="1"
-                            placeholder="e.g. Metformin 500mg, Aspirin, supplements"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Existing Medical Conditions</label>
-                        <textarea type="textarea" rows="1"
-                            placeholder="e.g., Diabetes, Hypertension, Pregnancy status"></textarea>
-                    </div>
                 </div>
 
                 <div class="button-section">
                     <button class="secondary" onclick="clearInput(this)">Reset</button>
                     <button class="secondary" onclick="closeModal(this)&&clearInput(this)">Cancel</button>
                     <button
-                        onclick="verifyInput(this)&&showToast('New patient added!', 'success')&&closeModal(this)&&clearInput(this)"><i
-                            class="fas fa-save"></i>Save New Patient</button>
+                        onclick="verifyInput(this)&&showToast('New staff added!', 'success')&&closeModal(this)&&clearInput(this)"><i
+                            class="fas fa-save"></i>Save New Staff</button>
                 </div>
             </div>
         </div>
 
         <div id="detailsModal" class="modal">
             <div class="modal-box card">
-                <div class="top-title">Patient Details</div>
+                <div class="top-title">Staff Details</div>
                 <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
 
-                <div class="tab-section">
-                    <div class="tab selected" onclick="openTab(this, 'patientsTab')">Patients Details</div>
-                    <div class="tab" onclick="openTab(this, 'visitsTab')">Visits</div>
-                </div>
-
-                <div id="patientsTab" class="tab-content show">
-
+                <div class="modal-content">
                     <div class="personal-info card">
                         <div>PATIENT INFORMATION</div>
                         <div class="row">
@@ -298,8 +232,8 @@
                             <span id="view-nric"></span>
                         </div>
                         <div class="row">
-                            <span>Nationality:</span>
-                            <span id="view-nationality"></span>
+                            <span>Role:</span>
+                            <span id="view-role"></span>
                         </div>
                         <div class="row">
                             <span>Status:</span>
@@ -326,35 +260,6 @@
                             <span id="view-emergency"></span>
                         </div>
                     </div>
-
-                    <div class="medical-info card">
-                        <div>MEDICAL INFORMATION</div>
-                        <div class="row">
-                            <span>Known Allergies:</span>
-                            <span id="view-allergies"></span>
-                        </div>
-                        <div class="row">
-                            <span>Current Medications:</span>
-                            <span id="view-medications"></span>
-                        </div>
-                        <div class="row">
-                            <span>Existing Medical Conditions:</span>
-                            <span id="view-conditions"></span>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div id="visitsTab" class="tab-content">
-                    <div class="upcoming">
-                        <div class="title">Upcoming Visits</div>
-                        <div class="card-content" id="view-upcoming-visits"></div>
-                    </div>
-
-                    <div class="past">
-                        <div class="title">Past Visits</div>
-                        <div class="card-content" id="view-past-visits"></div>
-                    </div>
                 </div>
 
                 <div class="button-section">
@@ -363,9 +268,9 @@
             </div>
         </div>
 
-        <div id="editPatientModal" class="modal">
+        <div id="editStaffModal" class="modal">
             <div class="modal-box card">
-                <div class="top-title">Edit Patient Information</div>
+                <div class="top-title">Edit Staff Information</div>
                 <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
 
                 <div class="modal-content">
@@ -405,9 +310,12 @@
                         </div>
 
                         <div class="field">
-                            <label class="required">Nationality</label>
+                            <label class="required">Role</label>
                             <div class="custom-select">
-                                <select id="edit-nationality" required></select>
+                                <select id="edit-role" required>
+                                    <option>Receptionist</option>
+                                    <option>Doctor</option>
+                                </select>
                             </div>
                         </div>
 
@@ -421,17 +329,6 @@
                             <label class="required">Email Address</label>
                             <input type="email" id="edit-email" placeholder="example@csc.singaporehealth.sg" required>
                         </div>
-
-                        <div class="field">
-                            <label>Emergency Contact</label>
-                            <input type="text" id="edit-emergencyName" placeholder="Name">
-                        </div>
-
-                        <div class="field">
-                            <label style="color: white;">.</label>
-                            <input type="tel" id="edit-emergencyPhone" maxlength="8" placeholder="e.g. 9123 4567"
-                                oninput="this.value = this.value.replace(/[^\d]/g, '')">
-                        </div>
                     </div>
 
                     <div class="field">
@@ -439,25 +336,6 @@
                         <textarea id="edit-address" rows="4"
                             placeholder="Enter street, block, unit, and postal code"></textarea>
                     </div>
-
-                    <div class="field">
-                        <label>Known Allergies</label>
-                        <textarea id="edit-allergies" rows="1"
-                            placeholder="e.g. Drug, food, or material allergies like latex"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Current Medications</label>
-                        <textarea id="edit-medications" rows="1"
-                            placeholder="e.g. Metformin 500mg, Aspirin, supplements"></textarea>
-                    </div>
-
-                    <div class="field">
-                        <label>Existing Medical Conditions</label>
-                        <textarea id="edit-conditions" rows="1"
-                            placeholder="e.g., Diabetes, Hypertension, Pregnancy status"></textarea>
-                    </div>
-
                 </div>
 
                 <div class="button-section">

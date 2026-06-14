@@ -2,6 +2,8 @@
 <html lang="en">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medical Records</title>
     <link rel="stylesheet" href="../assets/css/medical-records.css">
     <script src="https://kit.fontawesome.com/4897704fad.js"></script>
@@ -10,13 +12,263 @@
     <script src="../assets/js/firebase-config.js"></script>
     <script src="../assets/js/FirebaseService.js"></script>
     <script src="../assets/js/general.js"></script>
+    <script src="../assets/js/medical-records.js"></script>
 </head>
 
 <body>
 
     <div id="header-placeholder"></div>
 
-    <main></main>
+    <main>
+        <div class="page-title">
+            <div>
+                <div class="title">Patient Medical Record Detail</div>
+                <div class="description">View and manage a single patient's comprehensive medical history, clinical
+                    notes, and health timelines</div>
+            </div>
+        </div>
+
+        <div id="patientInfo" class="card">
+            <img src="https://i.pinimg.com/736x/48/49/ab/4849ab9b4c07e86b9fc62757cb11c37d.jpg">
+            <div class="info-grid">
+                <div class="info-item">
+                    <p>Full Name</p>
+                    <p>Michael Tan</p>
+                </div>
+                <div class="info-item">
+                    <p>IC Number</p>
+                    <p>S1234567A</p>
+                </div>
+                <div class="info-item">
+                    <p>Date of Birth</p>
+                    <p>15/03/1992</p>
+                </div>
+                <div class="info-item">
+                    <p>Contact Phone</p>
+                    <p>+65 98765432</p>
+                </div>
+
+                <div class="info-item">
+                    <p>Known Allergies</p>
+                    <p>Penicillin</p>
+                </div>
+                <div class="info-item">
+                    <p>Current Medications</p>
+                    <p>Loratadine</p>
+                </div>
+                <div class="info-item">
+                    <p>Existing Medical Conditions</p>
+                    <p>Asthma</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="addMRtab">
+            <p class="title">Current Ongoing Visit (Today Appointment)</p>
+
+            <div id="vital-row">
+                <div class="field">
+                    <label>Blood Pressure</label>
+                    <input value="125/82" readonly="">
+                </div>
+                <div class="field">
+                    <label>Temperature (°C)</label>
+                    <input value="37.2" readonly="">
+                </div>
+                <div class="field">
+                    <label>Pulse Rate (bpm)</label>
+                    <input value="88" readonly="">
+                </div>
+                <div class="field">
+                    <label>Height (cm)</label>
+                    <input value="172" readonly="">
+                </div>
+                <div class="field">
+                    <label>Weight (kg)</label>
+                    <input value="68.5" readonly="">
+                </div>
+            </div>
+
+            <div id="treat-grid">
+                <div class="field">
+                    <label class="required">Reason of Visit</label>
+                    <textarea id="visitReason" placeholder="Fill patient main complaint..."></textarea>
+                </div>
+                <div class="field">
+                    <label class="required">Clinical Findings</label>
+                    <textarea id="findings" placeholder="Physical check findings..."></textarea>
+                </div>
+                <div class="field">
+                    <label class="required">Diagnosis</label>
+                    <textarea id="diagnosis" placeholder="Final diagnosis result..."></textarea>
+                </div>
+                <div class="field">
+                    <label>Treatment Extra Remark / Notes</label>
+                    <textarea id="treatNote" placeholder="Doctor additional note..."></textarea>
+                </div>
+            </div>
+
+            <div class="field">
+                <input type="checkbox" id="addPrescript" name="addPrescript" value="addPrescript"
+                    onchange="showAddPrescriptTab(this)">
+                <label for="addPrescript">Add Prescription</label>
+            </div>
+
+            <div class="card" id="addPrescriptTab">
+                <div class="title-btn">
+                    <p>Prescription List</p>
+                    <button onclick="addNewPresRow()"><i class="fa-solid fa-prescription"></i>Add More Medicine</button>
+                </div>
+                <div class="field">
+                    <label>Usage Instruction</label>
+                    <textarea id="usageIns" placeholder="Additional instruction..."></textarea>
+                </div>
+                <div id="presWrap">
+                    <div class="pres-row">
+                        <div class="field">
+                            <label class="required">Medicine</label>
+                            <div class="custom-select">
+                                <i class="fa-solid fa-capsules"></i>
+                                <select class="med-select">
+                                    <option>Paracetamol</option>
+                                    <option>Amoxicillin</option>
+                                    <option>Ibuprofen</option>
+                                    <option>Cetirizine</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="required">Dosage</label>
+                            <div class="custom-select">
+                                <i class="fa-solid fa-prescription-bottle-medical"></i>
+                                <select class="dosage-select">
+                                    <option>250mg</option>
+                                    <option>500mg</option>
+                                    <option>1000mg</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="required">Frequency</label>
+                            <div class="custom-select">
+                                <i class="fa-solid fa-prescription-bottle"></i>
+                                <select class="freq-select">
+                                    <option>1x/Day</option>
+                                    <option>2x/Day</option>
+                                    <option>3x/Day</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="saveRecBtn"><i class="fa-solid fa-floppy-disk"></i>Save record</button>
+            </div>
+        </div>
+
+        <div class="card" id="prevRecord">
+            <p class="title"><i class="fa-solid fa-clock-rotate-left"></i>Previous Historical Visits Record</p>
+
+            <div class="history-card">
+                <div class="history-head" onclick="toggleHistory(this)">
+                    <span>Visit Date: 12/05/2025<span>Dr. Jimmy</span></span>
+                    <div>
+                        <button onclick="event.stopPropagation();printSingleHist()">Print This Visit</button>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="history-body">
+                    <div class="hist-data">
+                        <div>
+                            <p>BP</p>
+                            <p>120/78</p>
+                        </div>
+                        <div>
+                            <p>Temp</p>
+                            <p>36.7°C</p>
+                        </div>
+                        <div>
+                            <p>Pulse</p>
+                            <p>76bpm</p>
+                        </div>
+                        <div>
+                            <p>Height</p>
+                            <p>172cm</p>
+                        </div>
+                        <div>
+                            <p>Weight</p>
+                            <p>67kg</p>
+                        </div>
+                    </div>
+                    <div class="hist-block">
+                        <p>Reason: </p>
+                        <p>Headache &amp; mild fever for 2 days</p>
+                    </div>
+                    <div class="hist-block">
+                        <p>Findings & Diagnosis: </p>
+                        <p>Viral upper respiratory tract infection</p>
+                    </div>
+                    <div class="hist-block">
+                        <p>Prescription:</p>
+                        <p>Paracetamol 500mg 2x/Day, after meal</p>
+                        <p>Omeprazole 20mg 1x/Day before breakfast</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="history-card">
+                <div class="history-head" onclick="toggleHistory(this)">
+                    <div>
+                        <span>Visit Date: 28/04/2025</span>
+                        <span>Dr. Lee</span>
+                    </div>
+                    <div>
+                        <button onclick="event.stopPropagation();printSingleHist(this)">Print This Visit</button>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="history-body">
+                    <div class="hist-data">
+                        <div>
+                            <p>BP</p>
+                            <p>122/80</p>
+                        </div>
+                        <div>
+                            <p>Temp</p>
+                            <p>36.5°C</p>
+                        </div>
+                        <div>
+                            <p>Pulse</p>
+                            <p>72bpm</p>
+                        </div>
+                        <div>
+                            <p>Height</p>
+                            <p>172cm</p>
+                        </div>
+                        <div>
+                            <p>Weight</p>
+                            <p>66.8kg</p>
+                        </div>
+                    </div>
+                    <div class="hist-block">
+                        <p>Reason: </p>
+                        <p>Mild stomach discomfort</p>
+                    </div>
+                    <div class="hist-block">
+                        <p>Findings &amp; Diagnosis: </p>
+                        <p>Indigestion due to irregular diet</p>
+                    </div>
+                    <div class="hist-block">
+                        <p>Prescription:</p>
+                        <p>Omeprazole 20mg 1x/Day before breakfast</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="toast card" id="toast"></div>
+    </main>
 
     <div id="footer-placeholder"></div>
 
