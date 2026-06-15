@@ -91,6 +91,11 @@ button.secondary {
     border: 1px solid var(--border);
 }
 
+button.secondary:hover,
+button.secondary:active {
+    background: var(--hover);
+}
+
 button:disabled {
     opacity: 0.4;
     cursor: not-allowed;

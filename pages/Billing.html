@@ -19,7 +19,307 @@
 
     <div id="header-placeholder"></div>
 
-    <main></main>
+    <main>
+        <div class="page-title">
+            <div>
+                <div class="title">Billing & Invoices</div>
+                <div class="description">Auto-generated bills from appointments & prescriptions</div>
+            </div>
+        </div>
+
+        <div class="display">
+            <div class="card" id="pendingBills">
+                <div class="details">
+                    <div class="data">Pending Bills</div>
+                    <div class="number">12</div>
+                </div>
+                <div class="icon"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+            </div>
+
+            <div class="card" id="paidBills">
+                <div class="details">
+                    <div class="data">Paid This Month</div>
+                    <div class="number">48</div>
+                </div>
+                <div class="icon"><i class="fa-solid fa-check-circle"></i></div>
+            </div>
+
+            <div class="card" id="overdueBills">
+                <div class="details">
+                    <div class="data">Overdue Bills</div>
+                    <div class="number">3</div>
+                </div>
+                <div class="icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            </div>
+
+            <div class="card" id="totalRevenue">
+                <div class="details">
+                    <div class="data">Total Revenue</div>
+                    <div class="number">$1,240</div>
+                </div>
+                <div class="icon"><i class="fa-solid fa-dollar-sign"></i></div>
+            </div>
+        </div>
+
+        <div class="control card">
+            <div class="search">
+                <input type="text" placeholder="Search Invoice ID / patient name" id="searchInput"
+                    oninput="refreshBillingList()">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </div>
+            <button class="secondary filter" onclick="openModal('filterModal')">
+                <i class="fa-solid fa-filter"></i>Filter
+            </button>
+            <div class="custom-select">
+                <select id="sortBy" onchange="refreshBillingList()">
+                    <option value="dateNewest">Date (Newest)</option>
+                    <option value="dateOldest">Date (Oldest)</option>
+                    <option value="amount">Total Amount</option>
+                    <option value="status">Bill Status</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-list">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Invoice ID</th>
+                        <th>Patient Name</th>
+                        <th>Appointment ID</th>
+                        <th>Bill Date</th>
+                        <th>Total Amount</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="billingTableBody"></tbody>
+            </table>
+
+            <div class="pagination">
+                <p id="pageInfo"></p>
+                <div>
+                    <div class="rowsPage">
+                        <span>Rows per page:</span>
+                        <select id="rowsPerPageSelect" onchange="pagination.changeRowsPerPage(this.value)">
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+
+                    <div class="controls">
+                        <button class="secondary" id="prevBtn" onclick="pagination.prev()">
+                            <i class="fa fa-chevron-left"></i>
+                        </button>
+                        <span>Page:</span>
+                        <select id="pageSelect" onchange="pagination.goToPage(this.value)"></select>
+                        <button class="secondary" id="nextBtn" onclick="pagination.next()">
+                            <i class="fa fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="filterModal" class="modal">
+            <div class="modal-box card">
+                <div class="top-title">Filter Billing Records</div>
+                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+                <div class="modal-content">
+                    <div class="field">
+                        <label>Bill Status</label>
+                        <div class="custom-select">
+                            <i class="fa-solid fa-list-check"></i>
+                            <select id="filter-status">
+                                <option value="">All Status</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Paid">Paid</option>
+                                <option value="Overdue">Overdue</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Date Range</label>
+                        <div class="custom-select">
+                            <i class="fa-solid fa-calendar-days"></i>
+                            <select id="filter-date">
+                                <option value="">All Date</option>
+                                <option value="today">Today</option>
+                                <option value="thisweek">This Week</option>
+                                <option value="thismonth">This Month</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-section">
+                    <button class="secondary" onclick="clearInput(this)">Reset</button>
+                    <button onclick="refreshBillingList(); closeModal(this); showToast('Filter applied!', 'success')">
+                        Apply Filter
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="detailsModal" class="modal">
+            <div class="modal-box card">
+                <div class="top-title">Invoice Details</div>
+                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+                <div class="modal-content">
+                    <div class="info card">
+                        <div>BILLING BASIC INFO</div>
+                        <div class="row">
+                            <span>Invoice ID:</span>
+                            <span id="view-invoice-id"></span>
+                        </div>
+                        <div class="row">
+                            <span>Appointment ID:</span>
+                            <span id="view-appt-id"></span>
+                        </div>
+                        <div class="row">
+                            <span>Patient:</span>
+                            <span id="view-patient"></span>
+                        </div>
+                        <div class="row">
+                            <span>Bill Date:</span>
+                            <span id="view-bill-date"></span>
+                        </div>
+                        <div class="row">
+                            <span>Status:</span>
+                            <span id="view-status"></span>
+                        </div>
+                    </div>
+
+                    <div class="info card">
+                        <div>CONSULTATION & TREATMENT</div>
+                        <div class="row">
+                            <span>Description:</span>
+                            <span id="view-consult-desc"></span>
+                        </div>
+                        <div class="row">
+                            <span>Consultation Fee:</span>
+                            <span id="view-consult-fee"></span>
+                        </div>
+                    </div>
+
+                    <div class="info card">
+                        <div>PRESCRIPTION & MEDICINES</div>
+                        <div id="medicineList"></div>
+                        <div class="row">
+                            <span>Medicine Subtotal:</span>
+                            <span id="view-medicine-sub"></span>
+                        </div>
+                    </div>
+
+                    <div class="info card">
+                        <div>TOTAL</div>
+                        <div class="row">
+                            <span>Total Amount Payable:</span>
+                            <span id="view-total"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-section">
+                    <button class="secondary" onclick="goToMedicalRecord()">
+                        <i class="fa-solid fa-file-medical"></i> View Medical Record
+                    </button>
+                    <button class="secondary" onclick="printBill()">
+                        <i class="fa-solid fa-print"></i> Print Invoice
+                    </button>
+                    <button onclick="closeModal(this)">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="toast card" id="toast"></div>
+    </main>
+
+    <div id="printTemplate">
+        <div class="hospital-header">
+            <strong>CSCare Clinic</strong>
+            1 Punggol Coast Road<br>
+            Singapore 828608<br>
+            Phone: +65 9123 5678 | Email: info@cscare.com<br>
+            Website: www.cscare.com
+        </div>
+        <div class="print-header">
+            <h5><strong>INVOICE</strong></h5>
+            <p>OUTPATIENT BILL - ITEMISED</p>
+        </div>
+        <div class="print-row">
+            <div>
+                <p><strong>Payor:</strong> <span id="print-payor">Off Jumpol</span></p>
+                <p><strong>Patient Name:</strong> <span id="print-patient"></span></p>
+                <p><strong>Patient ID:</strong> <span id="print-pid">1</span></p>
+                <p><strong>Appointment ID:</strong> <span id="print-appt-id"></span></p>
+            </div>
+            <div>
+                <p><strong>Invoice No:</strong> <span id="print-invoice-id"></span></p>
+                <p><strong>Bill Date / Time:</strong> <span id="print-bill-date"></span></p>
+                <p><strong>Attending Dr.:</strong> <span id="print-doctor">Dr. Jimmy Jitaraphol</span></p>
+                <p><strong>Bill Type:</strong> FINAL BILL</p>
+            </div>
+        </div>
+        
+        <p class="table-header"><strong>Billing Group: CONSULTATION / TREATMENT</strong></p>
+        <table class="table print-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Qty</th>
+                    <th class="text-end">Amount ($)</th>
+                </tr>
+            </thead>
+            <tbody id="print-consult-tbody">
+                <tr>
+                    <td>03/06/2026</td>
+                    <td>Routine Checkup Consultation</td>
+                    <td>1</td>
+                    <td class="text-end">1.00</td>
+                </tr>
+                <tr>
+                    <td colspan="3" class="text-end"><strong>Subtotal</strong></td>
+                    <td class="text-end"><strong>1.00</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <p class="table-header"><strong>Billing Group: MEDICATION / PRESCRIPTION</strong></p>
+        <table class="table print-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Medicine Name</th>
+                    <th>Qty</th>
+                    <th class="text-end">Amount ($)</th>
+                </tr>
+            </thead>
+            <tbody id="print-med-tbody">
+                <tr>
+                    <td>03/06/2026</td>
+                    <td>Paracetamol 500mg Tablet</td>
+                    <td>10</td>
+                    <td class="text-end">1.00</td>
+                </tr>
+                <tr>
+                    <td colspan="3" class="text-end"><strong>Subtotal</strong></td>
+                    <td class="text-end"><strong>1.00</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="text-end">
+            <p><strong>Total Amount Payable: </strong><span id="print-total">$2.00</span></p>
+        </div>
+        <p><strong>Print Date / Time:</strong> <span id="print-now">15/06/2026 10:00 AM</span></p>
+        <p><strong>Remarks:</strong> All payments are to be made to "CSCare Clinic System".</p>
+    </div>
 
     <div id="footer-placeholder"></div>
 

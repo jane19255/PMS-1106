@@ -1,2 +1,190 @@
 @import url("HeaderFooter.css");
 @import url("general.css");
+
+#totalRevenue .icon {
+    background-color: rgb(from var(--primary) r g b / 10%);
+    color: var(--primary);
+}
+
+#paidBills .icon,
+.status.Paid {
+    background-color: rgb(from var(--success) r g b / 10%);
+    color: var(--success);
+}
+
+#overdueBills .icon,
+.status.Overdue {
+    background-color: rgb(from var(--danger) r g b / 10%);
+    color: var(--danger);
+}
+
+#pendingBills .icon,
+.status.Pending {
+    background-color: rgb(from var(--warning) r g b / 10%);
+    color: var(--warning);
+}
+
+.modal .custom-select select {
+    padding: 12px 12px 12px 40px;
+}
+
+.modal .custom-select i {
+    position: absolute;
+    top: 15px;
+    left: 12px;
+    color: var(--gray);
+}
+
+.has-tooltip .fa-print {
+    color: var(--warning);
+}
+
+.has-tooltip .fa-file-medical {
+    color: var(--success)
+}
+
+/* Hide normal page content during print, only show invoice */
+@media print {
+
+    body>main,
+    #header-placeholder,
+    #footer-placeholder,
+    .modal,
+    .no-print {
+        display: none !important;
+    }
+
+    #printTemplate {
+        display: block !important;
+        width: 100%;
+        padding: 0;
+    }
+
+    @page {
+        size: A4;
+        margin: 20mm;
+
+        @top-left {
+            content: "";
+        }
+
+        @top-right {
+            content: "";
+        }
+
+        @bottom-left {
+            content: "";
+        }
+
+        @bottom-right {
+            content: "";
+        }
+    }
+
+    .hospital-header {
+        text-align: right;
+        font-size: 14px;
+        margin-bottom: 16px;
+    }
+
+    .hospital-header strong {
+        display: block;
+        font-size: 18px;
+    }
+
+    .print-header {
+        font-size: 32px;
+        text-align: center;
+        padding: 12px 0;
+        border-top: 1px solid var(--border);
+    }
+
+    .print-header p {
+        font-size: 14px;
+    }
+
+    .print-row {
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .print-row div {
+        display: grid;
+        gap: 8px;
+    }
+
+    .text-end {
+        text-align: end;
+    }
+
+    .table-header {
+        margin: 40px 0 8px;
+    }
+
+    table.print-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    table.print-table th,
+    table.print-table td {
+        border: 1px solid #333;
+        padding: 6px;
+    }
+
+    div:has(#print-total) {
+        margin-top: 10px;
+    }
+
+    p:has(#print-now) {
+        margin-top: 40px;
+    }
+}
+
+/* Hide print area on normal screen */
+#printTemplate {
+    display: none;
+}
+
+#detailsModal .info.card {
+    margin-bottom: 16px;
+}
+
+#detailsModal .info.card div:first-child{
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--secondary);
+    margin-bottom: 8px;
+}
+
+#detailsModal .info.card span {
+    font-size: 14px;
+}
+
+#detailsModal .info.card span:first-child{
+    font-weight: 500;
+}
+
+#medicineList span {
+    color: #1f2937;
+    font-weight: 400;
+}
+
+#detailsModal .modal-content {
+    overflow-y: auto;
+    
+}
+
+.status {
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+@media only screen and (max-width: 1000px) {
+    main {
+        padding: 90px 24px 24px;
+    }
+}
