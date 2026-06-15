@@ -2,8 +2,8 @@
 @import url("general.css");
 
 #totalPatients .icon {
-    background-color: rgb(from var(--primary-focus) r g b / 10%);
-    color: var(--primary-focus);
+    background-color: rgb(from var(--primary) r g b / 10%);
+    color: var(--primary);
 }
 
 #newPatients .icon,
