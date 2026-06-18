@@ -17,7 +17,7 @@ pub enum DoctorStatus {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum DoctorSchedule {
+pub struct DoctorSchedule {
     pub id: String,
     pub doctor_id: String,
     pub day_of_week: DayOfWeek,
