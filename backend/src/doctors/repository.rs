@@ -1,5 +1,5 @@
 use super::models::Doctor;
-use std::collections::HashMap
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 #[derive(Debug)]
@@ -11,14 +11,14 @@ pub enum RepositoryError {
 pub trait DoctorRepository: Send + Sync {
     fn create(&self, doctor: Doctor) -> Result<Doctor, RepositoryError>;
     fn find_by_id(&self, doctor_id: &str) -> Result<Doctor, RepositoryError>;
-    fn list(&self) -> Result<Vec<Doctor>, RespositoryError>;
+    fn list(&self) -> Result<Vec<Doctor>, RepositoryError>;
     fn update(&self, doctor: Doctor) -> Result<Doctor, RepositoryError>;
     fn delete(&self, doctor_id: &str) -> Result<(), RepositoryError>;
 }
 
 #[derive(Default)]
 pub struct InMemoryDoctorRepository {
-    doctors: Mutex<HashMap<String, Dcotr>>,
+    doctors: Mutex<HashMap<String, Doctor>>,
 }
 
 impl DoctorRepository for InMemoryDoctorRepository {
@@ -27,12 +27,12 @@ impl DoctorRepository for InMemoryDoctorRepository {
             .doctors
             .lock()
             .map_err(|_| RepositoryError::StorageUnavailable)?;
-        doctor.insert(doctor.id.clone(), doctor.clone());
+        doctors.insert(doctor.id.clone(), doctor.clone());
         Ok(doctor)
     }
 
     fn find_by_id(&self, doctor_id: &str) -> Result<Doctor, RepositoryError> {
-        let doctor = self
+        let doctors = self
             .doctors
             .lock()
             .map_err(|_| RepositoryError::StorageUnavailable)?;
@@ -63,7 +63,7 @@ impl DoctorRepository for InMemoryDoctorRepository {
         }
 
         doctors.insert(doctor.id.clone(), doctor.clone());
-        Ok(doctor);
+        Ok(doctor)
     }
 
     fn delete(&self, doctor_id: &str) -> Result<(), RepositoryError> {
