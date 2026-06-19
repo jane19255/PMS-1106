@@ -1,4 +1,4 @@
-header {
+body > header {
     position: fixed;
     top: 0;
     left: 0;
@@ -23,6 +23,10 @@ header {
     padding: 4px 8px;
     gap: 8px;
     align-items: center;
+}
+
+.top-header .logo {
+    text-decoration: none;
 }
 
 .top-header .logo i {
@@ -63,11 +67,19 @@ header {
     font-size: 18px;
 }
 
-.top-header .relative .profile img {
+.top-header .relative .profile img,
+.top-header .relative .profile-avatar {
     height: 36px;
     width: 36px;
     border-radius: 50%;
     object-fit: cover;
+}
+
+.top-header .relative .profile-avatar {
+    display: grid;
+    place-items: center;
+    background: var(--hover);
+    color: var(--primary-focus);
 }
 
 .top-header .relative .profile .identity .name {
@@ -153,6 +165,7 @@ header {
     font-size: 16px;
     color: var(--text);
     transition: background-color 0.2s ease;
+    text-decoration: none;
 }
 
 .dropdown-item i {

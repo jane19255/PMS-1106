@@ -2,14 +2,23 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Patient Management System{% endblock title %}</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/assets/css/general.css">
+    <link rel="stylesheet" href="/assets/css/HeaderFooter.css?v=2">
+    <script src="https://kit.fontawesome.com/4897704fad.js" crossorigin="anonymous"></script>
+    <script src="/assets/js/general.js" defer></script>
+    {% block styles %}{% endblock styles %}
 </head>
 
 <body>
+    {% include "header.html" %}
     <main class="container">
         {% block content %}{% endblock content %}
     </main>
+    {% include "footer.html" %}
+    {% block scripts %}{% endblock scripts %}
 </body>
 
 </html>

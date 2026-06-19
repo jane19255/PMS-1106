@@ -1,35 +1,58 @@
-// Header and Footer
+// Shared navigation and footer
 document.addEventListener('DOMContentLoaded', function () {
+    const initializeHeader = () => {
+        const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
+        document.querySelectorAll('.mega-menu a').forEach(link => {
+            const linkPath = new URL(link.href, window.location.origin).pathname.replace(/\/$/, '') || '/';
+            const selected = currentPath === linkPath || currentPath.startsWith(`${linkPath}/`);
+            link.classList.toggle('selected', selected);
+        });
 
-    fetch('header.html')
-        .then(r => r.text())
-        .then(html => {
-            const h = document.getElementById('header-placeholder');
-            if (h) h.innerHTML = html;
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        if (darkModeToggle) {
+            const darkModeEnabled = localStorage.getItem('pms-theme') === 'dark';
+            document.body.classList.toggle('dark', darkModeEnabled);
+            darkModeToggle.classList.toggle('active', darkModeEnabled);
 
-            const pageTitle = document.title.split(" - ")[0].trim();
-            const navLinks = document.querySelectorAll(".mega-menu a");
-
-            navLinks.forEach(link => {
-                const linkText = link.textContent.trim();
-                if (linkText === pageTitle) {
-                    link.classList.add("selected");
-                }
-            });
-
-            const darkModeToggle = document.getElementById('darkModeToggle');
             darkModeToggle.addEventListener('click', () => {
-                darkModeToggle.classList.toggle('active');
-                document.body.classList.toggle('dark');
+                const enabled = !document.body.classList.contains('dark');
+                document.body.classList.toggle('dark', enabled);
+                darkModeToggle.classList.toggle('active', enabled);
+                localStorage.setItem('pms-theme', enabled ? 'dark' : 'light');
             });
-        });
+        }
 
-    fetch('footer.html')
-        .then(r => r.text())
-        .then(html => {
-            const f = document.getElementById('footer-placeholder');
-            if (f) f.innerHTML = html;
-        });
+        const role = document.getElementById('currentUserRole');
+        if (role) {
+            fetch('/api/me')
+                .then(response => response.ok ? response.json() : null)
+                .then(user => {
+                    if (user?.role) {
+                        role.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+                    }
+                })
+                .catch(() => {});
+        }
+    };
+
+    const headerPlaceholder = document.getElementById('header-placeholder');
+    if (document.querySelector('body > header')) {
+        initializeHeader();
+    } else if (headerPlaceholder) {
+        fetch('header.html')
+            .then(response => response.text())
+            .then(html => {
+                headerPlaceholder.innerHTML = html;
+                initializeHeader();
+            });
+    }
+
+    const footerPlaceholder = document.getElementById('footer-placeholder');
+    if (footerPlaceholder && !document.querySelector('body > footer')) {
+        fetch('footer.html')
+            .then(response => response.text())
+            .then(html => { footerPlaceholder.innerHTML = html; });
+    }
 });
 
 function burgerMenu() {

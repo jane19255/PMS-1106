@@ -1,2 +1,43 @@
-@import url("HeaderFooter.css");
-@import url("general.css");
+main.container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 clamp(24px, 7vw, 120px) 32px;
+}
+.billing-page {
+    width: 100%;
+    padding-top: 130px;
+}
+.billing-page .summary-card { display: block; }
+.summary-card.pending { border-top: 4px solid var(--warning); }
+.summary-card.paid { border-top: 4px solid var(--success); }
+.summary-card.cancelled { border-top: 4px solid var(--danger); }
+.summary-card.revenue { border-top: 4px solid var(--primary); }
+
+.create-panel { margin-bottom: 24px; }
+.create-panel summary { cursor: pointer; font-weight: 700; }
+.invoice-form {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+.invoice-form label { display: grid; gap: 8px; }
+.invoice-form button { align-self: end; }
+.control select { min-width: 175px; }
+.table-list.card { padding: 0; }
+.table-scroll { overflow-x: auto; }
+.table-list .action a { color: var(--primary-hover); font-weight: 600; text-decoration: none; }
+.table-list .action a:hover { text-decoration: underline; }
+.empty-state { padding: 28px; text-align: center; color: var(--secondary); }
+span.status.pending { background: rgb(from var(--warning) r g b / 12%); color: var(--warning); }
+span.status.paid { background: rgb(from var(--success) r g b / 12%); color: var(--success); }
+span.status.cancelled { background: rgb(from var(--danger) r g b / 12%); color: var(--danger); }
+
+@media only screen and (max-width: 900px) {
+    main.container { padding: 0 24px 24px; }
+    .billing-page { padding-top: 80px; }
+    .invoice-form { grid-template-columns: 1fr 1fr; }
+    .control { flex-wrap: wrap; }
+    .control select { flex: 1; }
+}

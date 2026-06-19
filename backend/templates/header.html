@@ -1,9 +1,9 @@
 <header>
   <div class="top-header">
-    <div class="logo">
+    <a class="logo" href="/dashboard" aria-label="CSCare Hospital System dashboard">
       <i class="fa-solid fa-hospital-user"></i>
       <div class="title">CSCare Hospital System</div>
-    </div>
+    </a>
     <div class="relative">
       <div class="search-bar">
         <input type="text" placeholder="Search patient, appointment, staff...">
@@ -11,10 +11,10 @@
       </div>
       <div class="dropdown">
         <div class="profile">
-          <img src="https://i.mydramalist.com/kAOejw_5c.jpg">
+          <span class="profile-avatar" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
           <div class="identity">
-            <div class="name">Jimmy Jitaraphol</div>
-            <div class="roles">Doctor</div>
+            <div class="name">Signed-in user</div>
+            <div class="roles" id="currentUserRole">Staff</div>
           </div>
         </div>
 
@@ -24,10 +24,10 @@
             <span>Dark Theme</span>
             <div class="toggle-switch" id="darkModeToggle"></div>
           </div>
-          <div class="dropdown-item logout">
+          <a class="dropdown-item logout" href="/logout">
             <i class="fa-solid fa-arrow-right-from-bracket"></i>
             <span>Logout</span>
-          </div>
+          </a>
 
         </div>
       </div>

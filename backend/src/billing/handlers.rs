@@ -1,4 +1,5 @@
 use super::models::CreateInvoiceForm;
+use super::models::PaymentStatus;
 use super::service::{BillingError, BillingService};
 use actix_web::http::header;
 use actix_web::{web, HttpResponse, Responder};
@@ -11,7 +12,29 @@ pub async fn list_invoices(
     match billing_service.list_invoices() {
         Ok(invoices) => {
             let mut context = Context::new();
+            let pending_count = invoices
+                .iter()
+                .filter(|invoice| invoice.status == PaymentStatus::Pending)
+                .count();
+            let paid_count = invoices
+                .iter()
+                .filter(|invoice| invoice.status == PaymentStatus::Paid)
+                .count();
+            let cancelled_count = invoices
+                .iter()
+                .filter(|invoice| invoice.status == PaymentStatus::Cancelled)
+                .count();
+            let paid_revenue: f64 = invoices
+                .iter()
+                .filter(|invoice| invoice.status == PaymentStatus::Paid)
+                .map(|invoice| invoice.total)
+                .fold(0.0, |total, invoice_total| total + invoice_total);
+
             context.insert("invoices", &invoices);
+            context.insert("pending_count", &pending_count);
+            context.insert("paid_count", &paid_count);
+            context.insert("cancelled_count", &cancelled_count);
+            context.insert("paid_revenue", &paid_revenue);
             render_template(&templates, "billing/index.html", &context)
         }
         Err(error) => render_error(&templates, error),
