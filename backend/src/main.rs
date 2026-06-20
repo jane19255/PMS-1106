@@ -3,6 +3,7 @@ mod db;
 mod handlers;
 mod models;
 mod routes;
+mod appointments;
 
 use actix_files::Files;
 use actix_web::{web, App, HttpResponse, HttpServer};

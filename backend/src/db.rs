@@ -171,4 +171,143 @@ impl SupabaseRestDb {
             .map_err(|e| e.to_string())?;
         Self::read_response(response).await
     }
+
+    // Appointment Scheduling methods
+    pub async fn list_appointments(&self) -> Result<String, String> {
+        let url = self.rest_url("appointments?select=*&order=appointment_datetime");
+        let response = self
+            .authed(self.http_client.get(url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Self::read_response(response).await
+    }
+
+    pub async fn get_appointment(&self, appointment_id: &str) -> Result<String, String> {
+        let encoded_id = urlencoding::encode(appointment_id);
+        let url = self.rest_url(&format!("appointments?id=eq.{}&select=*", encoded_id));
+        let response = self
+            .authed(self.http_client.get(url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Self::read_response(response).await
+    }
+
+    pub async fn create_appointment(&self, payload: &Value) -> Result<String, String> {
+        let url = self.rest_url("appointments");
+        let response = self
+            .authed(self.http_client.post(url))
+            .header("Prefer", "return=representation")
+            .json(payload)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Self::read_response(response).await
+    }
+    
+    pub async fn update_appointment(&self, appointment_id: &str,payload: &Value) -> Result<String, String> {
+        let encoded_id = urlencoding::encode(appointment_id);
+        let url = self.rest_url(&format!("appointments?id=eq.{}", encoded_id));
+        let response = self
+            .authed(self.http_client.patch(url))
+            .header("Prefer", "return=representation")
+            .json(payload)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Self::read_response(response).await
+    }
+
+    pub async fn delete_appointment(&self, appointment_id: &str) -> Result<String, String> {
+        let encoded_id = urlencoding::encode(appointment_id);
+        let url = self.rest_url(&format!("appointments?id=eq.{}", encoded_id));
+        let response = self
+            .authed(self.http_client.delete(url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Self::read_response(response).await
+    }
+    
+    // Queue Management methods
+    pub async fn list_queue_by_doctor(&self, doctor_id: &str) -> Result<String, String> {
+        let encoded_id = urlencoding::encode(doctor_id);
+        let url = self.rest_url(&format!(
+            "appointment_queue?doctor_id=eq.{}&select=*&status=neq.Completed&order=created_at.asc",
+            encoded_id
+        ));
+
+        let response = self
+            .authed(self.http_client.get(url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Self::read_response(response).await
+    }
+
+    pub async fn create_queue_entry(&self, payload: &serde_json::Value) -> Result<String, String> {
+        let url = self.rest_url("appointment_queue");
+        let response = self
+            .authed(self.http_client.post(url))
+            .header("Prefer", "return=representation")
+            .json(payload)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Self::read_response(response).await
+    }
+
+    pub async fn update_queue_entry(
+        &self,
+        queue_id: &str,
+        payload: &serde_json::Value,
+    ) -> Result<String, String> {
+        let encoded_id = urlencoding::encode(queue_id);
+        let url = self.rest_url(&format!("appointment_queue?id=eq.{}", encoded_id));
+        let response = self
+            .authed(self.http_client.patch(url))
+            .header("Prefer", "return=representation")
+            .json(payload)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Self::read_response(response).await
+    }
+
+    // Doctor availability management methods
+    pub async fn list_doctor_availability(&self, doctor_id: &str) -> Result<String, String> {
+        let encoded_id = urlencoding::encode(doctor_id);
+        let url = self.rest_url(&format!(
+            "doctor_availability?doctor_id=eq.{}&select=*&order=available_from.asc",
+            encoded_id
+        ));
+
+        let response = self
+            .authed(self.http_client.get(url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Self::read_response(response).await
+    }
+
+    pub async fn create_doctor_availability(
+        &self,
+        payload: &serde_json::Value,
+    ) -> Result<String, String> {
+        let url = self.rest_url("doctor_availability");
+        let response = self
+            .authed(self.http_client.post(url))
+            .header("Prefer", "return=representation")
+            .json(payload)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Self::read_response(response).await
+    }
 }
