@@ -261,7 +261,7 @@ function formatDate(dateString) {
   return date.toLocaleDateString("en-GB", options);
 }
 
-class Pagination {
+class PatientPagination {
   constructor(config) {
     this.data = config.data || [];
     this.rowsPerPage = config.rowsPerPage || 3;
@@ -364,6 +364,7 @@ class Pagination {
 
 function renderPatientRow(patient, index) {
   const safePatientId = String(patient.id).replace(/'/g, "\\'");
+  const billingUrl = `/billing?patient_id=${encodeURIComponent(patient.id)}`;
   const editAction = currentUserPermissions.canEditPatients
     ? `
             <div class="has-tooltip" data-edit-patient>
@@ -383,7 +384,7 @@ function renderPatientRow(patient, index) {
   return `
     <tr class="hover:bg-slate-50">
         <td>${patient.id}</td>
-        <td>${patient.firstName + " " + patient.lastName}</td>
+        <td><a class="navigation" href="${billingUrl}">${patient.firstName + " " + patient.lastName}</a></td>
         <td>${patient.gender}</td>
         <td>${formatDate(patient.dob)}</td>
         <td>${patient.phone}</td>
@@ -399,7 +400,14 @@ function renderPatientRow(patient, index) {
     </tr>`;
 }
 
-const pagination = new Pagination({
+function createInvoiceForSelectedPatient() {
+  const patientId = document.getElementById("view-pid")?.innerText.trim();
+  if (patientId) {
+    window.location.href = `/billing?patient_id=${encodeURIComponent(patientId)}`;
+  }
+}
+
+const pagination = new PatientPagination({
   data: [],
   rowsPerPage: 3,
   tbodyId: "patientTableBody",

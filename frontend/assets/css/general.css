@@ -40,7 +40,7 @@ html.no-scroll {
 body {
     background: var(--light-bg);
     min-height: 100dvh;
-    min-width: 600px;
+    min-width: 320px;
     overflow: auto;
     display: flex;
     flex-direction: column;
@@ -616,4 +616,4 @@ span.status.inactive {
     .page-title {
         margin-top: 0;
     }
-}   
+}

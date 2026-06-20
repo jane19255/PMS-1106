@@ -1,32 +1,129 @@
 {% extends "layout.html" %}
 
-{% block title %}Billing{% endblock title %}
+{% block title %}Billing & Invoices{% endblock title %}
+
+{% block styles %}
+<link rel="stylesheet" href="/assets/css/billing.css?v=2">
+{% endblock styles %}
 
 {% block content %}
-<h1>Billing</h1>
+<div class="billing-page">
+    <div class="page-title">
+        <div>
+            <div class="title">Billing & Invoices</div>
+            <div class="description">Create invoices and track payment status</div>
+        </div>
+    </div>
 
-<form class="card" action="/billing/invoices" method="post">
-    <input type="text" name="patient_id" placeholder="Patient ID">
-    <input type="text" name="appointment_id" placeholder="Appointment ID">
-    <input type="text" name="treatment_name" placeholder="Treatment name">
-    <input type="number" name="treatment_cost" placeholder="Treatment cost" min="0" step="0.01">
-    <input type="text" name="prescription_name" placeholder="Prescription name">
-    <input type="number" name="prescription_cost" placeholder="Prescription cost" min="0" step="0.01">
-    <button type="submit">Create Invoice</button>
-</form>
+    <section class="display" aria-label="Billing summary">
+        <article class="card summary-card pending">
+            <div class="data">Pending bills</div>
+            <div class="number">{{ pending_count }}</div>
+        </article>
+        <article class="card summary-card paid">
+            <div class="data">Paid bills</div>
+            <div class="number">{{ paid_count }}</div>
+        </article>
+        <article class="card summary-card cancelled">
+            <div class="data">Cancelled bills</div>
+            <div class="number">{{ cancelled_count }}</div>
+        </article>
+        <article class="card summary-card revenue">
+            <div class="data">Paid revenue</div>
+            <div class="number">${{ paid_revenue | round(precision=2) }}</div>
+        </article>
+    </section>
 
-<h2>Invoices</h2>
+    <details class="card create-panel">
+        <summary>Create invoice</summary>
+        <form class="invoice-form" action="/billing/invoices" method="post">
+            <label class="patient-picker">Patient
+                <input type="search" id="invoicePatientSearch" list="invoicePatientOptions"
+                    placeholder="Search patient ID or name" autocomplete="off" required>
+                <input type="hidden" id="invoicePatientId" name="patient_id">
+                <datalist id="invoicePatientOptions"></datalist>
+                <small id="selectedPatientDetails">Select a patient from the database.</small>
+            </label>
+            <label>Appointment ID<input type="text" name="appointment_id"></label>
+            <label>Treatment name<input type="text" name="treatment_name" required></label>
+            <label>Treatment cost<input type="number" name="treatment_cost" min="0" step="0.01" required></label>
+            <label>Prescription name<input type="text" name="prescription_name"></label>
+            <label>Prescription cost<input type="number" name="prescription_cost" min="0" step="0.01"></label>
+            <button type="submit">Create invoice</button>
+        </form>
+    </details>
 
-{% if invoices | length == 0 %}
-<p>No invoices created yet.</p>
-{% endif %}
+    <section class="control card" aria-label="Invoice controls">
+        <div class="search">
+            <input type="search" id="billingSearch" placeholder="Search invoice, patient, or appointment ID">
+        </div>
+        <select id="billingStatus" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Paid">Paid</option>
+            <option value="Cancelled">Cancelled</option>
+        </select>
+        <select id="billingSort" aria-label="Sort invoices">
+            <option value="newest">Date (newest)</option>
+            <option value="oldest">Date (oldest)</option>
+            <option value="amount-high">Amount (highest)</option>
+            <option value="amount-low">Amount (lowest)</option>
+        </select>
+    </section>
 
-{% for invoice in invoices %}
-<section class="card invoice-card">
-    <h3><a href="/billing/invoices/{{ invoice.id }}">{{ invoice.id }}</a></h3>
-    <p>Patient ID: {{ invoice.patient_id }}</p>
-    <p>Total: ${{ invoice.total }}</p>
-    <p>Status: {{ invoice.status }}</p>
-</section>
-{% endfor %}
+    <section class="table-list card">
+        <div class="table-scroll">
+            <table id="billingTable">
+                <thead>
+                    <tr>
+                        <th>Invoice ID</th>
+                        <th>Patient ID</th>
+                        <th>Appointment ID</th>
+                        <th>Bill date</th>
+                        <th>Total amount</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invoice in invoices %}
+                    <tr data-search="{{ invoice.id }} {{ invoice.patient_id }} {{ invoice.appointment_id | default(value='') }}"
+                        data-status="{{ invoice.status }}"
+                        data-date="{{ invoice.created_at }}"
+                        data-amount="{{ invoice.total }}">
+                        <td>{{ invoice.id }}</td>
+                        <td>{{ invoice.patient_id }}</td>
+                        <td>{{ invoice.appointment_id | default(value="—") }}</td>
+                        <td>{{ invoice.created_at }}</td>
+                        <td>${{ invoice.total | round(precision=2) }}</td>
+                        <td><span class="status {{ invoice.status | lower }}">{{ invoice.status }}</span></td>
+                        <td class="action">
+                            <a href="/billing/invoices/{{ invoice.id }}">View</a>
+                            <a href="/billing/invoices/{{ invoice.id }}/report">Report</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p id="billingEmpty" class="empty-state" {% if invoices | length > 0 %}hidden{% endif %}>No invoices found.</p>
+        <div class="pagination">
+            <p id="billingPageInfo"></p>
+            <div>
+                <label for="billingRows">Rows per page</label>
+                <select id="billingRows">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                </select>
+                <button class="secondary" id="billingPrevious" type="button">Previous</button>
+                <button class="secondary" id="billingNext" type="button">Next</button>
+            </div>
+        </div>
+    </section>
+</div>
 {% endblock content %}
+
+{% block scripts %}
+<script src="/assets/js/billing-ssr.js?v=3" defer></script>
+{% endblock scripts %}

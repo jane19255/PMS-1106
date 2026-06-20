@@ -42,6 +42,12 @@ pub enum AppAction {
     ManageUsers,
 
     ManageDoctorAppt,
+
+    ViewBilling,
+    CreateInvoice,
+    RecordPayment,
+    CancelInvoice,
+    GenerateBillingReport,
 }
 
 pub fn routes(cfg: &mut web::ServiceConfig) {
@@ -218,7 +224,8 @@ pub async fn create_session(
                 Some(role) => role,
                 None => {
                     eprintln!("Rejected: UID {} has no active staff profile.", uid);
-                    return HttpResponse::Forbidden().body("Access Denied: No active staff profile found.");
+                    return HttpResponse::Forbidden()
+                        .body("Access Denied: No active staff profile found.");
                 }
             };
 
@@ -266,7 +273,9 @@ pub async fn current_user(
 
     let role = match get_staff_role(&firestore_db, &uid).await {
         Some(role) => role,
-        None => return HttpResponse::Forbidden().body("Access Denied: No active staff profile found."),
+        None => {
+            return HttpResponse::Forbidden().body("Access Denied: No active staff profile found.")
+        }
     };
 
     HttpResponse::Ok().json(serde_json::json!({
@@ -315,7 +324,8 @@ pub async fn forgot_password(form: web::Form<ForgotPasswordForm>) -> impl Respon
     }
 
     let api_key = std::env::var("FIREBASE_API_KEY").unwrap_or_default();
-    let url = format!("https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={api_key}");
+    let url =
+        format!("https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={api_key}");
     let body = serde_json::json!({ "requestType": "PASSWORD_RESET", "email": form.email });
     let client = reqwest::Client::new();
 
@@ -382,7 +392,10 @@ pub async fn require_auth_and_permission(
     if has_permission(&role, action) {
         Ok((uid, role))
     } else {
-        println!("SECURITY BLOCK: Role '{}' attempted unauthorized action.", role);
+        println!(
+            "SECURITY BLOCK: Role '{}' attempted unauthorized action.",
+            role
+        );
         Err(HttpResponse::Forbidden()
             .body("Access Denied: You do not have permission to perform this action."))
     }
@@ -404,6 +417,8 @@ pub fn has_permission(role: &str, action: AppAction) -> bool {
                 | AppAction::EditMedicalRecords
                 | AppAction::ViewPrescriptions
                 | AppAction::CreatePrescription
+                | AppAction::ViewBilling
+                | AppAction::GenerateBillingReport
         ),
 
         "receptionist" => matches!(
@@ -412,6 +427,11 @@ pub fn has_permission(role: &str, action: AppAction) -> bool {
                 | AppAction::CreatePatient
                 | AppAction::EditPatient
                 | AppAction::ManageAppointments
+                | AppAction::ViewBilling
+                | AppAction::CreateInvoice
+                | AppAction::RecordPayment
+                | AppAction::CancelInvoice
+                | AppAction::GenerateBillingReport
         ),
 
         "pharmacist" => matches!(
@@ -421,6 +441,7 @@ pub fn has_permission(role: &str, action: AppAction) -> bool {
                 | AppAction::ViewPrescriptions
                 | AppAction::DispenseMedicine
                 | AppAction::ManageMedicines
+                | AppAction::ViewBilling
         ),
 
         _ => false,
@@ -473,5 +494,52 @@ fn flash_message(code: &str) -> &'static str {
         "session_expired" => "Your session has expired. Please sign in again.",
         "unauthorized" => "You must be signed in to access that page.",
         _ => "An error occurred. Please try again.",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{has_permission, AppAction};
+
+    #[test]
+    fn receptionist_can_manage_billing_workflow() {
+        assert!(has_permission("receptionist", AppAction::ViewBilling));
+        assert!(has_permission("receptionist", AppAction::CreateInvoice));
+        assert!(has_permission("receptionist", AppAction::RecordPayment));
+        assert!(has_permission("receptionist", AppAction::CancelInvoice));
+        assert!(has_permission(
+            "receptionist",
+            AppAction::GenerateBillingReport
+        ));
+    }
+
+    #[test]
+    fn doctor_has_read_only_billing_access() {
+        assert!(has_permission("doctor", AppAction::ViewBilling));
+        assert!(has_permission("doctor", AppAction::GenerateBillingReport));
+        assert!(!has_permission("doctor", AppAction::CreateInvoice));
+        assert!(!has_permission("doctor", AppAction::RecordPayment));
+        assert!(!has_permission("doctor", AppAction::CancelInvoice));
+    }
+
+    #[test]
+    fn pharmacist_cannot_change_billing_records() {
+        assert!(has_permission("pharmacist", AppAction::ViewBilling));
+        assert!(!has_permission("pharmacist", AppAction::CreateInvoice));
+        assert!(!has_permission("pharmacist", AppAction::RecordPayment));
+        assert!(!has_permission("pharmacist", AppAction::CancelInvoice));
+    }
+
+    #[test]
+    fn admin_has_all_billing_permissions() {
+        for action in [
+            AppAction::ViewBilling,
+            AppAction::CreateInvoice,
+            AppAction::RecordPayment,
+            AppAction::CancelInvoice,
+            AppAction::GenerateBillingReport,
+        ] {
+            assert!(has_permission("admin", action));
+        }
     }
 }
