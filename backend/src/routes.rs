@@ -9,14 +9,21 @@ pub fn configure(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/billing")
             .route("", web::get().to(billing_handlers::list_invoices))
-            .route("/invoices", web::post().to(billing_handlers::create_invoice))
+            .route(
+                "/invoices",
+                web::post().to(billing_handlers::create_invoice),
+            )
             .route(
                 "/invoices/{invoice_id}",
                 web::get().to(billing_handlers::show_invoice),
             )
             .route(
-                "/invoices/{invoice_id}/pay",
-                web::post().to(billing_handlers::mark_invoice_paid),
+                "/invoices/{invoice_id}/payments",
+                web::post().to(billing_handlers::record_payment),
+            )
+            .route(
+                "/invoices/{invoice_id}/cancel",
+                web::post().to(billing_handlers::cancel_invoice),
             )
             .route(
                 "/invoices/{invoice_id}/report",

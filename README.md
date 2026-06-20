@@ -101,13 +101,19 @@ Implemented so far:
 - invoice creation
 - invoice listing
 - invoice detail page
-- payment status update
+- partial and full payment recording with payment history
+- outstanding balance tracking
+- invoice cancellation with guarded status transitions
+- duplicate active-invoice prevention per appointment
 - print-friendly medical report page
 - billing input validation
+- concurrent duplicate-invoice protection
 - in-memory repository for temporary testing
-- SQL schema draft for invoices, invoice items, and payments
+- PostgreSQL/Supabase schema for invoices, invoice items, and payments
 
-The current storage is temporary and uses an in-memory repository. Data resets when the server restarts. The final version should connect this repository layer to a relational database.
+Billing supports both in-memory storage for local testing and persistent Supabase
+PostgreSQL storage. Set `BILLING_STORAGE=supabase` after applying the billing
+schema to enable persistence.
 
 ## Project Structure
 
@@ -157,7 +163,8 @@ http://127.0.0.1:8080/billing
 GET  /billing
 POST /billing/invoices
 GET  /billing/invoices/{invoice_id}
-POST /billing/invoices/{invoice_id}/pay
+POST /billing/invoices/{invoice_id}/payments
+POST /billing/invoices/{invoice_id}/cancel
 GET  /billing/invoices/{invoice_id}/report
 ```
 
@@ -176,6 +183,27 @@ It currently includes tables for:
 - payments
 
 More tables should be added as the other members implement their modules.
+
+Run `supabase_schema.sql` before `schema.sql`, because billing invoices reference
+the patient table. Then set the following value in `backend/.env`:
+
+```text
+BILLING_STORAGE=supabase
+```
+
+The Supabase repository uses transactional PostgreSQL functions for invoice
+creation, payments, cancellation, and duplicate-appointment protection.
+
+## Tests
+
+Run the billing business-logic tests from the `backend` folder:
+
+```bash
+cargo test billing::service::tests
+```
+
+The tests cover totals, validation, partial and full payments, cancellation,
+duplicate appointment billing, and concurrent invoice creation.
 
 ## Development Notes
 

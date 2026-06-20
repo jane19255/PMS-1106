@@ -23,7 +23,7 @@
 
   <script src="/assets/js/FirebaseService.js"></script>
   <script src="/assets/js/general.js"></script>
-  <script src="/assets/js/patients.js"></script>
+  <script src="/assets/js/patients.js?v=2"></script>
 </head>
 
 <body>
@@ -383,6 +383,9 @@
         </div>
 
         <div class="button-section">
+          <button class="secondary" onclick="createInvoiceForSelectedPatient()">
+            <i class="fa-solid fa-file-invoice-dollar"></i> Create Invoice
+          </button>
           <button onclick="closeModal(this)">Close</button>
         </div>
       </div>

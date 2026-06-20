@@ -1,35 +1,137 @@
 {% extends "layout.html" %}
 
-{% block title %}Invoice{% endblock title %}
+{% block title %}Invoice {{ invoice.id }}{% endblock title %}
+
+{% block styles %}
+<link rel="stylesheet" href="/assets/css/billing.css?v=4">
+{% endblock styles %}
 
 {% block content %}
-<h1>Invoice {{ invoice.id }}</h1>
+<div class="billing-page billing-detail-page">
+    <div class="detail-toolbar">
+        <a class="back-link" href="/billing"><i class="fa-solid fa-arrow-left"></i> Back to billing</a>
+        <a class="button-link" href="/billing/invoices/{{ invoice.id }}/report">
+            <i class="fa-solid fa-file-lines"></i> Medical report
+        </a>
+    </div>
 
-<section class="card invoice-card">
-    <p>Patient ID: {{ invoice.patient_id }}</p>
-    {% if invoice.appointment_id %}
-    <p>Appointment ID: {{ invoice.appointment_id }}</p>
+    <section class="invoice-hero card">
+        <div>
+            <div class="eyebrow">Patient invoice</div>
+            <h1>{{ invoice.id }}</h1>
+            <p>Created {{ invoice.created_at }}</p>
+        </div>
+        <span class="status status-large {{ invoice.status | lower }}">{{ invoice.status }}</span>
+    </section>
+
+    <div class="invoice-overview">
+        <section class="card detail-section patient-summary">
+            <div class="section-heading">
+                <span class="section-icon"><i class="fa-solid fa-user"></i></span>
+                <div><h2>Patient details</h2><p>Linked patient record</p></div>
+            </div>
+            {% if patient %}
+            <div class="identity-name">{{ patient.firstName }} {{ patient.lastName }}</div>
+            <dl class="detail-grid">
+                <div><dt>Patient ID</dt><dd>{{ patient.id }}</dd></div>
+                <div><dt>NRIC / FIN</dt><dd>{{ patient.nric }}</dd></div>
+                <div><dt>Date of birth</dt><dd>{{ patient.dob }}</dd></div>
+                <div><dt>Gender</dt><dd>{{ patient.gender }}</dd></div>
+                <div><dt>Phone</dt><dd>{{ patient.phone }}</dd></div>
+                <div><dt>Email</dt><dd>{{ patient.email }}</dd></div>
+            </dl>
+            {% else %}
+            <div class="empty-inline">Patient details unavailable. ID: {{ invoice.patient_id }}</div>
+            {% endif %}
+        </section>
+
+        <section class="card detail-section financial-summary">
+            <div class="section-heading">
+                <span class="section-icon"><i class="fa-solid fa-receipt"></i></span>
+                <div><h2>Invoice summary</h2><p>Payment position</p></div>
+            </div>
+            <dl class="summary-list">
+                {% if invoice.appointment_id %}
+                <div><dt>Appointment</dt><dd>{{ invoice.appointment_id }}</dd></div>
+                {% endif %}
+                <div><dt>Subtotal</dt><dd>${{ invoice.subtotal | round(precision=2) }}</dd></div>
+                <div><dt>Amount paid</dt><dd class="paid-amount">${{ invoice.amount_paid | round(precision=2) }}</dd></div>
+                <div class="balance-row"><dt>Balance due</dt><dd>${{ invoice.balance_due | round(precision=2) }}</dd></div>
+            </dl>
+        </section>
+    </div>
+
+    <section class="card detail-section itemized-section">
+        <div class="section-heading">
+            <span class="section-icon"><i class="fa-solid fa-list-check"></i></span>
+            <div><h2>Itemized charges</h2><p>Treatments and prescriptions included in this invoice</p></div>
+        </div>
+        <div class="responsive-table">
+            <table class="billing-detail-table">
+                <thead><tr><th>Category</th><th>Description</th><th class="money-column">Amount</th></tr></thead>
+                <tbody>
+                    {% for item in invoice.items %}
+                    <tr>
+                        <td><span class="item-type">{{ item.item_type }}</span></td>
+                        <td>{{ item.name }}</td>
+                        <td class="money-column">${{ item.cost | round(precision=2) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot><tr><td colspan="2">Invoice total</td><td class="money-column">${{ invoice.total | round(precision=2) }}</td></tr></tfoot>
+            </table>
+        </div>
+    </section>
+
+    {% if invoice.status == "Pending" %}
+    <section class="card detail-section payment-panel">
+        <div class="section-heading">
+            <span class="section-icon"><i class="fa-solid fa-credit-card"></i></span>
+            <div><h2>Record payment</h2><p>Outstanding balance: ${{ invoice.balance_due | round(precision=2) }}</p></div>
+        </div>
+        <form class="payment-form" action="/billing/invoices/{{ invoice.id }}/payments" method="post">
+            <label>Amount
+                <div class="currency-input"><span>$</span><input type="number" name="amount" min="0.01" max="{{ invoice.balance_due }}" step="0.01" required></div>
+            </label>
+            <label>Payment method
+                <select name="payment_method" required>
+                    <option value="">Select method</option>
+                    <option value="Cash">Cash</option><option value="Card">Card</option>
+                    <option value="PayNow">PayNow</option><option value="Insurance">Insurance</option>
+                </select>
+            </label>
+            <label>Transaction reference
+                <input type="text" name="transaction_reference" maxlength="100" placeholder="Optional reference">
+            </label>
+            <button type="submit"><i class="fa-solid fa-check"></i> Record payment</button>
+        </form>
+        {% if invoice.amount_paid == 0 %}
+        <form class="cancel-form" action="/billing/invoices/{{ invoice.id }}/cancel" method="post">
+            <button type="submit" class="danger-button"><i class="fa-solid fa-ban"></i> Cancel invoice</button>
+        </form>
+        {% endif %}
+    </section>
     {% endif %}
-    <p>Created: {{ invoice.created_at }}</p>
-    <p>Status: {{ invoice.status }}</p>
 
-    <h2>Items</h2>
-    <ul>
-        {% for item in invoice.items %}
-        <li>{{ item.item_type }}: {{ item.name }} - ${{ item.cost }}</li>
-        {% endfor %}
-    </ul>
-
-    <p>Subtotal: ${{ invoice.subtotal }}</p>
-    <p>Total: ${{ invoice.total }}</p>
-
-    {% if invoice.status != "Paid" %}
-    <form action="/billing/invoices/{{ invoice.id }}/pay" method="post">
-        <button type="submit">Mark as Paid</button>
-    </form>
-    {% endif %}
-
-    <p><a href="/billing/invoices/{{ invoice.id }}/report">View Medical Report</a></p>
-    <p><a href="/billing">Back to Billing</a></p>
-</section>
+    <section class="card detail-section payment-history">
+        <div class="section-heading">
+            <span class="section-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
+            <div><h2>Payment history</h2><p>All transactions recorded for this invoice</p></div>
+        </div>
+        {% if invoice.payments | length == 0 %}
+        <div class="empty-state compact"><i class="fa-regular fa-credit-card"></i><span>No payments recorded yet.</span></div>
+        {% else %}
+        <div class="responsive-table">
+            <table class="billing-detail-table">
+                <thead><tr><th>Payment ID</th><th>Date</th><th>Method</th><th>Reference</th><th class="money-column">Amount</th></tr></thead>
+                <tbody>{% for payment in invoice.payments %}<tr>
+                    <td>{{ payment.id }}</td><td>{{ payment.paid_at }}</td><td>{{ payment.payment_method }}</td>
+                    <td>{{ payment.transaction_reference | default(value="—") }}</td>
+                    <td class="money-column">${{ payment.amount | round(precision=2) }}</td>
+                </tr>{% endfor %}</tbody>
+            </table>
+        </div>
+        {% endif %}
+    </section>
+</div>
 {% endblock content %}

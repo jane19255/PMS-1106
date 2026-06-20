@@ -10,8 +10,12 @@ pub struct Invoice {
     pub subtotal: f64,
     pub total: f64,
     pub status: PaymentStatus,
+    pub payments: Vec<Payment>,
+    pub amount_paid: f64,
+    pub balance_due: f64,
     pub created_at: DateTime<Utc>,
     pub paid_at: Option<DateTime<Utc>>,
+    pub cancelled_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -35,6 +39,16 @@ pub enum PaymentStatus {
     Cancelled,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Payment {
+    pub id: String,
+    pub invoice_id: String,
+    pub amount: f64,
+    pub payment_method: String,
+    pub transaction_reference: Option<String>,
+    pub paid_at: DateTime<Utc>,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct CreateInvoiceForm {
     pub patient_id: String,
@@ -43,6 +57,13 @@ pub struct CreateInvoiceForm {
     pub treatment_cost: String,
     pub prescription_name: Option<String>,
     pub prescription_cost: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct RecordPaymentForm {
+    pub amount: String,
+    pub payment_method: String,
+    pub transaction_reference: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]

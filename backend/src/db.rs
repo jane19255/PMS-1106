@@ -94,10 +94,15 @@ impl SupabaseRestDb {
     }
 
     fn authed(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        builder
+        let builder = builder
             .header("apikey", &self.key)
-            .header("Authorization", format!("Bearer {}", &self.key))
-            .header("Content-Type", "application/json")
+            .header("Content-Type", "application/json");
+
+        if self.key.starts_with("eyJ") {
+            builder.header("Authorization", format!("Bearer {}", &self.key))
+        } else {
+            builder
+        }
     }
 
     async fn read_response(response: reqwest::Response) -> Result<String, String> {
@@ -112,6 +117,17 @@ impl SupabaseRestDb {
 
     pub async fn list_patients(&self) -> Result<String, String> {
         let url = self.rest_url("patients?select=*&order=created_at.desc.nullslast");
+        let response = self
+            .authed(self.http_client.get(url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Self::read_response(response).await
+    }
+
+    pub async fn get_patient(&self, patient_id: &str) -> Result<String, String> {
+        let encoded_id = urlencoding::encode(patient_id);
+        let url = self.rest_url(&format!("patients?id=eq.{}&select=*&limit=1", encoded_id));
         let response = self
             .authed(self.http_client.get(url))
             .send()
