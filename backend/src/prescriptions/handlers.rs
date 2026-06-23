@@ -1,0 +1,422 @@
+use super::service::{
+    CreatePrescriptionForm, PrescriptionError, PrescriptionService, UpdatePrescriptionForm,
+};
+use crate::db::FirebaseRestDb;
+use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use actix_web::http::header;
+use actix_web::{web, HttpRequest, HttpResponse, Responder};
+use firebase_auth::FirebaseAuth;
+use serde::Deserialize;
+use tera::{Context, Tera};
+
+pub fn routes(config: &mut web::ServiceConfig) {
+    config
+        .route("/prescriptions", web::get().to(prescriptions_page))
+        .route("/prescriptions", web::post().to(create_prescription_form))
+        .route(
+            "/prescriptions/{prescription_id}",
+            web::get().to(show_prescription),
+        )
+        .route(
+            "/prescriptions/{prescription_id}",
+            web::post().to(update_prescription_form),
+        )
+        .route(
+            "/prescriptions/{prescription_id}/dispense",
+            web::post().to(dispense_prescription_form),
+        )
+        .route(
+            "/prescriptions/{prescription_id}/cancel",
+            web::post().to(cancel_prescription_form),
+        )
+        .route("/api/prescriptions", web::get().to(list_prescriptions_api))
+        .route(
+            "/api/prescriptions",
+            web::post().to(create_prescription_api),
+        )
+        .route(
+            "/api/prescriptions/{prescription_id}",
+            web::get().to(show_prescription_api),
+        )
+        .route(
+            "/api/prescriptions/{prescription_id}",
+            web::put().to(update_prescription_api),
+        )
+        .route(
+            "/api/prescriptions/{prescription_id}/dispense",
+            web::post().to(dispense_prescription_api),
+        )
+        .route(
+            "/api/prescriptions/{prescription_id}/cancel",
+            web::post().to(cancel_prescription_api),
+        );
+}
+
+pub async fn prescriptions_page(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    templates: web::Data<Tera>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::ViewPrescriptions,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    match prescription_service.list_prescriptions() {
+        Ok(prescriptions) => {
+            let mut context = Context::new();
+            context.insert("prescriptions", &prescriptions);
+            render_template(&templates, "prescriptions/index.html", &context)
+        }
+        Err(error) => render_error(&templates, error),
+    }
+}
+
+pub async fn show_prescription(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    templates: web::Data<Tera>,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::ViewPrescriptions,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    match prescription_service.find_prescription(&path.into_inner()) {
+        Ok(prescription) => {
+            let mut context = Context::new();
+            context.insert("prescription", &prescription);
+            render_template(&templates, "prescriptions/show.html", &context)
+        }
+        Err(error) => render_error(&templates, error),
+    }
+}
+
+pub async fn create_prescription_form(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    templates: web::Data<Tera>,
+    form: web::Form<CreatePrescriptionForm>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::CreatePrescription,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    match prescription_service.create_prescription(form.into_inner()) {
+        Ok(_) => redirect_to("/prescriptions"),
+        Err(error) => render_error(&templates, error),
+    }
+}
+
+pub async fn update_prescription_form(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    templates: web::Data<Tera>,
+    path: web::Path<String>,
+    form: web::Form<UpdatePrescriptionForm>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::CreatePrescription,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    let prescription_id = path.into_inner();
+    match prescription_service.update_prescription(&prescription_id, form.into_inner()) {
+        Ok(_) => redirect_to(&format!("/prescriptions/{prescription_id}")),
+        Err(error) => render_error(&templates, error),
+    }
+}
+
+pub async fn dispense_prescription_form(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    templates: web::Data<Tera>,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::DispenseMedicine,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    let prescription_id = path.into_inner();
+    match prescription_service.dispense_prescription(&prescription_id) {
+        Ok(_) => redirect_to(&format!("/prescriptions/{prescription_id}")),
+        Err(error) => render_error(&templates, error),
+    }
+}
+
+pub async fn cancel_prescription_form(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    templates: web::Data<Tera>,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::CreatePrescription,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    let prescription_id = path.into_inner();
+    match prescription_service.cancel_prescription(&prescription_id) {
+        Ok(_) => redirect_to(&format!("/prescriptions/{prescription_id}")),
+        Err(error) => render_error(&templates, error),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct PrescriptionListQuery {
+    pub patient_id: Option<String>,
+    pub doctor_id: Option<String>,
+}
+
+pub async fn list_prescriptions_api(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    query: web::Query<PrescriptionListQuery>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::ViewPrescriptions,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    let prescriptions = if let Some(patient_id) = query.patient_id.as_deref() {
+        prescription_service.list_prescriptions_for_patient(patient_id)
+    } else if let Some(doctor_id) = query.doctor_id.as_deref() {
+        prescription_service.list_prescriptions_for_doctor(doctor_id)
+    } else {
+        prescription_service.list_prescriptions()
+    };
+
+    match prescriptions {
+        Ok(prescriptions) => HttpResponse::Ok().json(prescriptions),
+        Err(error) => prescription_error_response(error),
+    }
+}
+
+pub async fn show_prescription_api(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::ViewPrescriptions,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    match prescription_service.find_prescription(&path.into_inner()) {
+        Ok(prescription) => HttpResponse::Ok().json(prescription),
+        Err(error) => prescription_error_response(error),
+    }
+}
+
+pub async fn create_prescription_api(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    form: web::Json<CreatePrescriptionForm>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::CreatePrescription,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    match prescription_service.create_prescription(form.into_inner()) {
+        Ok(prescription) => HttpResponse::Created().json(prescription),
+        Err(error) => prescription_error_response(error),
+    }
+}
+
+pub async fn update_prescription_api(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    path: web::Path<String>,
+    form: web::Json<UpdatePrescriptionForm>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::CreatePrescription,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    match prescription_service.update_prescription(&path.into_inner(), form.into_inner()) {
+        Ok(prescription) => HttpResponse::Ok().json(prescription),
+        Err(error) => prescription_error_response(error),
+    }
+}
+
+pub async fn dispense_prescription_api(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::DispenseMedicine,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    match prescription_service.dispense_prescription(&path.into_inner()) {
+        Ok(prescription) => HttpResponse::Ok().json(prescription),
+        Err(error) => prescription_error_response(error),
+    }
+}
+
+pub async fn cancel_prescription_api(
+    req: HttpRequest,
+    prescription_service: web::Data<PrescriptionService>,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_prescription_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::CreatePrescription,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    match prescription_service.cancel_prescription(&path.into_inner()) {
+        Ok(prescription) => HttpResponse::Ok().json(prescription),
+        Err(error) => prescription_error_response(error),
+    }
+}
+
+async fn require_prescription_permission(
+    req: &HttpRequest,
+    firebase_auth: &FirebaseAuth,
+    firestore_db: &FirebaseRestDb,
+    action: AppAction,
+) -> Result<(String, String), HttpResponse> {
+    require_auth_and_permission(req, firebase_auth, firestore_db, action).await
+}
+
+fn render_template(templates: &Tera, template_name: &str, context: &Context) -> HttpResponse {
+    match templates.render(template_name, context) {
+        Ok(body) => HttpResponse::Ok().content_type("text/html").body(body),
+        Err(error) => HttpResponse::InternalServerError()
+            .content_type("text/plain")
+            .body(format!("Template error: {error}")),
+    }
+}
+
+fn render_error(templates: &Tera, error: PrescriptionError) -> HttpResponse {
+    let mut context = Context::new();
+    context.insert("message", &prescription_error_message(error));
+    render_template(templates, "error.html", &context)
+}
+
+fn prescription_error_response(error: PrescriptionError) -> HttpResponse {
+    let message = prescription_error_message(error);
+    if message == "Prescription was not found." {
+        HttpResponse::NotFound().body(message)
+    } else if message == "Prescription storage is unavailable." {
+        HttpResponse::InternalServerError().body(message)
+    } else {
+        HttpResponse::BadRequest().body(message)
+    }
+}
+
+fn prescription_error_message(error: PrescriptionError) -> String {
+    match error {
+        PrescriptionError::InvalidInput(message) => message,
+        PrescriptionError::PrescriptionNotFound => "Prescription was not found.".to_string(),
+        PrescriptionError::StorageUnavailable => "Prescription storage is unavailable.".to_string(),
+    }
+}
+
+fn redirect_to(location: &str) -> HttpResponse {
+    HttpResponse::SeeOther()
+        .insert_header((header::LOCATION, location))
+        .finish()
+}

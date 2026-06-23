@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+
+{% block title %}Prescriptions{% endblock title %}
+
+{% block content %}
+<h1>Prescription Tracking</h1>
+
+<form class="card" action="/prescriptions" method="post">
+    <input type="text" name="patient_id" placeholder="Patient ID">
+    <input type="text" name="doctor_id" placeholder="Doctor ID">
+    <input type="text" name="medical_record_id" placeholder="Medical record ID">
+    <input type="text" name="medication_name" placeholder="Medication name">
+    <input type="text" name="dosage" placeholder="Dosage">
+    <input type="text" name="frequency" placeholder="Frequency">
+    <input type="text" name="duration" placeholder="Duration">
+    <input type="text" name="instructions" placeholder="Instructions">
+    <input type="number" name="quantity" placeholder="Quantity" min="1">
+    <input type="number" name="unit_cost" placeholder="Unit cost" min="0" step="0.01">
+    <button type="submit">Create Prescription</button>
+</form>
+
+<h2>Prescriptions</h2>
+
+{% if prescriptions | length == 0 %}
+<p>No prescriptions created yet.</p>
+{% endif %}
+
+{% for prescription in prescriptions %}
+<section class="card">
+    <h3><a href="/prescriptions/{{ prescription.id }}">{{ prescription.medication_name }}</a></h3>
+    <p>Patient ID: {{ prescription.patient_id }}</p>
+    <p>Doctor ID: {{ prescription.doctor_id }}</p>
+    <p>Dosage: {{ prescription.dosage }}</p>
+    <p>Status: {{ prescription.status }}</p>
+</section>
+{% endfor %}
+{% endblock content %}

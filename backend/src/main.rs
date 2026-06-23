@@ -1,10 +1,10 @@
 mod billing;
 mod db;
+mod doctors;
 mod handlers;
 mod models;
 mod prescriptions;
 mod routes;
-mod doctors;
 
 use actix_files::Files;
 use actix_web::{web, App, HttpResponse, HttpServer};
@@ -16,6 +16,8 @@ use doctors::repository::{DoctorRepository, InMemoryDoctorRepository, SupabaseDo
 use doctors::service::DoctorService;
 use dotenv::dotenv;
 use firebase_auth::FirebaseAuth;
+use prescriptions::repository::{InMemoryPrescriptionRepository, PrescriptionRepository};
+use prescriptions::service::PrescriptionService;
 use std::sync::Arc;
 use tera::Tera;
 
@@ -63,6 +65,9 @@ async fn main() -> std::io::Result<()> {
             }
         };
     let doctor_service = web::Data::new(DoctorService::new(doctor_repository));
+    let prescription_repository: Arc<dyn PrescriptionRepository> =
+        Arc::new(InMemoryPrescriptionRepository::default());
+    let prescription_service = web::Data::new(PrescriptionService::new(prescription_repository));
     let template_data = web::Data::new(templates);
 
     println!("Server running at http://127.0.0.1:8080");
@@ -71,6 +76,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(billing_service.clone())
             .app_data(doctor_service.clone())
+            .app_data(prescription_service.clone())
             .app_data(template_data.clone())
             .app_data(web::Data::new(firebase_auth.clone()))
             .app_data(web::Data::new(firestore_db.clone()))
@@ -142,5 +148,3 @@ mod template_tests {
         assert!(html.contains("Dr. Test"));
     }
 }
-
-
