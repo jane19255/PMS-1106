@@ -11,6 +11,8 @@ use billing::repository::{
     InMemoryInvoiceRepository, InvoiceRepository, SupabaseInvoiceRepository,
 };
 use billing::service::BillingService;
+use doctors::repository::{DoctorRepository, InMemoryDoctorRepository};
+use doctors::service::DoctorService;
 use dotenv::dotenv;
 use firebase_auth::FirebaseAuth;
 use std::sync::Arc;
@@ -45,6 +47,8 @@ async fn main() -> std::io::Result<()> {
             }
         };
     let billing_service = web::Data::new(BillingService::new(invoice_repository));
+    let doctor_repository: Arc<dyn DoctorRepository> = Arc::new(InMemoryDoctorRepository::default());
+    let doctor_service = web::Data::new(DoctorService::new(doctor_repository));
     let template_data = web::Data::new(templates);
 
     println!("Server running at http://127.0.0.1:8080");
@@ -52,6 +56,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(billing_service.clone())
+            .app_data(doctor_service.clone())
             .app_data(template_data.clone())
             .app_data(web::Data::new(firebase_auth.clone()))
             .app_data(web::Data::new(firestore_db.clone()))
@@ -91,3 +96,4 @@ mod template_tests {
         Tera::new("templates/**/*.html").expect("all Tera templates should parse");
     }
 }
+

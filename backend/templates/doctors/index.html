@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+
+{% block title %}Doctors{% endblock title %}
+
+{% block content %}
+<h1>Doctor Management</h1>
+
+<form class="card" action="/doctors" method="post">
+    <input type="text" name="name" placeholder="Doctor name">
+    <input type="text" name="specialization" placeholder="Specialization">
+    <input type="text" name="contact_number" placeholder="Contact number">
+    <input type="email" name="email" placeholder="Email">
+    <button type="submit">Create Doctor</button>
+</form>
+
+<h2>Doctors</h2>
+
+{% if doctors | length == 0 %}
+<p>No doctors created yet.</p>
+{% endif %}
+
+{% for doctor in doctors %}
+<section class="card">
+    <h3><a href="/doctors/{{ doctor.id }}">{{ doctor.name }}</a></h3>
+    <p>Specialization: {{ doctor.specialization }}</p>
+    <p>Contact: {{ doctor.contact_number }}</p>
+    <p>Email: {{ doctor.email }}</p>
+    <p>Status: {{ doctor.status }}</p>
+</section>
+{% endfor %}
+{% endblock content %}

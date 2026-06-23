@@ -1,0 +1,65 @@
+{% extends "layout.html" %}
+
+{% block title %}Doctor{% endblock title %}
+
+{% block content %}
+<h1>{{ doctor.name }}</h1>
+
+<section class="card">
+    <p>ID: {{ doctor.id }}</p>
+    <p>Specialization: {{ doctor.specialization }}</p>
+    <p>Contact: {{ doctor.contact_number }}</p>
+    <p>Email: {{ doctor.email }}</p>
+    <p>Status: {{ doctor.status }}</p>
+
+    <form action="/doctors/{{ doctor.id }}" method="post">
+        <input type="text" name="name" value="{{ doctor.name }}">
+        <input type="text" name="specialization" value="{{ doctor.specialization }}">
+        <input type="text" name="contact_number" value="{{ doctor.contact_number }}">
+        <input type="email" name="email" value="{{ doctor.email }}">
+        <select name="status">
+            <option value="Available">Available</option>
+            <option value="Unavailable">Unavailable</option>
+        </select>
+        <button type="submit">Update Doctor</button>
+    </form>
+
+    <form action="/doctors/{{ doctor.id }}/delete" method="post">
+        <button type="submit">Delete Doctor</button>
+    </form>
+</section>
+
+<section class="card">
+    <h2>Schedules</h2>
+
+    <form action="/doctors/{{ doctor.id }}/schedules" method="post">
+        <select name="day_of_week">
+            <option value="Monday">Monday</option>
+            <option value="Tuesday">Tuesday</option>
+            <option value="Wednesday">Wednesday</option>
+            <option value="Thursday">Thursday</option>
+            <option value="Friday">Friday</option>
+            <option value="Saturday">Saturday</option>
+            <option value="Sunday">Sunday</option>
+        </select>
+        <input type="time" name="start_time">
+        <input type="time" name="end_time">
+        <button type="submit">Add Schedule</button>
+    </form>
+
+    {% if schedules | length == 0 %}
+    <p>No schedules created yet.</p>
+    {% endif %}
+
+    {% for schedule in schedules %}
+    <div class="card">
+        <p>{{ schedule.day_of_week }}: {{ schedule.start_time }} - {{ schedule.end_time }}</p>
+        <form action="/doctors/schedules/{{ schedule.id }}/delete" method="post">
+            <button type="submit">Delete Schedule</button>
+        </form>
+    </div>
+    {% endfor %}
+</section>
+
+<p><a href="/doctors">Back to Doctors</a></p>
+{% endblock content %}
