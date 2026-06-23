@@ -2,6 +2,7 @@ mod billing;
 mod db;
 mod handlers;
 mod models;
+mod prescriptions;
 mod routes;
 mod doctors;
 
@@ -141,4 +142,5 @@ mod template_tests {
         assert!(html.contains("Dr. Test"));
     }
 }
+
 
