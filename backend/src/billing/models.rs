@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Invoice {
@@ -49,14 +49,43 @@ pub struct Payment {
     pub paid_at: DateTime<Utc>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct MedicineOption {
+    pub name: &'static str,
+    pub dosage: &'static str,
+    pub unit_cost: f64,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct CreateInvoiceForm {
     pub patient_id: String,
     pub appointment_id: Option<String>,
     pub treatment_name: String,
     pub treatment_cost: String,
-    pub prescription_name: Option<String>,
-    pub prescription_cost: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_form_vec")]
+    pub prescription_names: Vec<String>,
+    #[serde(default, deserialize_with = "deserialize_form_vec")]
+    pub custom_prescription_names: Vec<String>,
+    #[serde(default, deserialize_with = "deserialize_form_vec")]
+    pub custom_prescription_costs: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum FormVec {
+    One(String),
+    Many(Vec<String>),
+}
+
+fn deserialize_form_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(match Option::<FormVec>::deserialize(deserializer)? {
+        Some(FormVec::One(value)) => vec![value],
+        Some(FormVec::Many(values)) => values,
+        None => Vec::new(),
+    })
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -70,4 +99,16 @@ pub struct RecordPaymentForm {
 pub struct MedicalReport {
     pub invoice: Invoice,
     pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ClinicalSummary {
+    pub record_id: Option<String>,
+    pub appointment_id: Option<String>,
+    pub recorded_at: Option<DateTime<Utc>>,
+    pub doctor_name: Option<String>,
+    pub diagnosis: Option<String>,
+    pub doctor_notes: Option<String>,
+    pub treatment_plan: Option<String>,
+    pub prescribed_medicines: Option<String>,
 }

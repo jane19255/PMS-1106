@@ -15,3 +15,4 @@ dotenv = "0.15"
 reqwest = { version = "0.11", features = ["json"] }
 firebase-auth = "0.5.1"
 urlencoding = "2"
+printpdf = "0.7"

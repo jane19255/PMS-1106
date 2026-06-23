@@ -28,6 +28,10 @@ pub fn configure(config: &mut web::ServiceConfig) {
             .route(
                 "/invoices/{invoice_id}/report",
                 web::get().to(billing_handlers::show_medical_report),
+            )
+            .route(
+                "/invoices/{invoice_id}/report.pdf",
+                web::get().to(billing_handlers::download_medical_report_pdf),
             ),
     );
 }

@@ -21,13 +21,9 @@ pub async fn patients_page(
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
-    if let Err(rejection) = require_auth_and_permission(
-        &req,
-        &firebase_auth,
-        &firestore_db,
-        AppAction::ViewPatient,
-    )
-    .await
+    if let Err(rejection) =
+        require_auth_and_permission(&req, &firebase_auth, &firestore_db, AppAction::ViewPatient)
+            .await
     {
         return rejection;
     }
@@ -59,12 +55,10 @@ pub async fn list_patients(
     firestore_db: web::Data<FirebaseRestDb>,
     supabase_db: web::Data<SupabaseRestDb>,
 ) -> impl Responder {
-    if let Err(rejection) = require_auth_and_permission(
-        &req,
-        &firebase_auth,
-        &firestore_db,
-        AppAction::ViewPatient,
-    ).await {
+    if let Err(rejection) =
+        require_auth_and_permission(&req, &firebase_auth, &firestore_db, AppAction::ViewPatient)
+            .await
+    {
         return rejection;
     }
 
@@ -98,7 +92,9 @@ pub async fn create_patient(
         &firebase_auth,
         &firestore_db,
         AppAction::CreatePatient,
-    ).await {
+    )
+    .await
+    {
         return rejection;
     }
 
@@ -128,13 +124,17 @@ pub async fn create_patient(
 
     match supabase_db.create_patient(&payload).await {
         Ok(_) => {
-            println!("Successfully registered patient in Supabase: {}", patient_id);
+            println!(
+                "Successfully registered patient in Supabase: {}",
+                patient_id
+            );
             HttpResponse::Ok().json(json!({ "status": "success" }))
         }
         Err(e) => {
             eprintln!("Failed to create patient in Supabase: {e}");
             if e.contains("duplicate key") || e.contains("23505") {
-                HttpResponse::Conflict().body("A patient with this NRIC/FIN/Passport already exists.")
+                HttpResponse::Conflict()
+                    .body("A patient with this NRIC/FIN/Passport already exists.")
             } else {
                 HttpResponse::InternalServerError().body("Failed to save patient to database.")
             }
@@ -150,12 +150,10 @@ pub async fn update_patient(
     firestore_db: web::Data<FirebaseRestDb>,
     supabase_db: web::Data<SupabaseRestDb>,
 ) -> impl Responder {
-    if let Err(rejection) = require_auth_and_permission(
-        &req,
-        &firebase_auth,
-        &firestore_db,
-        AppAction::EditPatient,
-    ).await {
+    if let Err(rejection) =
+        require_auth_and_permission(&req, &firebase_auth, &firestore_db, AppAction::EditPatient)
+            .await
+    {
         return rejection;
     }
 
@@ -198,7 +196,9 @@ pub async fn delete_patient(
         &firebase_auth,
         &firestore_db,
         AppAction::DeletePatient,
-    ).await {
+    )
+    .await
+    {
         return rejection;
     }
 

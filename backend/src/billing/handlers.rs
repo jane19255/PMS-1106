@@ -1,4 +1,5 @@
-use super::models::{CreateInvoiceForm, PaymentStatus, RecordPaymentForm};
+use super::models::{ClinicalSummary, CreateInvoiceForm, PaymentStatus, RecordPaymentForm};
+use super::pdf::render_medical_report_pdf;
 use super::service::{BillingError, BillingService};
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
@@ -6,6 +7,7 @@ use crate::models::{PatientView, SupabasePatientRow};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
+use std::collections::HashMap;
 use tera::{Context, Tera};
 
 pub async fn list_invoices(
@@ -48,6 +50,7 @@ pub async fn list_invoices(
             context.insert("paid_count", &paid_count);
             context.insert("cancelled_count", &cancelled_count);
             context.insert("paid_revenue", &paid_revenue);
+            context.insert("medicine_options", &billing_service.medicine_catalog());
             render_template(&templates, "billing/index.html", &context)
         }
         Err(error) => render_error(&templates, error),
@@ -58,7 +61,7 @@ pub async fn create_invoice(
     req: HttpRequest,
     billing_service: web::Data<BillingService>,
     templates: web::Data<Tera>,
-    form: web::Form<CreateInvoiceForm>,
+    body: web::Bytes,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
@@ -73,7 +76,12 @@ pub async fn create_invoice(
         return rejection;
     }
 
-    match billing_service.create_invoice(form.into_inner()).await {
+    let form = match parse_create_invoice_form(&body) {
+        Ok(form) => form,
+        Err(error) => return render_error(&templates, error),
+    };
+
+    match billing_service.create_invoice(form).await {
         Ok(_) => redirect_to("/billing"),
         Err(error) => render_error(&templates, error),
     }
@@ -99,7 +107,10 @@ pub async fn show_invoice(
         Ok(invoice) => {
             let mut context = Context::new();
             context.insert("invoice", &invoice);
-            context.insert("patient", &find_patient(&supabase_db, &invoice.patient_id).await);
+            context.insert(
+                "patient",
+                &find_patient(&supabase_db, &invoice.patient_id).await,
+            );
             render_template(&templates, "billing/show.html", &context)
         }
         Err(error) => render_error(&templates, error),
@@ -190,12 +201,70 @@ pub async fn show_medical_report(
     {
         Ok(report) => {
             let mut context = Context::new();
+            let patient = find_patient(&supabase_db, &report.invoice.patient_id).await;
+            let clinical_record = find_clinical_summary(
+                &supabase_db,
+                &report.invoice.patient_id,
+                report.invoice.appointment_id.as_deref(),
+            )
+            .await;
             context.insert("report", &report);
-            context.insert(
-                "patient",
-                &find_patient(&supabase_db, &report.invoice.patient_id).await,
-            );
+            context.insert("patient", &patient);
+            context.insert("clinical_record", &clinical_record);
             render_template(&templates, "billing/report.html", &context)
+        }
+        Err(error) => render_error(&templates, error),
+    }
+}
+
+pub async fn download_medical_report_pdf(
+    req: HttpRequest,
+    billing_service: web::Data<BillingService>,
+    templates: web::Data<Tera>,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_auth_and_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::GenerateBillingReport,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    match billing_service
+        .generate_medical_report(&path.into_inner())
+        .await
+    {
+        Ok(report) => {
+            let patient = find_patient(&supabase_db, &report.invoice.patient_id).await;
+            let clinical_record = find_clinical_summary(
+                &supabase_db,
+                &report.invoice.patient_id,
+                report.invoice.appointment_id.as_deref(),
+            )
+            .await;
+
+            match render_medical_report_pdf(&report, patient.as_ref(), clinical_record.as_ref()) {
+                Ok(pdf) => HttpResponse::Ok()
+                    .insert_header((header::CONTENT_TYPE, "application/pdf"))
+                    .insert_header((
+                        header::CONTENT_DISPOSITION,
+                        format!(
+                            "attachment; filename=\"{}-medical-report.pdf\"",
+                            report.invoice.id
+                        ),
+                    ))
+                    .body(pdf),
+                Err(_) => HttpResponse::InternalServerError()
+                    .content_type("text/plain")
+                    .body("Unable to generate PDF report."),
+            }
         }
         Err(error) => render_error(&templates, error),
     }
@@ -208,6 +277,21 @@ async fn find_patient(database: &SupabaseRestDb, patient_id: &str) -> Option<Pat
         .into_iter()
         .next()
         .map(PatientView::from)
+}
+
+async fn find_clinical_summary(
+    database: &SupabaseRestDb,
+    patient_id: &str,
+    appointment_id: Option<&str>,
+) -> Option<ClinicalSummary> {
+    let body = database
+        .get_latest_medical_record(patient_id, appointment_id)
+        .await
+        .ok()?;
+    serde_json::from_str::<Vec<ClinicalSummary>>(&body)
+        .ok()?
+        .into_iter()
+        .next()
 }
 
 fn render_template(templates: &Tera, template_name: &str, context: &Context) -> HttpResponse {
@@ -231,6 +315,56 @@ fn billing_error_message(error: BillingError) -> String {
         BillingError::InvoiceNotFound => "Invoice was not found.".to_string(),
         BillingError::StorageUnavailable => "Billing storage is unavailable.".to_string(),
     }
+}
+
+fn parse_create_invoice_form(body: &[u8]) -> Result<CreateInvoiceForm, BillingError> {
+    let body = std::str::from_utf8(body).map_err(|_| {
+        BillingError::InvalidInput("Invoice form data must be valid UTF-8.".to_string())
+    })?;
+    let mut fields: HashMap<String, Vec<String>> = HashMap::new();
+
+    for pair in body.split('&').filter(|pair| !pair.is_empty()) {
+        let mut parts = pair.splitn(2, '=');
+        let key = decode_form_component(parts.next().unwrap_or(""))?;
+        let value = decode_form_component(parts.next().unwrap_or(""))?;
+        fields.entry(key).or_default().push(value);
+    }
+
+    Ok(CreateInvoiceForm {
+        patient_id: take_required_field(&mut fields, "patient_id"),
+        appointment_id: take_optional_field(&mut fields, "appointment_id"),
+        treatment_name: take_required_field(&mut fields, "treatment_name"),
+        treatment_cost: take_required_field(&mut fields, "treatment_cost"),
+        prescription_names: take_repeated_field(&mut fields, "prescription_names"),
+        custom_prescription_names: take_repeated_field(&mut fields, "custom_prescription_names"),
+        custom_prescription_costs: take_repeated_field(&mut fields, "custom_prescription_costs"),
+    })
+}
+
+fn decode_form_component(value: &str) -> Result<String, BillingError> {
+    urlencoding::decode(&value.replace('+', " "))
+        .map(|decoded| decoded.into_owned())
+        .map_err(|_| BillingError::InvalidInput("Invoice form data is not valid.".to_string()))
+}
+
+fn take_required_field(fields: &mut HashMap<String, Vec<String>>, name: &str) -> String {
+    take_repeated_field(fields, name)
+        .into_iter()
+        .next()
+        .unwrap_or_default()
+}
+
+fn take_optional_field(fields: &mut HashMap<String, Vec<String>>, name: &str) -> Option<String> {
+    let value = take_required_field(fields, name);
+    if value.trim().is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+fn take_repeated_field(fields: &mut HashMap<String, Vec<String>>, name: &str) -> Vec<String> {
+    fields.remove(name).unwrap_or_default()
 }
 
 fn redirect_to(location: &str) -> HttpResponse {

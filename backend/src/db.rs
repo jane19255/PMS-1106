@@ -22,7 +22,11 @@ impl FirebaseRestDb {
         )
     }
 
-    pub async fn get_document(&self, collection: &str, doc_id: &str) -> Result<String, reqwest::Error> {
+    pub async fn get_document(
+        &self,
+        collection: &str,
+        doc_id: &str,
+    ) -> Result<String, reqwest::Error> {
         let url = format!("{}/{}/{}", self.base_url(), collection, doc_id);
         let response = self.http_client.get(&url).send().await?;
         Ok(response.text().await?)
@@ -50,7 +54,11 @@ impl FirebaseRestDb {
         Ok(response.text().await?)
     }
 
-    pub async fn delete_document(&self, collection: &str, doc_id: &str) -> Result<String, reqwest::Error> {
+    pub async fn delete_document(
+        &self,
+        collection: &str,
+        doc_id: &str,
+    ) -> Result<String, reqwest::Error> {
         let url = format!("{}/{}/{}", self.base_url(), collection, doc_id);
         let response = self.http_client.delete(&url).send().await?;
         Ok(response.text().await?)
@@ -66,10 +74,8 @@ pub struct SupabaseRestDb {
 
 impl SupabaseRestDb {
     pub fn from_env() -> Self {
-        let url = std::env::var("SUPABASE_URL")
-            .expect("SUPABASE_URL must be set in .env");
-        let key = std::env::var("SUPABASE_KEY")
-            .expect("SUPABASE_KEY must be set in .env");
+        let url = std::env::var("SUPABASE_URL").expect("SUPABASE_URL must be set in .env");
+        let key = std::env::var("SUPABASE_KEY").expect("SUPABASE_KEY must be set in .env");
 
         let url = url.trim().trim_end_matches('/').to_string();
         let key = key.trim().to_string();
@@ -136,6 +142,33 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
+    pub async fn get_latest_medical_record(
+        &self,
+        patient_id: &str,
+        appointment_id: Option<&str>,
+    ) -> Result<String, String> {
+        let encoded_patient_id = urlencoding::encode(patient_id);
+        let mut query = format!(
+            "medical_records?patient_id=eq.{}&select=*&order=recorded_at.desc.nullslast&limit=1",
+            encoded_patient_id
+        );
+
+        if let Some(appointment_id) = appointment_id.filter(|id| !id.trim().is_empty()) {
+            query = format!(
+                "medical_records?patient_id=eq.{}&appointment_id=eq.{}&select=*&order=recorded_at.desc.nullslast&limit=1",
+                encoded_patient_id,
+                urlencoding::encode(appointment_id)
+            );
+        }
+
+        let response = self
+            .authed(self.http_client.get(self.rest_url(&query)))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Self::read_response(response).await
+    }
+
     pub async fn create_patient(&self, payload: &Value) -> Result<String, String> {
         let url = self.rest_url("patients");
         let response = self
@@ -148,7 +181,11 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
-    pub async fn update_patient(&self, patient_id: &str, payload: &Value) -> Result<String, String> {
+    pub async fn update_patient(
+        &self,
+        patient_id: &str,
+        payload: &Value,
+    ) -> Result<String, String> {
         let encoded_id = urlencoding::encode(patient_id);
         let url = self.rest_url(&format!("patients?id=eq.{}", encoded_id));
         let response = self
