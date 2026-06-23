@@ -3,89 +3,125 @@
 {% block title %}Medical Report {{ report.invoice.id }}{% endblock title %}
 
 {% block styles %}
-<link rel="stylesheet" href="/assets/css/billing.css?v=4">
+<link rel="stylesheet" href="/assets/css/billing.css?v=5">
 {% endblock styles %}
 
 {% block content %}
 <div class="billing-page report-page">
     <div class="report-toolbar no-print">
         <a class="back-link" href="/billing/invoices/{{ report.invoice.id }}"><i class="fa-solid fa-arrow-left"></i> Back to invoice</a>
-        <button type="button" onclick="window.print()"><i class="fa-solid fa-print"></i> Print report</button>
+        <div class="report-actions">
+            <button type="button" class="secondary" onclick="window.print()"><i class="fa-solid fa-print"></i> Print</button>
+            <a class="button-link" href="/billing/invoices/{{ report.invoice.id }}/report.pdf"><i class="fa-solid fa-file-pdf"></i> Download PDF</a>
+        </div>
     </div>
 
-    <article class="report-paper">
-        <header class="report-letterhead">
-            <div class="report-brand">
-                <span><i class="fa-solid fa-hospital-user"></i></span>
-                <div><h1>CSCare Hospital System</h1><p>Patient care and medical services</p></div>
-            </div>
-            <div class="clinic-details">1 Punggol Coast Road, Singapore 828608<br>+65 9123 5678 · info@cscare.com</div>
+    <article class="report-paper clinic-report">
+        <header class="clinic-report-header">
+            <h1>CSCare Clinic</h1>
+            <p>1 Punggol Coast Road</p>
+            <p>Singapore 828608</p>
+            <p>Phone: +65 9123 5678 | Email: info@cscare.com</p>
+            <p>Website: www.cscare.com</p>
         </header>
 
-        <div class="report-title-block">
-            <div><div class="eyebrow">Official document</div><h2>Medical Billing Report</h2></div>
-            <span class="status status-large {{ report.invoice.status | lower }}">{{ report.invoice.status }}</span>
-        </div>
-
-        <dl class="report-metadata">
-            <div><dt>Report generated</dt><dd>{{ report.generated_at }}</dd></div>
-            <div><dt>Invoice number</dt><dd>{{ report.invoice.id }}</dd></div>
-            <div><dt>Appointment</dt><dd>{{ report.invoice.appointment_id | default(value="Not linked") }}</dd></div>
-            <div><dt>Invoice date</dt><dd>{{ report.invoice.created_at }}</dd></div>
-        </dl>
-
-        <section class="report-section">
-            <h3><span>01</span> Patient information</h3>
+        <section class="clinic-report-section">
+            <h2>Patient Info</h2>
             {% if patient %}
-            <div class="report-data-grid">
-                <div><label>Full name</label><strong>{{ patient.firstName }} {{ patient.lastName }}</strong></div>
-                <div><label>Patient ID</label><strong>{{ patient.id }}</strong></div>
-                <div><label>NRIC / FIN</label><strong>{{ patient.nric }}</strong></div>
-                <div><label>Date of birth</label><strong>{{ patient.dob }}</strong></div>
-                <div><label>Gender</label><strong>{{ patient.gender }}</strong></div>
-                <div><label>Contact</label><strong>{{ patient.phone }}</strong><small>{{ patient.email }}</small></div>
+            <div class="clinic-info-grid">
+                <div><strong>Full Name</strong><span>{{ patient.firstName }} {{ patient.lastName }}</span></div>
+                <div><strong>IC Number</strong><span>{{ patient.nric }}</span></div>
+                <div><strong>Date of Birth</strong><span>{{ patient.dob }}</span></div>
+                <div><strong>Contact Phone</strong><span>{{ patient.phone }}</span></div>
+                <div><strong>Known Allergies</strong><span>{{ patient.allergies | default(value="None recorded") }}</span></div>
+                <div><strong>Current Medications</strong><span>{{ patient.medications | default(value="None recorded") }}</span></div>
+                <div><strong>Existing Medical Conditions</strong><span>{{ patient.conditions | default(value="None recorded") }}</span></div>
             </div>
-            {% else %}<p class="empty-inline">Patient details unavailable. ID: {{ report.invoice.patient_id }}</p>{% endif %}
+            {% else %}
+            <p class="clinic-muted">Patient details unavailable. ID: {{ report.invoice.patient_id }}</p>
+            {% endif %}
         </section>
 
-        {% if patient %}
-        <section class="report-section">
-            <h3><span>02</span> Medical information</h3>
-            <div class="clinical-grid">
-                <div><label>Known allergies</label><p>{{ patient.allergies | default(value="None recorded") }}</p></div>
-                <div><label>Current medications</label><p>{{ patient.medications | default(value="None recorded") }}</p></div>
-                <div><label>Existing conditions</label><p>{{ patient.conditions | default(value="None recorded") }}</p></div>
+        <section class="clinic-report-section">
+            <h2>Medical Record</h2>
+            <div class="clinic-record-meta">
+                <span>Visit Date: {% if clinical_record and clinical_record.recorded_at %}{{ clinical_record.recorded_at }}{% else %}{{ report.invoice.created_at }}{% endif %}</span>
+                <span>{% if clinical_record %}{{ clinical_record.doctor_name | default(value="Doctor not recorded") }}{% else %}Doctor not recorded{% endif %}</span>
+            </div>
+
+            <div class="clinic-note-block">
+                <strong>Reason:</strong>
+                <p>{% if clinical_record %}{{ clinical_record.doctor_notes | default(value="Not recorded") }}{% else %}Not recorded{% endif %}</p>
+            </div>
+            <div class="clinic-note-block">
+                <strong>Findings & Diagnosis:</strong>
+                <p>{% if clinical_record %}{{ clinical_record.diagnosis | default(value="Not recorded") }}{% else %}Not recorded{% endif %}</p>
+            </div>
+            <div class="clinic-note-block">
+                <strong>Treatment Plan:</strong>
+                <p>{% if clinical_record %}{{ clinical_record.treatment_plan | default(value="Not recorded") }}{% else %}Not recorded{% endif %}</p>
+            </div>
+            <div class="clinic-note-block">
+                <strong>Prescription:</strong>
+                {% set prescription_count = 0 %}
+                {% for item in report.invoice.items %}
+                    {% if item.item_type == "Prescription" %}
+                    {% set_global prescription_count = prescription_count + 1 %}
+                    <p>{{ item.name }}</p>
+                    {% endif %}
+                {% endfor %}
+                {% if prescription_count == 0 %}
+                <p>{% if clinical_record %}{{ clinical_record.prescribed_medicines | default(value="No prescription recorded") }}{% else %}No prescription recorded{% endif %}</p>
+                {% endif %}
             </div>
         </section>
-        {% endif %}
 
-        <section class="report-section">
-            <h3><span>03</span> Itemized billing</h3>
-            <table class="report-table">
+        <section class="clinic-report-section clinic-billing-section">
+            <h2>Billing Summary</h2>
+            <table class="clinic-report-table">
                 <thead><tr><th>Category</th><th>Description</th><th>Amount</th></tr></thead>
-                <tbody>{% for item in report.invoice.items %}<tr>
-                    <td>{{ item.item_type }}</td><td>{{ item.name }}</td><td>${{ item.cost | round(precision=2) }}</td>
-                </tr>{% endfor %}</tbody>
+                <tbody>
+                    {% for item in report.invoice.items %}
+                    <tr><td>{{ item.item_type }}</td><td>{{ item.name }}</td><td>${{ item.cost | round(precision=2) }}</td></tr>
+                    {% endfor %}
+                </tbody>
             </table>
-            <div class="report-totals">
-                <div><span>Total charges</span><strong>${{ report.invoice.total | round(precision=2) }}</strong></div>
-                <div><span>Amount paid</span><strong>${{ report.invoice.amount_paid | round(precision=2) }}</strong></div>
-                <div class="report-balance"><span>Balance due</span><strong>${{ report.invoice.balance_due | round(precision=2) }}</strong></div>
+            <div class="clinic-totals">
+                <div><span>Total Charges</span><strong>${{ report.invoice.total | round(precision=2) }}</strong></div>
+                <div><span>Amount Paid</span><strong>${{ report.invoice.amount_paid | round(precision=2) }}</strong></div>
+                <div><span>Balance Due</span><strong>${{ report.invoice.balance_due | round(precision=2) }}</strong></div>
             </div>
         </section>
 
-        <section class="report-section">
-            <h3><span>04</span> Payment record</h3>
-            {% if report.invoice.payments | length == 0 %}<p class="empty-inline">No payments recorded.</p>{% else %}
-            <table class="report-table"><thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Amount</th></tr></thead>
-                <tbody>{% for payment in report.invoice.payments %}<tr><td>{{ payment.paid_at }}</td><td>{{ payment.payment_method }}</td>
-                    <td>{{ payment.transaction_reference | default(value="—") }}</td><td>${{ payment.amount | round(precision=2) }}</td></tr>{% endfor %}</tbody>
-            </table>{% endif %}
+        <section class="clinic-report-section clinic-payment-section">
+            <h2>Payment Record</h2>
+            {% if report.invoice.payments | length == 0 %}
+            <p class="clinic-muted">No payments recorded.</p>
+            {% else %}
+            <table class="clinic-report-table">
+                <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Amount</th></tr></thead>
+                <tbody>
+                    {% for payment in report.invoice.payments %}
+                    <tr>
+                        <td>{{ payment.paid_at }}</td>
+                        <td>{{ payment.payment_method }}</td>
+                        <td>{{ payment.transaction_reference | default(value="Not recorded") }}</td>
+                        <td>${{ payment.amount | round(precision=2) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
         </section>
 
-        <footer class="report-footer">
-            <div><strong>Authorized by CSCare Hospital System</strong><p>This document was generated electronically and requires no signature.</p></div>
-            <div class="report-number">{{ report.invoice.id }}</div>
+        <section class="clinic-signature-row">
+            <div>Physician Signature: ____________________</div>
+            <div>Date: ____________________</div>
+        </section>
+
+        <footer class="clinic-report-footer">
+            <p>For appointments, billing inquiries, or medical assistance, please contact us at (123) 456-7890 or email info@cscare.com.</p>
+            <p>Thank you for choosing CSCare Hospital for your healthcare needs.</p>
         </footer>
     </article>
 </div>

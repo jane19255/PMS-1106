@@ -17,7 +17,11 @@
   const patientId = document.getElementById("invoicePatientId");
   const patientOptions = document.getElementById("invoicePatientOptions");
   const selectedPatientDetails = document.getElementById("selectedPatientDetails");
+  const prescriptionRows = document.getElementById("prescriptionRows");
+  const addPrescriptionRow = document.getElementById("addPrescriptionRow");
+  const prescriptionTotal = document.getElementById("prescriptionTotal");
   const patientsBySelection = new Map();
+  const CUSTOM_PRESCRIPTION_VALUE = "__custom__";
   let page = 1;
 
   function selectPatient(patient) {
@@ -73,13 +77,141 @@
   });
 
   invoiceForm?.addEventListener("submit", (event) => {
+    const duplicateMedicine = findDuplicatePrescription();
+    const invalidCustomInput = findInvalidCustomPrescription();
     if (!patientId.value) {
       event.preventDefault();
       patientSearch.setCustomValidity("Select a patient from the suggestions.");
       patientSearch.reportValidity();
+    } else if (duplicateMedicine) {
+      event.preventDefault();
+      const duplicateSelect = Array.from(document.querySelectorAll(".prescription-select"))
+        .find((select) => select.value === duplicateMedicine);
+      duplicateSelect?.setCustomValidity("This medicine has already been added.");
+      duplicateSelect?.reportValidity();
+    } else if (invalidCustomInput) {
+      event.preventDefault();
+      invalidCustomInput.reportValidity();
     } else {
       patientSearch.setCustomValidity("");
     }
+  });
+
+  function prescriptionSelects() {
+    return Array.from(document.querySelectorAll(".prescription-select"));
+  }
+
+  function findDuplicatePrescription() {
+    const seen = new Set();
+    const customSeen = new Set();
+    for (const select of prescriptionSelects()) {
+      select.setCustomValidity("");
+      const row = select.closest(".prescription-row");
+      const customName = row?.querySelector(".custom-medicine-name");
+      customName?.setCustomValidity("");
+
+      if (select.value === CUSTOM_PRESCRIPTION_VALUE) {
+        const customValue = customName?.value.trim().toLowerCase();
+        if (!customValue) continue;
+        if (customSeen.has(customValue) || seen.has(customValue)) return CUSTOM_PRESCRIPTION_VALUE;
+        customSeen.add(customValue);
+        continue;
+      }
+
+      if (!select.value) continue;
+      const catalogValue = select.value.toLowerCase();
+      if (seen.has(catalogValue)) return select.value;
+      seen.add(catalogValue);
+    }
+    return null;
+  }
+
+  function findInvalidCustomPrescription() {
+    const rows = Array.from(document.querySelectorAll(".prescription-row"));
+    for (const row of rows) {
+      const select = row.querySelector(".prescription-select");
+      const name = row.querySelector(".custom-medicine-name");
+      const cost = row.querySelector(".custom-medicine-cost");
+      name?.setCustomValidity("");
+      cost?.setCustomValidity("");
+      if (select?.value !== CUSTOM_PRESCRIPTION_VALUE) continue;
+
+      if (!name?.value.trim()) {
+        name?.setCustomValidity("Enter the custom medicine name.");
+        return name;
+      }
+      if (!cost?.value || Number(cost.value) <= 0) {
+        cost?.setCustomValidity("Enter a custom medicine cost greater than zero.");
+        return cost;
+      }
+    }
+    return null;
+  }
+
+  function syncPrescriptionRows() {
+    if (!prescriptionRows) return;
+    let total = 0;
+    const rows = Array.from(prescriptionRows.querySelectorAll(".prescription-row"));
+
+    rows.forEach((row) => {
+      const select = row.querySelector(".prescription-select");
+      const costInput = row.querySelector(".prescription-cost");
+      const customNameLabel = row.querySelector(".custom-prescription-name");
+      const customCostLabel = row.querySelector(".custom-prescription-cost");
+      const customName = row.querySelector(".custom-medicine-name");
+      const customCost = row.querySelector(".custom-medicine-cost");
+      const remove = row.querySelector(".remove-prescription-row");
+      const isCustom = select?.value === CUSTOM_PRESCRIPTION_VALUE;
+      const catalogCost = Number(select?.selectedOptions[0]?.dataset.cost || 0);
+      const customAmount = Number(customCost?.value || 0);
+      const cost = isCustom ? customAmount : catalogCost;
+
+      if (customNameLabel) customNameLabel.hidden = !isCustom;
+      if (customCostLabel) customCostLabel.hidden = !isCustom;
+      if (!isCustom) {
+        if (customName) customName.value = "";
+        if (customCost) customCost.value = "";
+      }
+      if (costInput) costInput.value = cost ? cost.toFixed(2) : "";
+      if (remove) remove.disabled = rows.length === 1;
+      total += cost;
+    });
+
+    if (prescriptionTotal) prescriptionTotal.textContent = `$${total.toFixed(2)}`;
+    findDuplicatePrescription();
+  }
+
+  function addMedicineRow() {
+    const firstRow = prescriptionRows?.querySelector(".prescription-row");
+    if (!firstRow) return;
+    const row = firstRow.cloneNode(true);
+    row.querySelector(".prescription-select").value = "";
+    row.querySelector(".prescription-cost").value = "";
+    const customName = row.querySelector(".custom-medicine-name");
+    const customCost = row.querySelector(".custom-medicine-cost");
+    if (customName) {
+      customName.value = "";
+      customName.setCustomValidity("");
+    }
+    if (customCost) {
+      customCost.value = "";
+      customCost.setCustomValidity("");
+    }
+    prescriptionRows.appendChild(row);
+    syncPrescriptionRows();
+  }
+
+  addPrescriptionRow?.addEventListener("click", addMedicineRow);
+  prescriptionRows?.addEventListener("change", (event) => {
+    if (event.target.matches(".prescription-select, .custom-medicine-cost")) syncPrescriptionRows();
+  });
+  prescriptionRows?.addEventListener("input", (event) => {
+    if (event.target.matches(".custom-medicine-name, .custom-medicine-cost")) syncPrescriptionRows();
+  });
+  prescriptionRows?.addEventListener("click", (event) => {
+    if (!event.target.matches(".remove-prescription-row")) return;
+    event.target.closest(".prescription-row")?.remove();
+    syncPrescriptionRows();
   });
 
   function filteredRows() {
@@ -126,5 +258,6 @@
   previous.addEventListener("click", () => { page -= 1; render(); });
   next.addEventListener("click", () => { page += 1; render(); });
   loadPatientOptions();
+  syncPrescriptionRows();
   render();
 })();

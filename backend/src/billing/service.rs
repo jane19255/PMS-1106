@@ -1,11 +1,14 @@
 use super::models::{
-    CreateInvoiceForm, Invoice, InvoiceItem, InvoiceItemType, MedicalReport, Payment,
-    PaymentStatus, RecordPaymentForm,
+    CreateInvoiceForm, Invoice, InvoiceItem, InvoiceItemType, MedicalReport, MedicineOption,
+    Payment, PaymentStatus, RecordPaymentForm,
 };
 use super::repository::{InvoiceRepository, RepositoryError};
 use chrono::Utc;
+use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
+
+const CUSTOM_PRESCRIPTION_VALUE: &str = "__custom__";
 
 #[derive(Debug, PartialEq)]
 pub enum BillingError {
@@ -18,9 +21,45 @@ pub struct BillingService {
     invoice_repository: Arc<dyn InvoiceRepository>,
 }
 
+#[derive(Clone, Debug)]
+struct PrescriptionCharge {
+    name: String,
+    cost: f64,
+}
+
 impl BillingService {
     pub fn new(invoice_repository: Arc<dyn InvoiceRepository>) -> Self {
         Self { invoice_repository }
+    }
+
+    pub fn medicine_catalog(&self) -> Vec<MedicineOption> {
+        vec![
+            MedicineOption {
+                name: "Paracetamol",
+                dosage: "500mg",
+                unit_cost: 6.50,
+            },
+            MedicineOption {
+                name: "Amoxicillin",
+                dosage: "500mg",
+                unit_cost: 18.00,
+            },
+            MedicineOption {
+                name: "Ibuprofen",
+                dosage: "400mg",
+                unit_cost: 9.80,
+            },
+            MedicineOption {
+                name: "Cetirizine",
+                dosage: "10mg",
+                unit_cost: 7.20,
+            },
+            MedicineOption {
+                name: "Omeprazole",
+                dosage: "20mg",
+                unit_cost: 14.50,
+            },
+        ]
     }
 
     pub async fn create_invoice(&self, form: CreateInvoiceForm) -> Result<Invoice, BillingError> {
@@ -44,7 +83,6 @@ impl BillingService {
         }
 
         let treatment_cost = self.parse_cost(&form.treatment_cost, "Treatment cost")?;
-        let prescription_cost = self.parse_optional_cost(&form.prescription_cost)?;
 
         let mut items = vec![InvoiceItem {
             item_type: InvoiceItemType::Treatment,
@@ -53,15 +91,13 @@ impl BillingService {
             cost: treatment_cost,
         }];
 
-        if let Some(prescription_name) = form.prescription_name {
-            if !prescription_name.trim().is_empty() {
-                items.push(InvoiceItem {
-                    item_type: InvoiceItemType::Prescription,
-                    name: prescription_name.trim().to_string(),
-                    description: None,
-                    cost: prescription_cost,
-                });
-            }
+        for medicine in self.prescription_charges_from_form(&form)? {
+            items.push(InvoiceItem {
+                item_type: InvoiceItemType::Prescription,
+                name: medicine.name,
+                description: None,
+                cost: medicine.cost,
+            });
         }
 
         let subtotal = self.calculate_total(&items);
@@ -244,25 +280,13 @@ impl BillingService {
             ));
         }
 
-        let prescription_cost = self.parse_optional_cost(&form.prescription_cost)?;
-        if prescription_cost < 0.0 {
-            return Err(BillingError::InvalidInput(
-                "Prescription cost cannot be negative.".to_string(),
-            ));
-        }
+        let prescription_items = self.prescription_charges_from_form(form)?;
+        let prescription_total: f64 = prescription_items
+            .iter()
+            .map(|medicine| medicine.cost)
+            .sum();
 
-        let has_prescription_name = form
-            .prescription_name
-            .as_deref()
-            .map(str::trim)
-            .is_some_and(|name| !name.is_empty());
-        if prescription_cost > 0.0 && !has_prescription_name {
-            return Err(BillingError::InvalidInput(
-                "Prescription name is required when a prescription cost is entered.".to_string(),
-            ));
-        }
-
-        if self.round_money(treatment_cost + prescription_cost) <= 0.0 {
+        if self.round_money(treatment_cost + prescription_total) <= 0.0 {
             return Err(BillingError::InvalidInput(
                 "Invoice total must be greater than zero.".to_string(),
             ));
@@ -271,11 +295,103 @@ impl BillingService {
         Ok(())
     }
 
-    fn parse_optional_cost(&self, value: &Option<String>) -> Result<f64, BillingError> {
-        match value {
-            Some(cost) if !cost.trim().is_empty() => self.parse_cost(cost, "Prescription cost"),
-            _ => Ok(0.0),
+    fn prescription_charges_from_form(
+        &self,
+        form: &CreateInvoiceForm,
+    ) -> Result<Vec<PrescriptionCharge>, BillingError> {
+        let mut medicines = Vec::new();
+        let catalog = self.medicine_catalog();
+        let mut seen = HashSet::new();
+
+        for name in form
+            .prescription_names
+            .iter()
+            .map(|name| name.trim())
+            .filter(|name| !name.is_empty() && *name != CUSTOM_PRESCRIPTION_VALUE)
+        {
+            let duplicate_key = name.to_lowercase();
+            if !seen.insert(duplicate_key) {
+                return Err(BillingError::InvalidInput(
+                    "Duplicate prescription medicines are not allowed.".to_string(),
+                ));
+            }
+
+            let medicine = catalog
+                .iter()
+                .find(|medicine| medicine.name == name)
+                .cloned()
+                .ok_or_else(|| {
+                    BillingError::InvalidInput(
+                        "Prescriptions must be selected from the medicine list.".to_string(),
+                    )
+                })?;
+            medicines.push(PrescriptionCharge {
+                name: self.prescription_label(medicine.name),
+                cost: medicine.unit_cost,
+            });
         }
+
+        let custom_count = form
+            .custom_prescription_names
+            .len()
+            .max(form.custom_prescription_costs.len());
+
+        for index in 0..custom_count {
+            let name = form
+                .custom_prescription_names
+                .get(index)
+                .map(|name| name.trim())
+                .unwrap_or("");
+            let cost_raw = form
+                .custom_prescription_costs
+                .get(index)
+                .map(|cost| cost.trim())
+                .unwrap_or("");
+
+            if name.is_empty() && cost_raw.is_empty() {
+                continue;
+            }
+
+            let cost = self.parse_cost(cost_raw, "Custom prescription cost")?;
+            if name.is_empty() {
+                return Err(BillingError::InvalidInput(
+                    "Custom medicine name is required when a custom prescription cost is entered."
+                        .to_string(),
+                ));
+            }
+            if name.len() > 200 {
+                return Err(BillingError::InvalidInput(
+                    "Custom medicine name cannot exceed 200 characters.".to_string(),
+                ));
+            }
+            if cost <= 0.0 {
+                return Err(BillingError::InvalidInput(
+                    "Custom prescription cost must be greater than zero.".to_string(),
+                ));
+            }
+
+            let duplicate_key = name.to_lowercase();
+            if !seen.insert(duplicate_key) {
+                return Err(BillingError::InvalidInput(
+                    "Duplicate prescription medicines are not allowed.".to_string(),
+                ));
+            }
+
+            medicines.push(PrescriptionCharge {
+                name: name.to_string(),
+                cost,
+            });
+        }
+
+        Ok(medicines)
+    }
+
+    fn prescription_label(&self, name: &str) -> String {
+        self.medicine_catalog()
+            .into_iter()
+            .find(|medicine| medicine.name == name)
+            .map(|medicine| format!("{} {}", medicine.name, medicine.dosage))
+            .unwrap_or_else(|| name.to_string())
     }
 
     fn parse_cost(&self, value: &str, field_name: &str) -> Result<f64, BillingError> {
@@ -328,8 +444,9 @@ mod tests {
             appointment_id: appointment_id.map(str::to_string),
             treatment_name: "Consultation".to_string(),
             treatment_cost: "80.00".to_string(),
-            prescription_name: Some("Medication".to_string()),
-            prescription_cost: Some("20.00".to_string()),
+            prescription_names: vec!["Paracetamol".to_string()],
+            custom_prescription_names: Vec::new(),
+            custom_prescription_costs: Vec::new(),
         }
     }
 
@@ -349,9 +466,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(invoice.total, 100.0);
+        assert_eq!(invoice.total, 86.5);
         assert_eq!(invoice.amount_paid, 0.0);
-        assert_eq!(invoice.balance_due, 100.0);
+        assert_eq!(invoice.balance_due, 86.5);
         assert_eq!(invoice.status, PaymentStatus::Pending);
     }
 
@@ -387,7 +504,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(updated.amount_paid, 40.0);
-        assert_eq!(updated.balance_due, 60.0);
+        assert_eq!(updated.balance_due, 46.5);
         assert_eq!(updated.status, PaymentStatus::Pending);
         assert_eq!(updated.payments.len(), 1);
     }
@@ -398,7 +515,7 @@ mod tests {
         let invoice = service.create_invoice(invoice_form(None)).await.unwrap();
 
         let updated = service
-            .record_payment(&invoice.id, payment_form("100.00"))
+            .record_payment(&invoice.id, payment_form("86.50"))
             .await
             .unwrap();
 
@@ -413,7 +530,7 @@ mod tests {
         let invoice = service.create_invoice(invoice_form(None)).await.unwrap();
 
         let error = service
-            .record_payment(&invoice.id, payment_form("100.01"))
+            .record_payment(&invoice.id, payment_form("86.51"))
             .await
             .unwrap_err();
 
@@ -462,17 +579,95 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn rejects_prescription_cost_without_name() {
+    async fn creates_one_invoice_item_per_prescribed_medicine() {
         let service = service();
         let mut form = invoice_form(None);
-        form.prescription_name = None;
+        form.prescription_names = vec!["Paracetamol".to_string(), "Amoxicillin".to_string()];
+
+        let invoice = service.create_invoice(form).await.unwrap();
+
+        assert_eq!(invoice.items.len(), 3);
+        assert_eq!(invoice.total, 104.5);
+        assert!(invoice
+            .items
+            .iter()
+            .any(|item| item.name == "Paracetamol 500mg" && item.cost == 6.5));
+        assert!(invoice
+            .items
+            .iter()
+            .any(|item| item.name == "Amoxicillin 500mg" && item.cost == 18.0));
+    }
+
+    #[actix_web::test]
+    async fn rejects_duplicate_prescription_medicine() {
+        let service = service();
+        let mut form = invoice_form(None);
+        form.prescription_names = vec!["Paracetamol".to_string(), "Paracetamol".to_string()];
 
         let error = service.create_invoice(form).await.unwrap_err();
 
         assert_eq!(
             error,
             BillingError::InvalidInput(
-                "Prescription name is required when a prescription cost is entered.".to_string()
+                "Duplicate prescription medicines are not allowed.".to_string()
+            )
+        );
+    }
+
+    #[actix_web::test]
+    async fn creates_invoice_with_custom_prescription_medicine() {
+        let service = service();
+        let mut form = invoice_form(None);
+        form.prescription_names = vec![
+            "Paracetamol".to_string(),
+            CUSTOM_PRESCRIPTION_VALUE.to_string(),
+        ];
+        form.custom_prescription_names = vec!["Sterile eye drops".to_string()];
+        form.custom_prescription_costs = vec!["12.35".to_string()];
+
+        let invoice = service.create_invoice(form).await.unwrap();
+
+        assert_eq!(invoice.items.len(), 3);
+        assert_eq!(invoice.total, 98.85);
+        assert!(invoice
+            .items
+            .iter()
+            .any(|item| item.name == "Sterile eye drops" && item.cost == 12.35));
+    }
+
+    #[actix_web::test]
+    async fn rejects_custom_prescription_cost_without_name() {
+        let service = service();
+        let mut form = invoice_form(None);
+        form.prescription_names = vec![CUSTOM_PRESCRIPTION_VALUE.to_string()];
+        form.custom_prescription_names = vec!["".to_string()];
+        form.custom_prescription_costs = vec!["12.35".to_string()];
+
+        let error = service.create_invoice(form).await.unwrap_err();
+
+        assert_eq!(
+            error,
+            BillingError::InvalidInput(
+                "Custom medicine name is required when a custom prescription cost is entered."
+                    .to_string()
+            )
+        );
+    }
+
+    #[actix_web::test]
+    async fn rejects_custom_prescription_name_without_positive_cost() {
+        let service = service();
+        let mut form = invoice_form(None);
+        form.prescription_names = vec![CUSTOM_PRESCRIPTION_VALUE.to_string()];
+        form.custom_prescription_names = vec!["Sterile eye drops".to_string()];
+        form.custom_prescription_costs = vec!["0".to_string()];
+
+        let error = service.create_invoice(form).await.unwrap_err();
+
+        assert_eq!(
+            error,
+            BillingError::InvalidInput(
+                "Custom prescription cost must be greater than zero.".to_string()
             )
         );
     }
