@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Doctor {
     pub id: String,
     pub name: String,
@@ -10,13 +10,13 @@ pub struct Doctor {
     pub status: DoctorStatus,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DoctorStatus {
     Available,
     Unavailable,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DoctorSchedule {
     pub id: String,
     pub doctor_id: String,
@@ -25,7 +25,7 @@ pub struct DoctorSchedule {
     pub end_time: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DayOfWeek {
     Monday,
     Tuesday,

@@ -1,4 +1,4 @@
-use super::models::Doctor;
+use super::models::{Doctor, DoctorSchedule};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -14,11 +14,15 @@ pub trait DoctorRepository: Send + Sync {
     fn list(&self) -> Result<Vec<Doctor>, RepositoryError>;
     fn update(&self, doctor: Doctor) -> Result<Doctor, RepositoryError>;
     fn delete(&self, doctor_id: &str) -> Result<(), RepositoryError>;
+    fn create_schedule(&self, schedule: DoctorSchedule) -> Result<DoctorSchedule, RepositoryError>;
+    fn list_schedules(&self, doctor_id: &str) -> Result<Vec<DoctorSchedule>, RepositoryError>;
+    fn delete_schedule(&self, schedule_id: &str) -> Result<(), RepositoryError>;
 }
 
 #[derive(Default)]
 pub struct InMemoryDoctorRepository {
     doctors: Mutex<HashMap<String, Doctor>>,
+    schedules: Mutex<HashMap<String, DoctorSchedule>>,
 }
 
 impl DoctorRepository for InMemoryDoctorRepository {
@@ -49,7 +53,9 @@ impl DoctorRepository for InMemoryDoctorRepository {
             .lock()
             .map_err(|_| RepositoryError::StorageUnavailable)?;
 
-        Ok(doctors.values().cloned().collect())
+        let mut doctor_list: Vec<Doctor> = doctors.values().cloned().collect();
+        doctor_list.sort_by(|left, right| left.name.cmp(&right.name));
+        Ok(doctor_list)
     }
 
     fn update(&self, doctor: Doctor) -> Result<Doctor, RepositoryError> {
@@ -74,6 +80,53 @@ impl DoctorRepository for InMemoryDoctorRepository {
 
         doctors
             .remove(doctor_id)
+            .map(|_| ())
+            .ok_or(RepositoryError::NotFound)?;
+
+        let mut schedules = self
+            .schedules
+            .lock()
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+        schedules.retain(|_, schedule| schedule.doctor_id != doctor_id);
+        Ok(())
+    }
+
+    fn create_schedule(&self, schedule: DoctorSchedule) -> Result<DoctorSchedule, RepositoryError> {
+        self.find_by_id(&schedule.doctor_id)?;
+
+        let mut schedules = self
+            .schedules
+            .lock()
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+        schedules.insert(schedule.id.clone(), schedule.clone());
+        Ok(schedule)
+    }
+
+    fn list_schedules(&self, doctor_id: &str) -> Result<Vec<DoctorSchedule>, RepositoryError> {
+        self.find_by_id(doctor_id)?;
+
+        let schedules = self
+            .schedules
+            .lock()
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+        let mut schedule_list: Vec<DoctorSchedule> = schedules
+            .values()
+            .filter(|schedule| schedule.doctor_id == doctor_id)
+            .cloned()
+            .collect();
+        schedule_list.sort_by(|left, right| left.start_time.cmp(&right.start_time));
+        Ok(schedule_list)
+    }
+
+    fn delete_schedule(&self, schedule_id: &str) -> Result<(), RepositoryError> {
+        let mut schedules = self
+            .schedules
+            .lock()
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+        schedules
+            .remove(schedule_id)
             .map(|_| ())
             .ok_or(RepositoryError::NotFound)
     }
