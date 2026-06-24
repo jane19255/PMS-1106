@@ -22,10 +22,10 @@ const appointments = [
     { appointmentId: "APP-029", priority: "Urgent", doctor: "Dr. Wong", date: "2026-06-06", time: "11:00 AM", room: "Room 3", type: "New Consultation", referringProvider: "", specialRequirements: [], status: "Scheduled", patient: { id: "PAT-029", firstName: "Natasha", lastName: "Romanoff", dob: "1985-06-20", gender: "Female", phone: "99900112", email: "natasha.r@csc.singaporehealth.sg" } },
 ];
 
-let activeDoctorNames = [];
+let activeDoctorNames = null;
 
 function getDashboardAppointments() {
-    if (activeDoctorNames.length === 0) return appointments;
+    if (activeDoctorNames === null) return appointments;
     return appointments.filter(appointment => activeDoctorNames.includes(appointment.doctor));
 }
 
@@ -50,7 +50,7 @@ function getTodayDate() {
 
 function getTodaysDoctors() {
     const today = getTodayDate();
-    if (activeDoctorNames.length > 0) return activeDoctorNames;
+    if (activeDoctorNames !== null) return activeDoctorNames;
 
     const todaysApps = getDashboardAppointments().filter(a => a.date === today);
     return [...new Set(todaysApps.map(a => a.doctor))];
@@ -273,8 +273,8 @@ async function loadDoctors() {
         const doctors = await response.json();
         activeDoctorNames = doctors.map(doctor => doctor.name).filter(Boolean);
     } catch (error) {
-        console.warn("Falling back to appointment doctors:", error);
-        activeDoctorNames = [...new Set(appointments.map(item => item.doctor))];
+        console.warn("Could not load doctors from backend:", error);
+        activeDoctorNames = [];
     }
 
     if (doctorFilter) {
