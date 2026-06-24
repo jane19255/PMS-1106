@@ -215,7 +215,7 @@ pub async fn list_doctors_api(
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
-    if let Err(rejection) = require_doctor_admin(&req, &firebase_auth, &firestore_db).await {
+    if let Err(rejection) = require_doctor_view(&req, &firebase_auth, &firestore_db).await {
         return rejection;
     }
 
@@ -232,7 +232,7 @@ pub async fn show_doctor_api(
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
-    if let Err(rejection) = require_doctor_admin(&req, &firebase_auth, &firestore_db).await {
+    if let Err(rejection) = require_doctor_view(&req, &firebase_auth, &firestore_db).await {
         return rejection;
     }
 
@@ -301,7 +301,7 @@ pub async fn list_schedules_api(
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
-    if let Err(rejection) = require_doctor_admin(&req, &firebase_auth, &firestore_db).await {
+    if let Err(rejection) = require_doctor_view(&req, &firebase_auth, &firestore_db).await {
         return rejection;
     }
 
@@ -346,6 +346,13 @@ pub async fn delete_schedule_api(
     }
 }
 
+async fn require_doctor_view(
+    req: &HttpRequest,
+    firebase_auth: &FirebaseAuth,
+    firestore_db: &FirebaseRestDb,
+) -> Result<(String, String), HttpResponse> {
+    require_auth_and_permission(req, firebase_auth, firestore_db, AppAction::ViewPatient).await
+}
 async fn require_doctor_admin(
     req: &HttpRequest,
     firebase_auth: &FirebaseAuth,
