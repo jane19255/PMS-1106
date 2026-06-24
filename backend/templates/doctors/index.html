@@ -4,18 +4,62 @@
 
 {% block styles %}
 <style>
-    .doctor-form .form-error {
+    .doctor-form .form-error,
+    .schedule-form .form-error {
         color: var(--danger);
         font-weight: 700;
         margin-bottom: 12px;
     }
 
-    .doctor-form input.is-invalid {
+    .doctor-form input.is-invalid,
+    .schedule-form input.is-invalid {
         border-color: var(--danger);
         box-shadow: 0 0 0 3px rgb(220 38 38 / 12%);
     }
+
+    .doctor-card {
+        display: grid;
+        gap: 10px;
+    }
+
+    .doctor-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-top: 6px;
+    }
+
+    .button-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        padding: 11px 16px;
+        border-radius: var(--radius);
+        background: var(--primary);
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .button-link:hover {
+        background: var(--primary-hover);
+    }
+
+    .danger-button {
+        background: transparent !important;
+        color: var(--danger) !important;
+        border: 1px solid rgb(239 68 68 / 35%) !important;
+    }
+
+    .danger-button:hover {
+        background: rgb(239 68 68 / 8%) !important;
+    }
 </style>
 {% endblock styles %}
+
 {% block content %}
 <h1>Doctor Management</h1>
 
@@ -38,12 +82,18 @@
 {% endif %}
 
 {% for doctor in doctors %}
-<section class="card">
+<section class="card doctor-card">
     <h3><a href="/doctors/{{ doctor.id }}">{{ doctor.name }}</a></h3>
     <p>Specialization: {{ doctor.specialization }}</p>
     <p>Contact: {{ doctor.contact_number }}</p>
     <p>Email: {{ doctor.email }}</p>
     <p>Status: {{ doctor.status }}</p>
+    <div class="doctor-card-actions">
+        <a class="button-link" href="/doctors/{{ doctor.id }}">View Details</a>
+        <form action="/doctors/{{ doctor.id }}/delete" method="post">
+            <button class="danger-button" type="submit">Delete Doctor</button>
+        </form>
+    </div>
 </section>
 {% endfor %}
 {% endblock content %}

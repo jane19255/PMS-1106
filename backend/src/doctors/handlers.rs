@@ -80,17 +80,15 @@ pub async fn show_doctor(
 
     let doctor_id = path.into_inner();
     match doctor_service.find_doctor(&doctor_id) {
-        Ok(doctor) => {
-            let mut context = Context::new();
-            context.insert("doctor", &doctor);
-            context.insert(
-                "schedules",
-                &doctor_service
-                    .list_schedules(&doctor_id)
-                    .unwrap_or_default(),
-            );
-            render_template(&templates, "doctors/show.html", &context)
-        }
+        Ok(doctor) => render_doctor_detail_page(
+            &templates,
+            doctor,
+            doctor_service
+                .list_schedules(&doctor_id)
+                .unwrap_or_default(),
+            None,
+            None,
+        ),
         Err(error) => render_error(&templates, error),
     }
 }
@@ -173,8 +171,22 @@ pub async fn create_schedule_form(
     }
 
     let doctor_id = path.into_inner();
-    match doctor_service.create_schedule(&doctor_id, form.into_inner()) {
+    let submitted_form = form.into_inner();
+
+    match doctor_service.create_schedule(&doctor_id, submitted_form.clone()) {
         Ok(_) => redirect_to(&format!("/doctors/{doctor_id}")),
+        Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.find_doctor(&doctor_id) {
+            Ok(doctor) => render_doctor_detail_page(
+                &templates,
+                doctor,
+                doctor_service
+                    .list_schedules(&doctor_id)
+                    .unwrap_or_default(),
+                Some(&submitted_form),
+                Some(error),
+            ),
+            Err(error) => render_error(&templates, error),
+        },
         Err(error) => render_error(&templates, error),
     }
 }
@@ -342,6 +354,41 @@ async fn require_doctor_admin(
     require_auth_and_permission(req, firebase_auth, firestore_db, AppAction::ManageUsers).await
 }
 
+fn render_doctor_detail_page(
+    templates: &Tera,
+    doctor: super::models::Doctor,
+    schedules: Vec<super::models::DoctorSchedule>,
+    schedule_form: Option<&CreateDoctorScheduleForm>,
+    error: Option<DoctorError>,
+) -> HttpResponse {
+    let mut context = Context::new();
+    context.insert("doctor", &doctor);
+    context.insert("schedules", &schedules);
+
+    if let Some(form) = schedule_form {
+        let day_of_week = format!("{:?}", form.day_of_week);
+        context.insert("schedule_day_of_week", &day_of_week);
+        context.insert("schedule_start_time", &form.start_time);
+        context.insert("schedule_end_time", &form.end_time);
+    }
+
+    if let Some(error) = error {
+        let message = doctor_error_message(error);
+        context.insert("schedule_error_message", &message);
+        context.insert(
+            "invalid_schedule_start_time",
+            &(message == "Start time must use HH:MM format"
+                || message == "Start time must be before end time"),
+        );
+        context.insert(
+            "invalid_schedule_end_time",
+            &(message == "End time must use HH:MM format"
+                || message == "Start time must be before end time"),
+        );
+    }
+
+    render_template(templates, "doctors/show.html", &context)
+}
 fn render_doctors_page(
     templates: &Tera,
     doctors: Vec<super::models::Doctor>,

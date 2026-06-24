@@ -1,4 +1,4 @@
-use super::models::{Doctor, DoctorSchedule};
+use super::models::{Doctor, DoctorSchedule, DoctorStatus};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -19,10 +19,48 @@ pub trait DoctorRepository: Send + Sync {
     fn delete_schedule(&self, schedule_id: &str) -> Result<(), RepositoryError>;
 }
 
-#[derive(Default)]
 pub struct InMemoryDoctorRepository {
     doctors: Mutex<HashMap<String, Doctor>>,
     schedules: Mutex<HashMap<String, DoctorSchedule>>,
+}
+
+impl Default for InMemoryDoctorRepository {
+    fn default() -> Self {
+        let doctors = [
+            Doctor {
+                id: "DOC-RICHARD".to_string(),
+                name: "Dr. Richard".to_string(),
+                specialization: "General Medicine".to_string(),
+                contact_number: "80000001".to_string(),
+                email: "richard@cscare.local".to_string(),
+                status: DoctorStatus::Available,
+            },
+            Doctor {
+                id: "DOC-LEE".to_string(),
+                name: "Dr. Lee".to_string(),
+                specialization: "Family Medicine".to_string(),
+                contact_number: "80000002".to_string(),
+                email: "lee@cscare.local".to_string(),
+                status: DoctorStatus::Available,
+            },
+            Doctor {
+                id: "DOC-WONG".to_string(),
+                name: "Dr. Wong".to_string(),
+                specialization: "Internal Medicine".to_string(),
+                contact_number: "80000003".to_string(),
+                email: "wong@cscare.local".to_string(),
+                status: DoctorStatus::Available,
+            },
+        ]
+        .into_iter()
+        .map(|doctor| (doctor.id.clone(), doctor))
+        .collect();
+
+        Self {
+            doctors: Mutex::new(doctors),
+            schedules: Mutex::new(HashMap::new()),
+        }
+    }
 }
 
 impl DoctorRepository for InMemoryDoctorRepository {

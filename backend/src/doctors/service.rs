@@ -54,7 +54,7 @@ impl DoctorService {
 
         let doctor = Doctor {
             id: format!("DOC-{}", Uuid::new_v4()),
-            name: form.name.trim().to_string(),
+            name: Self::normalize_doctor_name(&form.name),
             specialization: form.specialization.trim().to_string(),
             contact_number: form.contact_number.trim().to_string(),
             email: form.email.trim().to_string(),
@@ -99,7 +99,7 @@ impl DoctorService {
 
         let doctor = Doctor {
             id: existing.id,
-            name: form.name.trim().to_string(),
+            name: Self::normalize_doctor_name(&form.name),
             specialization: form.specialization.trim().to_string(),
             contact_number: form.contact_number.trim().to_string(),
             email: form.email.trim().to_string(),
@@ -168,6 +168,18 @@ impl DoctorService {
             .map_err(Self::map_repository_error)
     }
 
+    fn normalize_doctor_name(name: &str) -> String {
+        let trimmed = name.trim();
+        let without_prefix = trimmed
+            .strip_prefix("Dr. ")
+            .or_else(|| trimmed.strip_prefix("Dr "))
+            .or_else(|| trimmed.strip_prefix("dr. "))
+            .or_else(|| trimmed.strip_prefix("dr "))
+            .unwrap_or(trimmed)
+            .trim();
+
+        format!("Dr. {without_prefix}")
+    }
     fn validate_doctor_fields(
         &self,
         name: &str,
@@ -293,6 +305,15 @@ mod tests {
     }
 
     #[test]
+    fn prefixes_doctor_name_when_missing() {
+        let mut form = create_form();
+        form.name = "Lee".to_string();
+
+        let doctor = service().create_doctor(form).unwrap();
+
+        assert_eq!(doctor.name, "Dr. Lee");
+    }
+    #[test]
     fn updates_existing_doctor_status() {
         let service = service();
         let doctor = service.create_doctor(create_form()).unwrap();
@@ -331,7 +352,10 @@ mod tests {
 
         service.delete_doctor(&doctor.id).unwrap();
 
-        assert_eq!(service.find_doctor(&doctor.id), Err(DoctorError::DoctorNotFound));
+        assert_eq!(
+            service.find_doctor(&doctor.id),
+            Err(DoctorError::DoctorNotFound)
+        );
     }
 
     #[test]
