@@ -37,6 +37,8 @@ const appointments = [
     { appointmentId: "APP-036", priority: "Emergency", doctor: "Dr. Sarah Wong", date: "2026-06-07", time: "2:00 PM", room: "Room 1", type: "Emergency", referringProvider: "", specialRequirements: ["wheelchair"], status: "Scheduled", patient: { id: "PAT-036", firstName: "Stephen", lastName: "Strange", dob: "1979-01-05", gender: "Male", phone: "96677889", email: "stephen.s@csc.singaporehealth.sg" } }
 ];
 
+let availableDoctorNames = null;
+
 const pagination = new Pagination({
     data: appointments,
     rowsPerPage: 3,
@@ -123,6 +125,10 @@ function filterByDateRange(list, dateRange) {
 function refreshAppointmentList() {
     let list = [...appointments];
 
+    if (availableDoctorNames !== null) {
+        list = list.filter(appointment => availableDoctorNames.includes(appointment.doctor));
+    }
+
     // Search filter
     const keyword = document.getElementById("searchInput")?.value.toLowerCase() || "";
     if (keyword) {
@@ -207,32 +213,46 @@ function loadPatients() {
     }
 }
 
-function loadDoctors() {
-    const allDoctors = appointments.map(item => ({
-        name: `${item.doctor}`
-    }));
+async function loadDoctors() {
+    let doctors;
 
-    const uniqueDoctors = Array.from(new Map(allDoctors.map(d => [d.name, d])).values());
+    try {
+        const response = await fetch("/api/doctors");
+        if (!response.ok) throw new Error(`Doctor API returned ${response.status}`);
+
+        doctors = await response.json();
+    } catch (error) {
+        console.warn("Could not load doctors from backend:", error);
+        doctors = appointments.map(item => ({ name: item.doctor }));
+    }
+
+    const uniqueDoctors = Array.from(
+        new Map(doctors.map(doctor => [doctor.name, doctor])).values()
+    ).filter(doctor => doctor.name);
+    availableDoctorNames = uniqueDoctors.map(doctor => doctor.name);
 
     const addSelect = document.getElementById("doctorList");
     if (addSelect) {
-        uniqueDoctors.forEach(p => {
-            addSelect.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+        addSelect.innerHTML = "";
+        uniqueDoctors.forEach(doctor => {
+            addSelect.innerHTML += `<option value="${doctor.name}">${doctor.name}</option>`;
         });
     }
 
     const editSelect = document.getElementById("editDoctorList");
     if (editSelect) {
-        uniqueDoctors.forEach(p => {
-            editSelect.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+        editSelect.innerHTML = "";
+        uniqueDoctors.forEach(doctor => {
+            editSelect.innerHTML += `<option value="${doctor.name}">${doctor.name}</option>`;
         });
     }
 
     const checkbox = document.getElementById("doctorCheckbox");
     if (checkbox) {
-        uniqueDoctors.forEach(p => {
-            checkbox.innerHTML += `<div><input type="checkbox" class="filter-doctor" id="${p.name}" name="${p.name}" value="${p.name}">
-                                        <label for="${p.name}">${p.name}</label>
+        checkbox.innerHTML = "";
+        uniqueDoctors.forEach(doctor => {
+            checkbox.innerHTML += `<div><input type="checkbox" class="filter-doctor" id="${doctor.name}" name="${doctor.name}" value="${doctor.name}">
+                                        <label for="${doctor.name}">${doctor.name}</label>
                                     </div>`;
         });
     }
@@ -378,10 +398,10 @@ function backToFirstStep(button) {
     return true;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    pagination.renderTable();
+document.addEventListener("DOMContentLoaded", async () => {
     loadPatients();
-    loadDoctors();
+    await loadDoctors();
+    refreshAppointmentList();
 
     flatpickr("#appointment_date", {
         enableTime: false,
