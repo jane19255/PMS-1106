@@ -22,8 +22,16 @@ const appointments = [
     { appointmentId: "APP-029", priority: "Urgent", doctor: "Dr. Wong", date: "2026-06-06", time: "11:00 AM", room: "Room 3", type: "New Consultation", referringProvider: "", specialRequirements: [], status: "Scheduled", patient: { id: "PAT-029", firstName: "Natasha", lastName: "Romanoff", dob: "1985-06-20", gender: "Female", phone: "99900112", email: "natasha.r@csc.singaporehealth.sg" } },
 ];
 
+let activeDoctorNames = null;
+let currentSelectedDate = getTodayDate();
+
+function getActiveAppointments() {
+    if (activeDoctorNames === null) return appointments;
+    return appointments.filter(appointment => activeDoctorNames.includes(appointment.doctor));
+}
+
 const pagination = new Pagination({
-    data: appointments,
+    data: getActiveAppointments(),
     rowsPerPage: 3,
     tbodyId: "appBody",
     pageInfoId: "pageInfo",
@@ -87,7 +95,7 @@ function renderAppointmentRow(app, index) {
 
 function refreshAppointmentTable(selectedDate) {
     currentSelectedDate = selectedDate;
-    const filtered = appointments.filter(p => p.date === selectedDate);
+    const filtered = getActiveAppointments().filter(p => p.date === selectedDate);
 
     // Update pagination data
     pagination.data = filtered;
@@ -96,7 +104,7 @@ function refreshAppointmentTable(selectedDate) {
 }
 
 function findAppointmentByName(fullName) {
-    return appointments.find(a => `${a.patient.firstName} ${a.patient.lastName}` === fullName);
+    return getActiveAppointments().find(a => `${a.patient.firstName} ${a.patient.lastName}` === fullName);
 }
 
 function applyAllFiltersAndRefresh() {
@@ -104,7 +112,7 @@ function applyAllFiltersAndRefresh() {
     const selectedStatus = document.getElementById("statusFilter").value;
     const selectedPriority = document.getElementById("priorityFilter").value;
 
-    let filtered = appointments.filter(item => item.date === currentSelectedDate);
+    let filtered = getActiveAppointments().filter(item => item.date === currentSelectedDate);
 
     // Search by patient name / doctor name
     if (searchKeyword) {
@@ -140,7 +148,21 @@ function initFilters() {
 }
 
 
-document.addEventListener("DOMContentLoaded", () => {
+async function loadDoctors() {
+    try {
+        const response = await fetch("/api/doctors");
+        if (!response.ok) throw new Error(`Doctor API returned ${response.status}`);
+
+        const doctors = await response.json();
+        activeDoctorNames = doctors.map(doctor => doctor.name).filter(Boolean);
+    } catch (error) {
+        console.warn("Could not load doctors from backend:", error);
+        activeDoctorNames = null;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    await loadDoctors();
     initFilters();
     flatpickr("#fullCalendar", {
         inline: true, dateFormat: "Y-m-d", defaultDate: getTodayDate(),
