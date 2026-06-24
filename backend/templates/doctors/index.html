@@ -2,14 +2,32 @@
 
 {% block title %}Doctors{% endblock title %}
 
+{% block styles %}
+<style>
+    .doctor-form .form-error {
+        color: var(--danger);
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+
+    .doctor-form input.is-invalid {
+        border-color: var(--danger);
+        box-shadow: 0 0 0 3px rgb(220 38 38 / 12%);
+    }
+</style>
+{% endblock styles %}
 {% block content %}
 <h1>Doctor Management</h1>
 
-<form class="card" action="/doctors" method="post">
-    <input type="text" name="name" placeholder="Doctor name">
-    <input type="text" name="specialization" placeholder="Specialization">
-    <input type="text" name="contact_number" placeholder="Contact number">
-    <input type="email" name="email" placeholder="Email">
+<form class="card doctor-form" action="/doctors" method="post">
+    {% if error_message %}
+    <p class="form-error">{{ error_message }}</p>
+    {% endif %}
+
+    <input class="{% if invalid_name %}is-invalid{% endif %}" type="text" name="name" placeholder="Doctor name" value="{{ form_name | default(value="") }}">
+    <input class="{% if invalid_specialization %}is-invalid{% endif %}" type="text" name="specialization" placeholder="Specialization" value="{{ form_specialization | default(value="") }}">
+    <input class="{% if invalid_contact_number %}is-invalid{% endif %}" type="text" name="contact_number" placeholder="Contact number" value="{{ form_contact_number | default(value="") }}">
+    <input class="{% if invalid_email %}is-invalid{% endif %}" type="email" name="email" placeholder="Email" value="{{ form_email | default(value="") }}">
     <button type="submit">Create Doctor</button>
 </form>
 

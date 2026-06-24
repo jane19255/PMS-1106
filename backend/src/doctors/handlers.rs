@@ -1,4 +1,6 @@
-use super::service::{CreateDoctorForm, CreateDoctorScheduleForm, DoctorError, DoctorService, UpdateDoctorForm};
+use super::service::{
+    CreateDoctorForm, CreateDoctorScheduleForm, DoctorError, DoctorService, UpdateDoctorForm,
+};
 use crate::db::FirebaseRestDb;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use actix_web::http::header;
@@ -13,7 +15,10 @@ pub fn routes(config: &mut web::ServiceConfig) {
         .route("/doctors", web::post().to(create_doctor_form))
         .route("/doctors/{doctor_id}", web::get().to(show_doctor))
         .route("/doctors/{doctor_id}", web::post().to(update_doctor_form))
-        .route("/doctors/{doctor_id}/delete", web::post().to(delete_doctor_form))
+        .route(
+            "/doctors/{doctor_id}/delete",
+            web::post().to(delete_doctor_form),
+        )
         .route(
             "/doctors/{doctor_id}/schedules",
             web::post().to(create_schedule_form),
@@ -26,7 +31,10 @@ pub fn routes(config: &mut web::ServiceConfig) {
         .route("/api/doctors", web::post().to(create_doctor_api))
         .route("/api/doctors/{doctor_id}", web::get().to(show_doctor_api))
         .route("/api/doctors/{doctor_id}", web::put().to(update_doctor_api))
-        .route("/api/doctors/{doctor_id}", web::delete().to(delete_doctor_api))
+        .route(
+            "/api/doctors/{doctor_id}",
+            web::delete().to(delete_doctor_api),
+        )
         .route(
             "/api/doctors/{doctor_id}/schedules",
             web::get().to(list_schedules_api),
@@ -53,11 +61,7 @@ pub async fn doctors_page(
     }
 
     match doctor_service.list_doctors() {
-        Ok(doctors) => {
-            let mut context = Context::new();
-            context.insert("doctors", &doctors);
-            render_template(&templates, "doctors/index.html", &context)
-        }
+        Ok(doctors) => render_doctors_page(&templates, doctors, None, None),
         Err(error) => render_error(&templates, error),
     }
 }
@@ -81,7 +85,9 @@ pub async fn show_doctor(
             context.insert("doctor", &doctor);
             context.insert(
                 "schedules",
-                &doctor_service.list_schedules(&doctor_id).unwrap_or_default(),
+                &doctor_service
+                    .list_schedules(&doctor_id)
+                    .unwrap_or_default(),
             );
             render_template(&templates, "doctors/show.html", &context)
         }
@@ -101,8 +107,16 @@ pub async fn create_doctor_form(
         return rejection;
     }
 
-    match doctor_service.create_doctor(form.into_inner()) {
+    let submitted_form = form.into_inner();
+
+    match doctor_service.create_doctor(submitted_form.clone()) {
         Ok(_) => redirect_to("/doctors"),
+        Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.list_doctors() {
+            Ok(doctors) => {
+                render_doctors_page(&templates, doctors, Some(&submitted_form), Some(error))
+            }
+            Err(error) => render_error(&templates, error),
+        },
         Err(error) => render_error(&templates, error),
     }
 }
@@ -328,6 +342,39 @@ async fn require_doctor_admin(
     require_auth_and_permission(req, firebase_auth, firestore_db, AppAction::ManageUsers).await
 }
 
+fn render_doctors_page(
+    templates: &Tera,
+    doctors: Vec<super::models::Doctor>,
+    form: Option<&CreateDoctorForm>,
+    error: Option<DoctorError>,
+) -> HttpResponse {
+    let mut context = Context::new();
+    context.insert("doctors", &doctors);
+
+    if let Some(form) = form {
+        context.insert("form_name", &form.name);
+        context.insert("form_specialization", &form.specialization);
+        context.insert("form_contact_number", &form.contact_number);
+        context.insert("form_email", &form.email);
+    }
+
+    if let Some(error) = error {
+        let message = doctor_error_message(error);
+        context.insert("error_message", &message);
+        context.insert("invalid_name", &(message == "Doctor name is required"));
+        context.insert(
+            "invalid_specialization",
+            &(message == "Specialization is required"),
+        );
+        context.insert(
+            "invalid_contact_number",
+            &(message == "Contact number is required"),
+        );
+        context.insert("invalid_email", &(message == "Email is required"));
+    }
+
+    render_template(templates, "doctors/index.html", &context)
+}
 fn render_template(templates: &Tera, template_name: &str, context: &Context) -> HttpResponse {
     match templates.render(template_name, context) {
         Ok(body) => HttpResponse::Ok().content_type("text/html").body(body),
@@ -340,6 +387,8 @@ fn render_template(templates: &Tera, template_name: &str, context: &Context) -> 
 fn render_error(templates: &Tera, error: DoctorError) -> HttpResponse {
     let mut context = Context::new();
     context.insert("message", &doctor_error_message(error));
+    context.insert("back_url", "/doctors");
+    context.insert("back_label", "Back to Doctor Management");
     render_template(templates, "error.html", &context)
 }
 
