@@ -22,8 +22,15 @@ const appointments = [
     { appointmentId: "APP-029", priority: "Urgent", doctor: "Dr. Wong", date: "2026-06-06", time: "11:00 AM", room: "Room 3", type: "New Consultation", referringProvider: "", specialRequirements: [], status: "Scheduled", patient: { id: "PAT-029", firstName: "Natasha", lastName: "Romanoff", dob: "1985-06-20", gender: "Female", phone: "99900112", email: "natasha.r@csc.singaporehealth.sg" } },
 ];
 
+let activeDoctorNames = [];
+
+function getDashboardAppointments() {
+    if (activeDoctorNames.length === 0) return appointments;
+    return appointments.filter(appointment => activeDoctorNames.includes(appointment.doctor));
+}
+
 const pagination = new Pagination({
-    data: appointments,
+    data: getDashboardAppointments(),
     rowsPerPage: 3,
     tbodyId: "appBody",
     pageInfoId: "pageInfo",
@@ -43,7 +50,9 @@ function getTodayDate() {
 
 function getTodaysDoctors() {
     const today = getTodayDate();
-    const todaysApps = appointments.filter(a => a.date === today);
+    if (activeDoctorNames.length > 0) return activeDoctorNames;
+
+    const todaysApps = getDashboardAppointments().filter(a => a.date === today);
     return [...new Set(todaysApps.map(a => a.doctor))];
 }
 
@@ -55,7 +64,7 @@ function getRoomStatuses() {
     while (rooms.length < 3) rooms.push({ doctor: "Unassigned", roomNumber: roomList[rooms.length] });
 
     return rooms.map(room => {
-        const todaysApps = appointments.filter(a => a.date === today && a.doctor === room.doctor).sort((a, b) => a.time.localeCompare(b.time));
+        const todaysApps = getDashboardAppointments().filter(a => a.date === today && a.doctor === room.doctor).sort((a, b) => a.time.localeCompare(b.time));
         const inRoomPatient = todaysApps.find(a => a.status === "In-Room");
         const nextApp = todaysApps.find(a => ["Scheduled", "Checked-In", "Vitals-Done"].includes(a.status));
         return {
@@ -143,7 +152,7 @@ function renderAppointmentRow(app, index) {
 
 function refreshAppointmentTable(selectedDate) {
     currentSelectedDate = selectedDate;
-    const filtered = appointments.filter(p => p.date === selectedDate);
+    const filtered = getDashboardAppointments().filter(p => p.date === selectedDate);
 
     // Update pagination data
     pagination.data = filtered;
@@ -152,7 +161,7 @@ function refreshAppointmentTable(selectedDate) {
 }
 
 function findAppointmentByName(fullName) {
-    return appointments.find(a => `${a.patient.firstName} ${a.patient.lastName}` === fullName);
+    return getDashboardAppointments().find(a => `${a.patient.firstName} ${a.patient.lastName}` === fullName);
 }
 
 function confirmArrive(patientName) {
@@ -216,7 +225,7 @@ function applyAllFiltersAndRefresh() {
     const selectedDoctor = document.getElementById("doctorFilter").value;
     const selectedStatus = document.getElementById("statusFilter").value;
 
-    let filtered = appointments.filter(item => item.date === currentSelectedDate);
+    let filtered = getDashboardAppointments().filter(item => item.date === currentSelectedDate);
 
     // Search by patient name / doctor name
     if (searchKeyword) {
@@ -254,23 +263,34 @@ function initFilters() {
 }
 
 
-function loadDoctors() {
-    const allDoctors = appointments.map(item => ({
-        name: `${item.doctor}`
-    }));
-
-    const uniqueDoctors = Array.from(new Map(allDoctors.map(d => [d.name, d])).values());
-
+async function loadDoctors() {
     const doctorFilter = document.getElementById("doctorFilter");
+
+    try {
+        const response = await fetch("/api/doctors");
+        if (!response.ok) throw new Error(`Doctor API returned ${response.status}`);
+
+        const doctors = await response.json();
+        activeDoctorNames = doctors.map(doctor => doctor.name).filter(Boolean);
+    } catch (error) {
+        console.warn("Falling back to appointment doctors:", error);
+        activeDoctorNames = [...new Set(appointments.map(item => item.doctor))];
+    }
+
     if (doctorFilter) {
-        uniqueDoctors.forEach(p => {
-            doctorFilter.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+        doctorFilter.innerHTML = `<option value="all">All Doctors</option>`;
+        activeDoctorNames.forEach(name => {
+            doctorFilter.innerHTML += `<option value="${name}">${name}</option>`;
         });
     }
+
+    pagination.data = getDashboardAppointments().filter(item => item.date === currentSelectedDate);
+    pagination.currentPage = 1;
+    pagination.renderTable();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    loadDoctors();
+document.addEventListener("DOMContentLoaded", async () => {
+    await loadDoctors();
     renderRoomTable();
     initFilters();
     flatpickr("#fullCalendar", {
@@ -279,3 +299,4 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     refreshAppointmentTable(getTodayDate());
 });
+
