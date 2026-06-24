@@ -23,6 +23,7 @@ const appointments = [
 ];
 
 let activeDoctorNames = null;
+let currentSelectedDate = getTodayDate();
 
 function getDashboardAppointments() {
     if (activeDoctorNames === null) return appointments;
