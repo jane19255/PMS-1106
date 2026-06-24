@@ -100,15 +100,10 @@ impl SupabaseRestDb {
     }
 
     fn authed(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        let builder = builder
+        builder
             .header("apikey", &self.key)
-            .header("Content-Type", "application/json");
-
-        if self.key.starts_with("eyJ") {
-            builder.header("Authorization", format!("Bearer {}", &self.key))
-        } else {
-            builder
-        }
+            .header("Authorization", format!("Bearer {}", &self.key))
+            .header("Content-Type", "application/json")
     }
 
     async fn read_response(response: reqwest::Response) -> Result<String, String> {

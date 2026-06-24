@@ -102,4 +102,6 @@ pub struct UpdatePatient {
     pub allergies: Option<String>,
     pub medications: Option<String>,
     pub conditions: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
 }

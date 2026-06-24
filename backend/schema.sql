@@ -1,10 +1,10 @@
 -- PostgreSQL / Supabase billing schema.
--- Run after supabase_schema.sql so public.patients already exists.
+-- Run after supabase_schema.sql so public.patients and public.appointments already exist.
 
 create table if not exists public.invoices (
   id text primary key,
   patient_id text not null references public.patients(id) on update cascade,
-  appointment_id text,
+  appointment_id text references public.appointments(id) on update cascade on delete set null,
   subtotal numeric(12, 2) not null check (subtotal >= 0),
   total numeric(12, 2) not null check (total >= 0),
   status text not null default 'Pending'

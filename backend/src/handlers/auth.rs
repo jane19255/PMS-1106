@@ -502,6 +502,30 @@ mod tests {
     use super::{has_permission, AppAction};
 
     #[test]
+    fn admin_can_create_update_and_delete_patients() {
+        assert!(has_permission("admin", AppAction::CreatePatient));
+        assert!(has_permission("admin", AppAction::EditPatient));
+        assert!(has_permission("admin", AppAction::DeletePatient));
+    }
+
+    #[test]
+    fn receptionist_can_create_and_update_but_not_delete_patients() {
+        assert!(has_permission("receptionist", AppAction::CreatePatient));
+        assert!(has_permission("receptionist", AppAction::EditPatient));
+        assert!(!has_permission("receptionist", AppAction::DeletePatient));
+    }
+
+    #[test]
+    fn doctor_and_pharmacist_have_read_only_patient_access() {
+        for role in ["doctor", "pharmacist"] {
+            assert!(has_permission(role, AppAction::ViewPatient));
+            assert!(!has_permission(role, AppAction::CreatePatient));
+            assert!(!has_permission(role, AppAction::EditPatient));
+            assert!(!has_permission(role, AppAction::DeletePatient));
+        }
+    }
+
+    #[test]
     fn receptionist_can_manage_billing_workflow() {
         assert!(has_permission("receptionist", AppAction::ViewBilling));
         assert!(has_permission("receptionist", AppAction::CreateInvoice));

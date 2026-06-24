@@ -102,6 +102,7 @@ Implemented modules include:
 - Role-based access checks for patient, billing, and report actions
 - Dashboard and shared navigation for core hospital modules
 - Patient management page and JSON APIs for listing, creating, updating, and deleting patients
+- Backend patient validation for required fields, NRIC/FIN, phone, email, date of birth, gender, duplicate NRIC, and status values
 - Appointment and queue management UI pages
 - Medical records UI pages and Supabase medical record schema support
 - Billing dashboard with invoice creation, filtering, sorting, pagination, payment recording, cancellation, and invoice detail pages
@@ -110,7 +111,38 @@ Implemented modules include:
 - Backend-generated PDF report downloads using Rust `printpdf`
 - Repository/service separation for billing business rules and persistence
 - In-memory billing repository for tests and Supabase billing repository for persistent storage
-- PostgreSQL/Supabase schema for patients, medical records, invoices, invoice items, and payments
+- PostgreSQL/Supabase schema for patients, staff, doctors, appointments, queues, medical records, medicine inventory, prescriptions, invoices, invoice items, and payments
+
+## Database Schema
+
+Apply `backend/supabase_schema.sql` first, then apply `backend/schema.sql` for
+billing tables and billing stored procedures.
+
+Core relationships:
+
+- `patients` is the main patient registration table. `id` is the normalized
+  NRIC/FIN and is protected by a unique constraint.
+- `staff` stores backend staff profiles that map to Firebase users through
+  `firebase_uid`. Its `role` values match the backend RBAC roles:
+  `admin`, `doctor`, `receptionist`, and `pharmacist`.
+- `doctors` extends `staff` for clinical users and is referenced by
+  appointments, medical records, and prescriptions.
+- `appointments` links a patient to a doctor at a scheduled time.
+- `patient_queue` tracks appointment check-in and queue progress.
+- `medical_records` links clinical notes to a patient, and optionally to an
+  appointment and doctor.
+- `medicine_inventory` stores medicine stock, cost, and active/inactive status.
+- `prescriptions` links prescribed medicine work to a patient, doctor, and
+  optional medical record.
+- `prescription_items` stores the individual medicines, dosage, frequency,
+  duration, and quantity for a prescription.
+- `invoices` links billing to a patient and optional appointment.
+- `invoice_items` stores treatment or prescription charges for an invoice.
+- `payments` stores invoice payment transactions.
+
+All core tables enable row-level security. The current Rust backend uses a
+Supabase service/secret key and performs access control through Firebase RBAC
+before calling Supabase.
 
 ## Project Structure
 
