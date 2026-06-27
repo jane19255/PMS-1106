@@ -463,6 +463,7 @@ fn render_doctors_page(
     }
 
     if let Some(form) = form {
+        context.insert("form_license_number", &form.license_number);
         context.insert("form_name", &form.name);
         context.insert("form_specialization", &form.specialization);
         context.insert("form_contact_number", &form.contact_number);
