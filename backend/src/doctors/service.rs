@@ -14,6 +14,7 @@ pub enum DoctorError {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct CreateDoctorForm {
+    pub staff_id: String,
     pub license_number: String,
     pub name: String,
     pub specialization: String,
@@ -23,6 +24,7 @@ pub struct CreateDoctorForm {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct UpdateDoctorForm {
+    pub staff_id: String,
     pub license_number: String,
     pub name: String,
     pub specialization: String,
@@ -58,6 +60,7 @@ impl DoctorService {
 
     pub fn create_doctor(&self, form: CreateDoctorForm) -> Result<Doctor, DoctorError> {
         self.validate_doctor_fields(
+            &form.staff_id,
             &form.license_number,
             &form.name,
             &form.specialization,
@@ -67,6 +70,7 @@ impl DoctorService {
 
         let doctor = Doctor {
             id: format!("DOC-{}", Uuid::new_v4()),
+            staff_id: form.staff_id.trim().to_string(),
             license_number: form.license_number.trim().to_string(),
             name: Self::normalize_doctor_name(&form.name),
             specialization: form.specialization.trim().to_string(),
@@ -105,6 +109,7 @@ impl DoctorService {
     ) -> Result<Doctor, DoctorError> {
         let existing = self.find_doctor(doctor_id)?;
         self.validate_doctor_fields(
+            &form.staff_id,
             &form.license_number,
             &form.name,
             &form.specialization,
@@ -114,6 +119,7 @@ impl DoctorService {
 
         let doctor = Doctor {
             id: existing.id,
+            staff_id: form.staff_id.trim().to_string(),
             license_number: form.license_number.trim().to_string(),
             name: Self::normalize_doctor_name(&form.name),
             specialization: form.specialization.trim().to_string(),
@@ -241,12 +247,17 @@ impl DoctorService {
     }
     fn validate_doctor_fields(
         &self,
+        staff_id: &str,
         license_number: &str,
         name: &str,
         specialization: &str,
         contact_number: &str,
         email: &str,
     ) -> Result<(), DoctorError> {
+        if staff_id.trim().is_empty() {
+            return Err(DoctorError::InvalidInput("Staff ID is required".to_string()));
+        }
+
         if license_number.trim().is_empty() {
             return Err(DoctorError::InvalidInput(
                 "License number is required".to_string(),
@@ -341,6 +352,7 @@ mod tests {
 
     fn create_form() -> CreateDoctorForm {
         CreateDoctorForm {
+            staff_id: "STAFF-TAN".to_string(),
             license_number: "M12345A".to_string(),
             name: "Dr. Tan".to_string(),
             specialization: "Cardiology".to_string(),
@@ -368,6 +380,19 @@ mod tests {
         assert_eq!(
             error,
             DoctorError::InvalidInput("License number is required".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_blank_staff_id() {
+        let mut form = create_form();
+        form.staff_id = "  ".to_string();
+
+        let error = service().create_doctor(form).unwrap_err();
+
+        assert_eq!(
+            error,
+            DoctorError::InvalidInput("Staff ID is required".to_string())
         );
     }
 
@@ -402,6 +427,7 @@ mod tests {
             .update_doctor(
                 &doctor.id,
                 UpdateDoctorForm {
+                    staff_id: doctor.staff_id.clone(),
                     license_number: "M12345A".to_string(),
                     name: "Dr. Tan".to_string(),
                     specialization: "Cardiology".to_string(),

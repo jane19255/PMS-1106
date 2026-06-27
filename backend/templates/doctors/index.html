@@ -91,6 +91,7 @@
     <p class="form-error">{{ error_message }}</p>
     {% endif %}
 
+    <input class="{% if invalid_staff_id %}is-invalid{% endif %}" type="text" name="staff_id" placeholder="Staff ID" value="{{ form_staff_id | default(value="") }}">
     <input class="{% if invalid_license_number %}is-invalid{% endif %}" type="text" name="license_number" placeholder="License number" value="{{ form_license_number | default(value="") }}">
     <input class="{% if invalid_name %}is-invalid{% endif %}" type="text" name="name" placeholder="Doctor name" value="{{ form_name | default(value="") }}">
     <input class="{% if invalid_specialization %}is-invalid{% endif %}" type="text" name="specialization" placeholder="Specialization" value="{{ form_specialization | default(value="") }}">
@@ -108,6 +109,7 @@
 {% for doctor in doctors %}
 <section class="card doctor-card">
     <h3><a href="/doctors/{{ doctor.id }}">{{ doctor.name }}</a></h3>
+    <p>Staff ID: {{ doctor.staff_id }}</p>
     <p>License: {{ doctor.license_number }}</p>
     <p>Specialization: {{ doctor.specialization }}</p>
     <p>Contact: {{ doctor.contact_number }}</p>

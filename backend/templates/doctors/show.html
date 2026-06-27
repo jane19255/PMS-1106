@@ -59,6 +59,7 @@
 
 <section class="card">
     <p>ID: {{ doctor.id }}</p>
+    <p>Staff ID: {{ doctor.staff_id }}</p>
     <p>License: {{ doctor.license_number }}</p>
     <p>Specialization: {{ doctor.specialization }}</p>
     <p>Contact: {{ doctor.contact_number }}</p>
@@ -66,6 +67,7 @@
     <p>Status: {{ doctor.status }}</p>
 
     <form action="/doctors/{{ doctor.id }}" method="post">
+        <input type="text" name="staff_id" value="{{ doctor.staff_id }}">
         <input type="text" name="license_number" value="{{ doctor.license_number }}">
         <input type="text" name="name" value="{{ doctor.name }}">
         <input type="text" name="specialization" value="{{ doctor.specialization }}">

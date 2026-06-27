@@ -29,6 +29,7 @@ impl Default for InMemoryDoctorRepository {
         let doctors = [
             Doctor {
                 id: "DOC-RICHARD".to_string(),
+                staff_id: "STAFF-RICHARD".to_string(),
                 license_number: "M-RICHARD".to_string(),
                 name: "Dr. Richard".to_string(),
                 specialization: "General Medicine".to_string(),
@@ -38,6 +39,7 @@ impl Default for InMemoryDoctorRepository {
             },
             Doctor {
                 id: "DOC-LEE".to_string(),
+                staff_id: "STAFF-LEE".to_string(),
                 license_number: "M-LEE".to_string(),
                 name: "Dr. Lee".to_string(),
                 specialization: "Family Medicine".to_string(),
@@ -47,6 +49,7 @@ impl Default for InMemoryDoctorRepository {
             },
             Doctor {
                 id: "DOC-WONG".to_string(),
+                staff_id: "STAFF-WONG".to_string(),
                 license_number: "M-WONG".to_string(),
                 name: "Dr. Wong".to_string(),
                 specialization: "Internal Medicine".to_string(),

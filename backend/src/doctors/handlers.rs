@@ -463,6 +463,7 @@ fn render_doctors_page(
     }
 
     if let Some(form) = form {
+        context.insert("form_staff_id", &form.staff_id);
         context.insert("form_license_number", &form.license_number);
         context.insert("form_name", &form.name);
         context.insert("form_specialization", &form.specialization);
@@ -473,6 +474,7 @@ fn render_doctors_page(
     if let Some(error) = error {
         let message = doctor_error_message(error);
         context.insert("error_message", &message);
+        context.insert("invalid_staff_id", &(message == "Staff ID is required"));
         context.insert("invalid_name", &(message == "Doctor name is required"));
         context.insert(
             "invalid_specialization",

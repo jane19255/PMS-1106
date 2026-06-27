@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Doctor {
     pub id: String,
+    pub staff_id: String,
     pub license_number: String,
     pub name: String,
     pub specialization: String,
