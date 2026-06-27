@@ -64,7 +64,7 @@
     <p>Specialization: {{ doctor.specialization }}</p>
     <p>Contact: {{ doctor.contact_number }}</p>
     <p>Email: {{ doctor.email }}</p>
-    <p>Status: {{ doctor.status }}</p>
+    <p>Status: {{ doctor_status }}</p>
 
     <form action="/doctors/{{ doctor.id }}" method="post">
         <input type="text" name="staff_id" value="{{ doctor.staff_id }}">
@@ -74,9 +74,9 @@
         <input type="text" name="contact_number" value="{{ doctor.contact_number }}">
         <input type="email" name="email" value="{{ doctor.email }}">
         <select name="status">
-            <option value="Available" {% if doctor.status == "Available" %}selected{% endif %}>Available</option>
-            <option value="Unavailable" {% if doctor.status == "Unavailable" %}selected{% endif %}>Unavailable</option>
-            <option value="On Leave" {% if doctor.status == "On Leave" %}selected{% endif %}>On Leave</option>
+            <option value="Available" {% if doctor_status == "Available" %}selected{% endif %}>Available</option>
+            <option value="Unavailable" {% if doctor_status == "Unavailable" %}selected{% endif %}>Unavailable</option>
+            <option value="On Leave" {% if doctor_status == "On Leave" %}selected{% endif %}>On Leave</option>
         </select>
         <button type="submit">Update Doctor</button>
     </form>

@@ -416,7 +416,9 @@ fn render_doctor_detail_page(
     error: Option<DoctorError>,
 ) -> HttpResponse {
     let mut context = Context::new();
+    let doctor_status = format!("{:?}", doctor.status).replace("OnLeave", "On Leave");
     context.insert("doctor", &doctor);
+    context.insert("doctor_status", &doctor_status);
     context.insert("schedules", &schedules);
 
     if let Some(form) = schedule_form {
