@@ -131,7 +131,7 @@
                         data-amount="{{ invoice.total }}">
                         <td>{{ invoice.id }}</td>
                         <td>{{ invoice.patient_id }}</td>
-                        <td>{{ invoice.appointment_id | default(value="—") }}</td>
+                        <td>{{ invoice.appointment_id | default(value="â€”") }}</td>
                         <td>{{ invoice.created_at }}</td>
                         <td>${{ invoice.total | round(precision=2) }}</td>
                         <td><span class="status {{ invoice.status | lower }}">{{ invoice.status }}</span></td>
@@ -163,5 +163,5 @@
 {% endblock content %}
 
 {% block scripts %}
-<script src="/assets/js/billing-ssr.js?v=5" defer></script>
+<script src="/assets/js/billing-ssr.js?v=prescriptions-1" defer></script>
 {% endblock scripts %}

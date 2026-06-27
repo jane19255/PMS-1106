@@ -23,15 +23,17 @@
   const patientsBySelection = new Map();
   const CUSTOM_PRESCRIPTION_VALUE = "__custom__";
   let page = 1;
+  let prescriptionLoadToken = 0;
 
   function selectPatient(patient) {
     if (!patient) {
       patientId.value = "";
       selectedPatientDetails.textContent = "Select a patient from the database.";
+      clearFetchedPrescriptionOptions();
       return;
     }
 
-    const display = `${patient.id} — ${patient.firstName} ${patient.lastName}`;
+    const display = `${patient.id} â€” ${patient.firstName} ${patient.lastName}`;
     patientSearch.value = display;
     patientId.value = patient.id;
     selectedPatientDetails.textContent = [
@@ -39,6 +41,7 @@
       patient.dob ? `DOB: ${patient.dob}` : null,
       patient.phone ? `Phone: ${patient.phone}` : null,
     ].filter(Boolean).join(" | ");
+    loadPatientPrescriptions(patient.id);
   }
 
   async function loadPatientOptions() {
@@ -52,7 +55,7 @@
 
       const patients = await response.json();
       patients.forEach((patient) => {
-        const display = `${patient.id} — ${patient.firstName} ${patient.lastName}`;
+        const display = `${patient.id} â€” ${patient.firstName} ${patient.lastName}`;
         const option = document.createElement("option");
         option.value = display;
         patientOptions.appendChild(option);
@@ -71,6 +74,62 @@
     }
   }
 
+  function clearFetchedPrescriptionOptions() {
+    prescriptionLoadToken += 1;
+    document.querySelectorAll(".prescription-select option[data-prescription-id]").forEach((option) => option.remove());
+    syncPrescriptionRows();
+  }
+
+  async function loadPatientPrescriptions(patientIdValue) {
+    if (!patientIdValue) {
+      clearFetchedPrescriptionOptions();
+      return;
+    }
+
+    const token = prescriptionLoadToken + 1;
+    prescriptionLoadToken = token;
+
+    try {
+      const response = await fetch(`/api/prescriptions?patient_id=${encodeURIComponent(patientIdValue)}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(await response.text());
+      if (token !== prescriptionLoadToken) return;
+
+      const prescriptions = (await response.json()).filter((prescription) => prescription.status === "Active");
+      applyFetchedPrescriptionOptions(prescriptions);
+    } catch (error) {
+      console.warn("Unable to load patient prescriptions for billing:", error);
+      applyFetchedPrescriptionOptions([]);
+    }
+  }
+
+  function applyFetchedPrescriptionOptions(prescriptions) {
+    document.querySelectorAll(".prescription-select option[data-prescription-id]").forEach((option) => option.remove());
+    const selects = prescriptionSelects();
+
+    selects.forEach((select) => {
+      const customOption = Array.from(select.options).find((option) => option.value === CUSTOM_PRESCRIPTION_VALUE);
+      prescriptions.forEach((prescription) => {
+        const option = document.createElement("option");
+        const medicineName = [prescription.medication_name, prescription.dosage].filter(Boolean).join(" ");
+        const totalCost = Number(prescription.unit_cost || 0) * Number(prescription.quantity || 0);
+        option.value = CUSTOM_PRESCRIPTION_VALUE;
+        option.dataset.prescriptionId = prescription.id;
+        option.dataset.customName = medicineName;
+        option.dataset.customCost = totalCost.toFixed(2);
+        option.textContent = `${medicineName} (prescribed)`;
+        select.insertBefore(option, customOption || null);
+      });
+    });
+
+    const firstSelect = selects[0];
+    const firstFetched = firstSelect?.querySelector("option[data-prescription-id]");
+    if (firstFetched) {
+      firstFetched.selected = true;
+    }
+    syncPrescriptionRows();
+  }
   patientSearch?.addEventListener("input", () => {
     patientSearch.setCustomValidity("");
     selectPatient(patientsBySelection.get(patientSearch.value.trim().toLowerCase()));
@@ -162,7 +221,12 @@
       const customCost = row.querySelector(".custom-medicine-cost");
       const remove = row.querySelector(".remove-prescription-row");
       const isCustom = select?.value === CUSTOM_PRESCRIPTION_VALUE;
-      const catalogCost = Number(select?.selectedOptions[0]?.dataset.cost || 0);
+      const selectedOption = select?.selectedOptions[0];
+      if (isCustom && selectedOption?.dataset.prescriptionId) {
+        if (customName) customName.value = selectedOption.dataset.customName || "";
+        if (customCost) customCost.value = selectedOption.dataset.customCost || "";
+      }
+      const catalogCost = Number(selectedOption?.dataset.cost || 0);
       const customAmount = Number(customCost?.value || 0);
       const cost = isCustom ? customAmount : catalogCost;
 
@@ -246,7 +310,7 @@
 
     empty.hidden = matches.length !== 0;
     pageInfo.textContent = matches.length
-      ? `Showing ${start + 1}–${Math.min(start + size, matches.length)} of ${matches.length}`
+      ? `Showing ${start + 1}â€“${Math.min(start + size, matches.length)} of ${matches.length}`
       : "Showing 0 invoices";
     previous.disabled = page === 1;
     next.disabled = page === pageCount;
