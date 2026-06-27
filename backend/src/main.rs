@@ -89,7 +89,7 @@ async fn main() -> std::io::Result<()> {
             .configure(routes::configure)
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 println!(
-                    ">>> Ã°Å¸Å¡Â¨ ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
+                    ">>> ÃƒÂ°Ã…Â¸Ã…Â¡Ã‚Â¨ ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
                     req.path()
                 );
                 HttpResponse::NotFound().body(format!("404 Not Found: {}", req.path()))
@@ -107,6 +107,38 @@ mod template_tests {
     #[test]
     fn all_tera_templates_parse() {
         Tera::new("templates/**/*.html").expect("all Tera templates should parse");
+    }
+    #[test]
+    fn doctor_detail_template_renders_without_schedule_form_context() {
+        use crate::doctors::models::{Doctor, DoctorStatus};
+        use tera::Context;
+
+        let templates = Tera::new("templates/**/*.html").expect("all Tera templates should parse");
+        let doctor = Doctor {
+            id: "DOC-TEST".to_string(),
+            staff_id: "STAFF-TEST".to_string(),
+            license_number: "M-TEST".to_string(),
+            name: "Dr. Test".to_string(),
+            specialization: "General Medicine".to_string(),
+            contact_number: "80000000".to_string(),
+            email: "test@example.com".to_string(),
+            status: DoctorStatus::Available,
+        };
+        let mut context = Context::new();
+        context.insert("doctor", &doctor);
+        context.insert("doctor_status", "Available");
+        context.insert("schedules", &Vec::<crate::doctors::models::DoctorSchedule>::new());
+        context.insert("schedule_day_of_week", "");
+        context.insert("schedule_start_time", "");
+        context.insert("schedule_end_time", "");
+        context.insert("invalid_schedule_start_time", &false);
+        context.insert("invalid_schedule_end_time", &false);
+
+        let html = templates
+            .render("doctors/show.html", &context)
+            .expect("doctor detail template should render");
+
+        assert!(html.contains("Dr. Test"));
     }
 }
 

@@ -420,6 +420,11 @@ fn render_doctor_detail_page(
     context.insert("doctor", &doctor);
     context.insert("doctor_status", &doctor_status);
     context.insert("schedules", &schedules);
+    context.insert("schedule_day_of_week", "");
+    context.insert("schedule_start_time", "");
+    context.insert("schedule_end_time", "");
+    context.insert("invalid_schedule_start_time", &false);
+    context.insert("invalid_schedule_end_time", &false);
 
     if let Some(form) = schedule_form {
         let day_of_week = format!("{:?}", form.day_of_week);
