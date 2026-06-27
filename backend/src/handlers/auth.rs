@@ -287,6 +287,7 @@ pub async fn current_user(
             "canEditPatients": has_permission(&role, AppAction::EditPatient),
             "canDeletePatients": has_permission(&role, AppAction::DeletePatient),
             "canManageAppointments": has_permission(&role, AppAction::ManageAppointments),
+            "canManageDoctorAppointments": has_permission(&role, AppAction::ManageDoctorAppt),
             "canViewMedicalRecords": has_permission(&role, AppAction::ViewMedicalRecords),
             "canEditMedicalRecords": has_permission(&role, AppAction::EditMedicalRecords),
             "canViewPrescriptions": has_permission(&role, AppAction::ViewPrescriptions),
@@ -413,6 +414,7 @@ pub fn has_permission(role: &str, action: AppAction) -> bool {
             action,
             AppAction::ViewPatient
                 | AppAction::ManageAppointments
+                | AppAction::ManageDoctorAppt
                 | AppAction::ViewMedicalRecords
                 | AppAction::EditMedicalRecords
                 | AppAction::ViewPrescriptions
@@ -535,6 +537,19 @@ mod tests {
             "receptionist",
             AppAction::GenerateBillingReport
         ));
+    }
+
+    #[test]
+    fn doctor_can_use_doctor_dashboard_but_not_manage_doctors() {
+        assert!(has_permission("doctor", AppAction::ManageDoctorAppt));
+        assert!(!has_permission("doctor", AppAction::ManageUsers));
+    }
+
+    #[test]
+    fn receptionist_manages_appointments_but_not_doctor_dashboard_or_doctors() {
+        assert!(has_permission("receptionist", AppAction::ManageAppointments));
+        assert!(!has_permission("receptionist", AppAction::ManageDoctorAppt));
+        assert!(!has_permission("receptionist", AppAction::ManageUsers));
     }
 
     #[test]
