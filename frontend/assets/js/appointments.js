@@ -38,6 +38,7 @@ const appointments = [
 ];
 
 let availableDoctorNames = null;
+let bookableDoctorNames = null;
 
 const pagination = new Pagination({
     data: appointments,
@@ -229,21 +230,30 @@ async function loadDoctors() {
     const uniqueDoctors = Array.from(
         new Map(doctors.map(doctor => [doctor.name, doctor])).values()
     ).filter(doctor => doctor.name);
+    const bookableDoctors = uniqueDoctors.filter(doctor => !doctor.status || doctor.status === "Available");
     availableDoctorNames = uniqueDoctors.map(doctor => doctor.name);
+    bookableDoctorNames = bookableDoctors.map(doctor => doctor.name);
 
     const addSelect = document.getElementById("doctorList");
     if (addSelect) {
         addSelect.innerHTML = "";
-        uniqueDoctors.forEach(doctor => {
-            addSelect.innerHTML += `<option value="${doctor.name}">${doctor.name}</option>`;
-        });
+        if (bookableDoctors.length === 0) {
+            addSelect.innerHTML = `<option value="">No available doctors</option>`;
+            addSelect.disabled = true;
+        } else {
+            addSelect.disabled = false;
+            bookableDoctors.forEach(doctor => {
+                addSelect.innerHTML += `<option value="${doctor.name}">${doctor.name}</option>`;
+            });
+        }
     }
 
     const editSelect = document.getElementById("editDoctorList");
     if (editSelect) {
         editSelect.innerHTML = "";
         uniqueDoctors.forEach(doctor => {
-            editSelect.innerHTML += `<option value="${doctor.name}">${doctor.name}</option>`;
+            const statusLabel = doctor.status && doctor.status !== "Available" ? ` (${doctor.status})` : "";
+            editSelect.innerHTML += `<option value="${doctor.name}">${doctor.name}${statusLabel}</option>`;
         });
     }
 
