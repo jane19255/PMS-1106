@@ -6,6 +6,7 @@ use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
+use serde::Deserialize;
 use serde_json::json;
 use tera::{Context, Tera};
 
@@ -18,6 +19,10 @@ pub fn routes(config: &mut web::ServiceConfig) {
         .route(
             "/doctors/{doctor_id}/delete",
             web::post().to(delete_doctor_form),
+        )
+        .route(
+            "/doctors/{doctor_id}/undo-delete",
+            web::post().to(undo_delete_doctor_form),
         )
         .route(
             "/doctors/{doctor_id}/schedules",
@@ -49,10 +54,17 @@ pub fn routes(config: &mut web::ServiceConfig) {
         );
 }
 
+#[derive(Deserialize)]
+pub struct DoctorsPageQuery {
+    deleted_doctor_id: Option<String>,
+    restored: Option<String>,
+}
+
 pub async fn doctors_page(
     req: HttpRequest,
     doctor_service: web::Data<DoctorService>,
     templates: web::Data<Tera>,
+    query: web::Query<DoctorsPageQuery>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
@@ -61,7 +73,14 @@ pub async fn doctors_page(
     }
 
     match doctor_service.list_doctors() {
-        Ok(doctors) => render_doctors_page(&templates, doctors, None, None),
+        Ok(doctors) => render_doctors_page(
+            &templates,
+            doctors,
+            None,
+            None,
+            query.deleted_doctor_id.as_deref(),
+            query.restored.as_deref(),
+        ),
         Err(error) => render_error(&templates, error),
     }
 }
@@ -111,7 +130,14 @@ pub async fn create_doctor_form(
         Ok(_) => redirect_to("/doctors"),
         Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.list_doctors() {
             Ok(doctors) => {
-                render_doctors_page(&templates, doctors, Some(&submitted_form), Some(error))
+                render_doctors_page(
+                    &templates,
+                    doctors,
+                    Some(&submitted_form),
+                    Some(error),
+                    None,
+                    None,
+                )
             }
             Err(error) => render_error(&templates, error),
         },
@@ -151,8 +177,27 @@ pub async fn delete_doctor_form(
         return rejection;
     }
 
-    match doctor_service.delete_doctor(&path.into_inner()) {
-        Ok(_) => redirect_to("/doctors"),
+    let doctor_id = path.into_inner();
+    match doctor_service.delete_doctor(&doctor_id) {
+        Ok(_) => redirect_to(&format!("/doctors?deleted_doctor_id={doctor_id}")),
+        Err(error) => render_error(&templates, error),
+    }
+}
+
+pub async fn undo_delete_doctor_form(
+    req: HttpRequest,
+    doctor_service: web::Data<DoctorService>,
+    templates: web::Data<Tera>,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_doctor_admin(&req, &firebase_auth, &firestore_db).await {
+        return rejection;
+    }
+
+    match doctor_service.undo_delete_doctor(&path.into_inner()) {
+        Ok(_) => redirect_to("/doctors?restored=1"),
         Err(error) => render_error(&templates, error),
     }
 }
@@ -401,9 +446,21 @@ fn render_doctors_page(
     doctors: Vec<super::models::Doctor>,
     form: Option<&CreateDoctorForm>,
     error: Option<DoctorError>,
+    deleted_doctor_id: Option<&str>,
+    restored: Option<&str>,
 ) -> HttpResponse {
     let mut context = Context::new();
     context.insert("doctors", &doctors);
+
+    if let Some(doctor_id) = deleted_doctor_id {
+        context.insert("deleted_doctor_id", doctor_id);
+        context.insert(
+            "success_message",
+            "Doctor deleted. You can undo this action while the server is still running.",
+        );
+    } else if restored == Some("1") {
+        context.insert("success_message", "Doctor restored successfully.");
+    }
 
     if let Some(form) = form {
         context.insert("form_name", &form.name);

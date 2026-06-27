@@ -57,12 +57,35 @@
     .danger-button:hover {
         background: rgb(239 68 68 / 8%) !important;
     }
+    .success-card {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        border-left: 4px solid var(--primary);
+    }
+
+    .success-card p {
+        margin: 0;
+        font-weight: 700;
+    }
 </style>
 {% endblock styles %}
 
 {% block content %}
 <h1>Doctor Management</h1>
 
+{% if success_message %}
+<section class="card success-card">
+    <p>{{ success_message }}</p>
+    {% if deleted_doctor_id %}
+    <form action="/doctors/{{ deleted_doctor_id }}/undo-delete" method="post">
+        <button type="submit">Undo Delete</button>
+    </form>
+    {% endif %}
+</section>
+{% endif %}
 <form class="card doctor-form" action="/doctors" method="post">
     {% if error_message %}
     <p class="form-error">{{ error_message }}</p>
@@ -90,7 +113,8 @@
     <p>Status: {{ doctor.status }}</p>
     <div class="doctor-card-actions">
         <a class="button-link" href="/doctors/{{ doctor.id }}">View Details</a>
-        <form action="/doctors/{{ doctor.id }}/delete" method="post">
+        <form action="/doctors/{{ doctor.id }}/delete" method="post"
+            onsubmit="return confirm('Delete this doctor?') && confirm('This will also remove the doctor schedules. Continue?');">
             <button class="danger-button" type="submit">Delete Doctor</button>
         </form>
     </div>

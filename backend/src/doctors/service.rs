@@ -1,7 +1,8 @@
 use super::models::{DayOfWeek, Doctor, DoctorSchedule, DoctorStatus};
 use super::repository::{DoctorRepository, RepositoryError};
 use serde::Deserialize;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 #[derive(Debug, PartialEq)]
@@ -37,11 +38,20 @@ pub struct CreateDoctorScheduleForm {
 
 pub struct DoctorService {
     doctor_repository: Arc<dyn DoctorRepository>,
+    deleted_doctors: Mutex<HashMap<String, DeletedDoctor>>,
+}
+
+struct DeletedDoctor {
+    doctor: Doctor,
+    schedules: Vec<DoctorSchedule>,
 }
 
 impl DoctorService {
     pub fn new(doctor_repository: Arc<dyn DoctorRepository>) -> Self {
-        Self { doctor_repository }
+        Self {
+            doctor_repository,
+            deleted_doctors: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn create_doctor(&self, form: CreateDoctorForm) -> Result<Doctor, DoctorError> {
@@ -118,9 +128,52 @@ impl DoctorService {
             ));
         }
 
+        let doctor_id = doctor_id.trim();
+        let doctor = self.find_doctor(doctor_id)?;
+        let schedules = self.list_schedules(doctor_id)?;
+
         self.doctor_repository
-            .delete(doctor_id.trim())
-            .map_err(Self::map_repository_error)
+            .delete(doctor_id)
+            .map_err(Self::map_repository_error)?;
+
+        let mut deleted_doctors = self
+            .deleted_doctors
+            .lock()
+            .map_err(|_| DoctorError::StorageUnavailable)?;
+        deleted_doctors.insert(doctor_id.to_string(), DeletedDoctor { doctor, schedules });
+
+        Ok(())
+    }
+
+    pub fn undo_delete_doctor(&self, doctor_id: &str) -> Result<(), DoctorError> {
+        if doctor_id.trim().is_empty() {
+            return Err(DoctorError::InvalidInput(
+                "Doctor ID is required".to_string(),
+            ));
+        }
+
+        let doctor_id = doctor_id.trim();
+        let deleted_doctor = {
+            let mut deleted_doctors = self
+                .deleted_doctors
+                .lock()
+                .map_err(|_| DoctorError::StorageUnavailable)?;
+            deleted_doctors
+                .remove(doctor_id)
+                .ok_or(DoctorError::DoctorNotFound)?
+        };
+
+        self.doctor_repository
+            .create(deleted_doctor.doctor)
+            .map_err(Self::map_repository_error)?;
+
+        for schedule in deleted_doctor.schedules {
+            self.doctor_repository
+                .create_schedule(schedule)
+                .map_err(Self::map_repository_error)?;
+        }
+
+        Ok(())
     }
 
     pub fn create_schedule(
@@ -356,6 +409,28 @@ mod tests {
             service.find_doctor(&doctor.id),
             Err(DoctorError::DoctorNotFound)
         );
+    }
+
+    #[test]
+    fn restores_deleted_doctor_and_schedules() {
+        let service = service();
+        let doctor = service.create_doctor(create_form()).unwrap();
+        service
+            .create_schedule(
+                &doctor.id,
+                CreateDoctorScheduleForm {
+                    day_of_week: DayOfWeek::Monday,
+                    start_time: "09:00".to_string(),
+                    end_time: "17:00".to_string(),
+                },
+            )
+            .unwrap();
+
+        service.delete_doctor(&doctor.id).unwrap();
+        service.undo_delete_doctor(&doctor.id).unwrap();
+
+        assert_eq!(service.find_doctor(&doctor.id).unwrap().name, doctor.name);
+        assert_eq!(service.list_schedules(&doctor.id).unwrap().len(), 1);
     }
 
     #[test]
