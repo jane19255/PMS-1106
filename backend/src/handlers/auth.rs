@@ -562,6 +562,20 @@ mod tests {
     }
 
     #[test]
+    fn prescription_permissions_match_clinical_roles() {
+        assert!(has_permission("doctor", AppAction::ViewPrescriptions));
+        assert!(has_permission("doctor", AppAction::CreatePrescription));
+        assert!(!has_permission("doctor", AppAction::DispenseMedicine));
+
+        assert!(has_permission("pharmacist", AppAction::ViewPrescriptions));
+        assert!(has_permission("pharmacist", AppAction::DispenseMedicine));
+        assert!(!has_permission("pharmacist", AppAction::CreatePrescription));
+
+        assert!(!has_permission("receptionist", AppAction::ViewPrescriptions));
+        assert!(!has_permission("receptionist", AppAction::CreatePrescription));
+        assert!(!has_permission("receptionist", AppAction::DispenseMedicine));
+    }
+    #[test]
     fn pharmacist_cannot_change_billing_records() {
         assert!(has_permission("pharmacist", AppAction::ViewBilling));
         assert!(!has_permission("pharmacist", AppAction::CreateInvoice));
