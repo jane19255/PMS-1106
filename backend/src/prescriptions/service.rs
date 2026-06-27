@@ -60,6 +60,12 @@ impl PrescriptionService {
             &form.frequency,
             &form.duration,
         )?;
+        self.reject_duplicate_active_prescription(
+            &form.patient_id,
+            &form.medication_name,
+            &form.dosage,
+        )
+        .await?;
         let quantity = self.parse_quantity(&form.quantity)?;
         let unit_cost = self.parse_unit_cost(&form.unit_cost)?;
 
@@ -233,6 +239,34 @@ impl PrescriptionService {
             .map_err(Self::map_repository_error)
     }
 
+    async fn reject_duplicate_active_prescription(
+        &self,
+        patient_id: &str,
+        medication_name: &str,
+        dosage: &str,
+    ) -> Result<(), PrescriptionError> {
+        let prescriptions = self
+            .prescription_repository
+            .list_by_patient(patient_id.trim())
+            .await
+            .map_err(Self::map_repository_error)?;
+        let medication_name = medication_name.trim().to_lowercase();
+        let dosage = dosage.trim().to_lowercase();
+
+        let duplicate_exists = prescriptions.iter().any(|prescription| {
+            prescription.status == PrescriptionStatus::Active
+                && prescription.medication_name.trim().eq_ignore_ascii_case(&medication_name)
+                && prescription.dosage.trim().eq_ignore_ascii_case(&dosage)
+        });
+
+        if duplicate_exists {
+            return Err(PrescriptionError::InvalidInput(
+                "An active prescription already exists for this patient and medication".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
     fn validate_prescription_fields(
         &self,
         patient_id: &str,
@@ -347,6 +381,20 @@ mod tests {
         );
     }
 
+    #[actix_web::test]
+    async fn rejects_duplicate_active_prescription() {
+        let service = service();
+        service.create_prescription(create_form()).await.unwrap();
+
+        let error = service.create_prescription(create_form()).await.unwrap_err();
+
+        assert_eq!(
+            error,
+            PrescriptionError::InvalidInput(
+                "An active prescription already exists for this patient and medication".to_string()
+            )
+        );
+    }
     #[actix_web::test]
     async fn dispenses_active_prescription() {
         let service = service();
