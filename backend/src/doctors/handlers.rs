@@ -72,7 +72,7 @@ pub async fn doctors_page(
         return rejection;
     }
 
-    match doctor_service.list_doctors() {
+    match doctor_service.list_doctors().await {
         Ok(doctors) => render_doctors_page(
             &templates,
             doctors,
@@ -98,12 +98,13 @@ pub async fn show_doctor(
     }
 
     let doctor_id = path.into_inner();
-    match doctor_service.find_doctor(&doctor_id) {
+    match doctor_service.find_doctor(&doctor_id).await {
         Ok(doctor) => render_doctor_detail_page(
             &templates,
             doctor,
             doctor_service
                 .list_schedules(&doctor_id)
+                .await
                 .unwrap_or_default(),
             None,
             None,
@@ -126,9 +127,9 @@ pub async fn create_doctor_form(
 
     let submitted_form = form.into_inner();
 
-    match doctor_service.create_doctor(submitted_form.clone()) {
+    match doctor_service.create_doctor(submitted_form.clone()).await {
         Ok(_) => redirect_to("/doctors"),
-        Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.list_doctors() {
+        Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.list_doctors().await {
             Ok(doctors) => {
                 render_doctors_page(
                     &templates,
@@ -159,7 +160,7 @@ pub async fn update_doctor_form(
     }
 
     let doctor_id = path.into_inner();
-    match doctor_service.update_doctor(&doctor_id, form.into_inner()) {
+    match doctor_service.update_doctor(&doctor_id, form.into_inner()).await {
         Ok(_) => redirect_to(&format!("/doctors/{doctor_id}")),
         Err(error) => render_error(&templates, error),
     }
@@ -178,7 +179,7 @@ pub async fn delete_doctor_form(
     }
 
     let doctor_id = path.into_inner();
-    match doctor_service.delete_doctor(&doctor_id) {
+    match doctor_service.delete_doctor(&doctor_id).await {
         Ok(_) => redirect_to(&format!("/doctors?deleted_doctor_id={doctor_id}")),
         Err(error) => render_error(&templates, error),
     }
@@ -196,7 +197,7 @@ pub async fn undo_delete_doctor_form(
         return rejection;
     }
 
-    match doctor_service.undo_delete_doctor(&path.into_inner()) {
+    match doctor_service.undo_delete_doctor(&path.into_inner()).await {
         Ok(_) => redirect_to("/doctors?restored=1"),
         Err(error) => render_error(&templates, error),
     }
@@ -218,14 +219,15 @@ pub async fn create_schedule_form(
     let doctor_id = path.into_inner();
     let submitted_form = form.into_inner();
 
-    match doctor_service.create_schedule(&doctor_id, submitted_form.clone()) {
+    match doctor_service.create_schedule(&doctor_id, submitted_form.clone()).await {
         Ok(_) => redirect_to(&format!("/doctors/{doctor_id}")),
-        Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.find_doctor(&doctor_id) {
+        Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.find_doctor(&doctor_id).await {
             Ok(doctor) => render_doctor_detail_page(
                 &templates,
                 doctor,
                 doctor_service
                     .list_schedules(&doctor_id)
+                    .await
                     .unwrap_or_default(),
                 Some(&submitted_form),
                 Some(error),
@@ -248,7 +250,7 @@ pub async fn delete_schedule_form(
         return rejection;
     }
 
-    match doctor_service.delete_schedule(&path.into_inner()) {
+    match doctor_service.delete_schedule(&path.into_inner()).await {
         Ok(_) => redirect_to("/doctors"),
         Err(error) => render_error(&templates, error),
     }
@@ -264,7 +266,7 @@ pub async fn list_doctors_api(
         return rejection;
     }
 
-    match doctor_service.list_doctors() {
+    match doctor_service.list_doctors().await {
         Ok(doctors) => HttpResponse::Ok().json(doctors),
         Err(error) => doctor_error_response(error),
     }
@@ -281,7 +283,7 @@ pub async fn show_doctor_api(
         return rejection;
     }
 
-    match doctor_service.find_doctor(&path.into_inner()) {
+    match doctor_service.find_doctor(&path.into_inner()).await {
         Ok(doctor) => HttpResponse::Ok().json(doctor),
         Err(error) => doctor_error_response(error),
     }
@@ -298,7 +300,7 @@ pub async fn create_doctor_api(
         return rejection;
     }
 
-    match doctor_service.create_doctor(form.into_inner()) {
+    match doctor_service.create_doctor(form.into_inner()).await {
         Ok(doctor) => HttpResponse::Created().json(doctor),
         Err(error) => doctor_error_response(error),
     }
@@ -316,7 +318,7 @@ pub async fn update_doctor_api(
         return rejection;
     }
 
-    match doctor_service.update_doctor(&path.into_inner(), form.into_inner()) {
+    match doctor_service.update_doctor(&path.into_inner(), form.into_inner()).await {
         Ok(doctor) => HttpResponse::Ok().json(doctor),
         Err(error) => doctor_error_response(error),
     }
@@ -333,7 +335,7 @@ pub async fn delete_doctor_api(
         return rejection;
     }
 
-    match doctor_service.delete_doctor(&path.into_inner()) {
+    match doctor_service.delete_doctor(&path.into_inner()).await {
         Ok(_) => HttpResponse::Ok().json(json!({ "status": "success" })),
         Err(error) => doctor_error_response(error),
     }
@@ -350,7 +352,7 @@ pub async fn list_schedules_api(
         return rejection;
     }
 
-    match doctor_service.list_schedules(&path.into_inner()) {
+    match doctor_service.list_schedules(&path.into_inner()).await {
         Ok(schedules) => HttpResponse::Ok().json(schedules),
         Err(error) => doctor_error_response(error),
     }
@@ -368,7 +370,7 @@ pub async fn create_schedule_api(
         return rejection;
     }
 
-    match doctor_service.create_schedule(&path.into_inner(), form.into_inner()) {
+    match doctor_service.create_schedule(&path.into_inner(), form.into_inner()).await {
         Ok(schedule) => HttpResponse::Created().json(schedule),
         Err(error) => doctor_error_response(error),
     }
@@ -385,7 +387,7 @@ pub async fn delete_schedule_api(
         return rejection;
     }
 
-    match doctor_service.delete_schedule(&path.into_inner()) {
+    match doctor_service.delete_schedule(&path.into_inner()).await {
         Ok(_) => HttpResponse::Ok().json(json!({ "status": "success" })),
         Err(error) => doctor_error_response(error),
     }

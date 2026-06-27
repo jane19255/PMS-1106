@@ -58,7 +58,7 @@ impl DoctorService {
         }
     }
 
-    pub fn create_doctor(&self, form: CreateDoctorForm) -> Result<Doctor, DoctorError> {
+    pub async fn create_doctor(&self, form: CreateDoctorForm) -> Result<Doctor, DoctorError> {
         self.validate_doctor_fields(
             &form.staff_id,
             &form.license_number,
@@ -81,16 +81,18 @@ impl DoctorService {
 
         self.doctor_repository
             .create(doctor)
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn list_doctors(&self) -> Result<Vec<Doctor>, DoctorError> {
+    pub async fn list_doctors(&self) -> Result<Vec<Doctor>, DoctorError> {
         self.doctor_repository
             .list()
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn find_doctor(&self, doctor_id: &str) -> Result<Doctor, DoctorError> {
+    pub async fn find_doctor(&self, doctor_id: &str) -> Result<Doctor, DoctorError> {
         if doctor_id.trim().is_empty() {
             return Err(DoctorError::InvalidInput(
                 "Doctor ID is required".to_string(),
@@ -99,15 +101,16 @@ impl DoctorService {
 
         self.doctor_repository
             .find_by_id(doctor_id.trim())
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn update_doctor(
+    pub async fn update_doctor(
         &self,
         doctor_id: &str,
         form: UpdateDoctorForm,
     ) -> Result<Doctor, DoctorError> {
-        let existing = self.find_doctor(doctor_id)?;
+        let existing = self.find_doctor(doctor_id).await?;
         self.validate_doctor_fields(
             &form.staff_id,
             &form.license_number,
@@ -130,10 +133,11 @@ impl DoctorService {
 
         self.doctor_repository
             .update(doctor)
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn delete_doctor(&self, doctor_id: &str) -> Result<(), DoctorError> {
+    pub async fn delete_doctor(&self, doctor_id: &str) -> Result<(), DoctorError> {
         if doctor_id.trim().is_empty() {
             return Err(DoctorError::InvalidInput(
                 "Doctor ID is required".to_string(),
@@ -141,11 +145,12 @@ impl DoctorService {
         }
 
         let doctor_id = doctor_id.trim();
-        let doctor = self.find_doctor(doctor_id)?;
-        let schedules = self.list_schedules(doctor_id)?;
+        let doctor = self.find_doctor(doctor_id).await?;
+        let schedules = self.list_schedules(doctor_id).await?;
 
         self.doctor_repository
             .delete(doctor_id)
+            .await
             .map_err(Self::map_repository_error)?;
 
         let mut deleted_doctors = self
@@ -157,7 +162,7 @@ impl DoctorService {
         Ok(())
     }
 
-    pub fn undo_delete_doctor(&self, doctor_id: &str) -> Result<(), DoctorError> {
+    pub async fn undo_delete_doctor(&self, doctor_id: &str) -> Result<(), DoctorError> {
         if doctor_id.trim().is_empty() {
             return Err(DoctorError::InvalidInput(
                 "Doctor ID is required".to_string(),
@@ -177,23 +182,25 @@ impl DoctorService {
 
         self.doctor_repository
             .create(deleted_doctor.doctor)
+            .await
             .map_err(Self::map_repository_error)?;
 
         for schedule in deleted_doctor.schedules {
             self.doctor_repository
                 .create_schedule(schedule)
+                .await
                 .map_err(Self::map_repository_error)?;
         }
 
         Ok(())
     }
 
-    pub fn create_schedule(
+    pub async fn create_schedule(
         &self,
         doctor_id: &str,
         form: CreateDoctorScheduleForm,
     ) -> Result<DoctorSchedule, DoctorError> {
-        let doctor = self.find_doctor(doctor_id)?;
+        let doctor = self.find_doctor(doctor_id).await?;
         self.validate_schedule(&form)?;
 
         let schedule = DoctorSchedule {
@@ -206,10 +213,11 @@ impl DoctorService {
 
         self.doctor_repository
             .create_schedule(schedule)
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn list_schedules(&self, doctor_id: &str) -> Result<Vec<DoctorSchedule>, DoctorError> {
+    pub async fn list_schedules(&self, doctor_id: &str) -> Result<Vec<DoctorSchedule>, DoctorError> {
         if doctor_id.trim().is_empty() {
             return Err(DoctorError::InvalidInput(
                 "Doctor ID is required".to_string(),
@@ -218,10 +226,11 @@ impl DoctorService {
 
         self.doctor_repository
             .list_schedules(doctor_id.trim())
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn delete_schedule(&self, schedule_id: &str) -> Result<(), DoctorError> {
+    pub async fn delete_schedule(&self, schedule_id: &str) -> Result<(), DoctorError> {
         if schedule_id.trim().is_empty() {
             return Err(DoctorError::InvalidInput(
                 "Schedule ID is required".to_string(),
@@ -230,6 +239,7 @@ impl DoctorService {
 
         self.doctor_repository
             .delete_schedule(schedule_id.trim())
+            .await
             .map_err(Self::map_repository_error)
     }
 
@@ -361,21 +371,21 @@ mod tests {
         }
     }
 
-    #[test]
-    fn creates_doctor_with_default_available_status() {
-        let doctor = service().create_doctor(create_form()).unwrap();
+    #[actix_web::test]
+    async fn creates_doctor_with_default_available_status() {
+        let doctor = service().create_doctor(create_form()).await.unwrap();
 
         assert!(doctor.id.starts_with("DOC-"));
         assert_eq!(doctor.name, "Dr. Tan");
         assert_eq!(doctor.status, DoctorStatus::Available);
     }
 
-    #[test]
-    fn rejects_blank_license_number() {
+    #[actix_web::test]
+    async fn rejects_blank_license_number() {
         let mut form = create_form();
         form.license_number = "  ".to_string();
 
-        let error = service().create_doctor(form).unwrap_err();
+        let error = service().create_doctor(form).await.unwrap_err();
 
         assert_eq!(
             error,
@@ -383,12 +393,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn rejects_blank_staff_id() {
+    #[actix_web::test]
+    async fn rejects_blank_staff_id() {
         let mut form = create_form();
         form.staff_id = "  ".to_string();
 
-        let error = service().create_doctor(form).unwrap_err();
+        let error = service().create_doctor(form).await.unwrap_err();
 
         assert_eq!(
             error,
@@ -396,12 +406,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn rejects_blank_doctor_name() {
+    #[actix_web::test]
+    async fn rejects_blank_doctor_name() {
         let mut form = create_form();
         form.name = "  ".to_string();
 
-        let error = service().create_doctor(form).unwrap_err();
+        let error = service().create_doctor(form).await.unwrap_err();
 
         assert_eq!(
             error,
@@ -409,19 +419,19 @@ mod tests {
         );
     }
 
-    #[test]
-    fn prefixes_doctor_name_when_missing() {
+    #[actix_web::test]
+    async fn prefixes_doctor_name_when_missing() {
         let mut form = create_form();
         form.name = "Lee".to_string();
 
-        let doctor = service().create_doctor(form).unwrap();
+        let doctor = service().create_doctor(form).await.unwrap();
 
         assert_eq!(doctor.name, "Dr. Lee");
     }
-    #[test]
-    fn updates_existing_doctor_status() {
+    #[actix_web::test]
+    async fn updates_existing_doctor_status() {
         let service = service();
-        let doctor = service.create_doctor(create_form()).unwrap();
+        let doctor = service.create_doctor(create_form()).await.unwrap();
 
         let updated = service
             .update_doctor(
@@ -436,16 +446,17 @@ mod tests {
                     status: DoctorStatus::Unavailable,
                 },
             )
+            .await
             .unwrap();
 
         assert_eq!(updated.id, doctor.id);
         assert_eq!(updated.status, DoctorStatus::Unavailable);
     }
 
-    #[test]
-    fn deletes_doctor_and_schedules() {
+    #[actix_web::test]
+    async fn deletes_doctor_and_schedules() {
         let service = service();
-        let doctor = service.create_doctor(create_form()).unwrap();
+        let doctor = service.create_doctor(create_form()).await.unwrap();
         service
             .create_schedule(
                 &doctor.id,
@@ -455,20 +466,21 @@ mod tests {
                     end_time: "17:00".to_string(),
                 },
             )
+            .await
             .unwrap();
 
-        service.delete_doctor(&doctor.id).unwrap();
+        service.delete_doctor(&doctor.id).await.unwrap();
 
         assert_eq!(
-            service.find_doctor(&doctor.id),
+            service.find_doctor(&doctor.id).await,
             Err(DoctorError::DoctorNotFound)
         );
     }
 
-    #[test]
-    fn restores_deleted_doctor_and_schedules() {
+    #[actix_web::test]
+    async fn restores_deleted_doctor_and_schedules() {
         let service = service();
-        let doctor = service.create_doctor(create_form()).unwrap();
+        let doctor = service.create_doctor(create_form()).await.unwrap();
         service
             .create_schedule(
                 &doctor.id,
@@ -478,19 +490,20 @@ mod tests {
                     end_time: "17:00".to_string(),
                 },
             )
+            .await
             .unwrap();
 
-        service.delete_doctor(&doctor.id).unwrap();
-        service.undo_delete_doctor(&doctor.id).unwrap();
+        service.delete_doctor(&doctor.id).await.unwrap();
+        service.undo_delete_doctor(&doctor.id).await.unwrap();
 
-        assert_eq!(service.find_doctor(&doctor.id).unwrap().name, doctor.name);
-        assert_eq!(service.list_schedules(&doctor.id).unwrap().len(), 1);
+        assert_eq!(service.find_doctor(&doctor.id).await.unwrap().name, doctor.name);
+        assert_eq!(service.list_schedules(&doctor.id).await.unwrap().len(), 1);
     }
 
-    #[test]
-    fn rejects_invalid_schedule_time_range() {
+    #[actix_web::test]
+    async fn rejects_invalid_schedule_time_range() {
         let service = service();
-        let doctor = service.create_doctor(create_form()).unwrap();
+        let doctor = service.create_doctor(create_form()).await.unwrap();
 
         let error = service
             .create_schedule(
@@ -501,6 +514,7 @@ mod tests {
                     end_time: "09:00".to_string(),
                 },
             )
+            .await
             .unwrap_err();
 
         assert_eq!(

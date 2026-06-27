@@ -74,8 +74,9 @@
         <input type="text" name="contact_number" value="{{ doctor.contact_number }}">
         <input type="email" name="email" value="{{ doctor.email }}">
         <select name="status">
-            <option value="Available">Available</option>
-            <option value="Unavailable">Unavailable</option>
+            <option value="Available" {% if doctor.status == "Available" %}selected{% endif %}>Available</option>
+            <option value="Unavailable" {% if doctor.status == "Unavailable" %}selected{% endif %}>Unavailable</option>
+            <option value="On Leave" {% if doctor.status == "On Leave" %}selected{% endif %}>On Leave</option>
         </select>
         <button type="submit">Update Doctor</button>
     </form>

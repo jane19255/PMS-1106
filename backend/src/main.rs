@@ -11,7 +11,7 @@ use billing::repository::{
     InMemoryInvoiceRepository, InvoiceRepository, SupabaseInvoiceRepository,
 };
 use billing::service::BillingService;
-use doctors::repository::{DoctorRepository, InMemoryDoctorRepository};
+use doctors::repository::{DoctorRepository, InMemoryDoctorRepository, SupabaseDoctorRepository};
 use doctors::service::DoctorService;
 use dotenv::dotenv;
 use firebase_auth::FirebaseAuth;
@@ -47,7 +47,20 @@ async fn main() -> std::io::Result<()> {
             }
         };
     let billing_service = web::Data::new(BillingService::new(invoice_repository));
-    let doctor_repository: Arc<dyn DoctorRepository> = Arc::new(InMemoryDoctorRepository::default());
+    let doctor_repository: Arc<dyn DoctorRepository> =
+        match std::env::var("DOCTOR_STORAGE").as_deref() {
+            Ok("supabase") => {
+                println!("Doctor storage: Supabase PostgreSQL");
+                Arc::new(SupabaseDoctorRepository::new(
+                    supabase_db.url.clone(),
+                    supabase_db.key.clone(),
+                ))
+            }
+            _ => {
+                println!("Doctor storage: in-memory (set DOCTOR_STORAGE=supabase to persist)");
+                Arc::new(InMemoryDoctorRepository::default())
+            }
+        };
     let doctor_service = web::Data::new(DoctorService::new(doctor_repository));
     let template_data = web::Data::new(templates);
 
@@ -76,7 +89,7 @@ async fn main() -> std::io::Result<()> {
             .configure(routes::configure)
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 println!(
-                    ">>> 🚨 ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
+                    ">>> Ã°Å¸Å¡Â¨ ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
                     req.path()
                 );
                 HttpResponse::NotFound().body(format!("404 Not Found: {}", req.path()))

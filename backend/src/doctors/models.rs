@@ -16,6 +16,8 @@ pub struct Doctor {
 pub enum DoctorStatus {
     Available,
     Unavailable,
+    #[serde(rename = "On Leave")]
+    OnLeave,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
