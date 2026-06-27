@@ -16,7 +16,7 @@ use doctors::repository::{DoctorRepository, InMemoryDoctorRepository, SupabaseDo
 use doctors::service::DoctorService;
 use dotenv::dotenv;
 use firebase_auth::FirebaseAuth;
-use prescriptions::repository::{InMemoryPrescriptionRepository, PrescriptionRepository};
+use prescriptions::repository::{InMemoryPrescriptionRepository, PrescriptionRepository, SupabasePrescriptionRepository};
 use prescriptions::service::PrescriptionService;
 use std::sync::Arc;
 use tera::Tera;
@@ -66,7 +66,19 @@ async fn main() -> std::io::Result<()> {
         };
     let doctor_service = web::Data::new(DoctorService::new(doctor_repository));
     let prescription_repository: Arc<dyn PrescriptionRepository> =
-        Arc::new(InMemoryPrescriptionRepository::default());
+        match std::env::var("PRESCRIPTION_STORAGE").as_deref() {
+            Ok("supabase") => {
+                println!("Prescription storage: Supabase PostgreSQL");
+                Arc::new(SupabasePrescriptionRepository::new(
+                    supabase_db.url.clone(),
+                    supabase_db.key.clone(),
+                ))
+            }
+            _ => {
+                println!("Prescription storage: in-memory (set PRESCRIPTION_STORAGE=supabase to persist)");
+                Arc::new(InMemoryPrescriptionRepository::default())
+            }
+        };
     let prescription_service = web::Data::new(PrescriptionService::new(prescription_repository));
     let template_data = web::Data::new(templates);
 
@@ -96,7 +108,7 @@ async fn main() -> std::io::Result<()> {
             .configure(routes::configure)
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 println!(
-                    ">>> ÃƒÂ°Ã…Â¸Ã…Â¡Ã‚Â¨ ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
+                    ">>> ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â¨ ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
                     req.path()
                 );
                 HttpResponse::NotFound().body(format!("404 Not Found: {}", req.path()))

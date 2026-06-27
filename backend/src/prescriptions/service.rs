@@ -48,7 +48,7 @@ impl PrescriptionService {
         }
     }
 
-    pub fn create_prescription(
+    pub async fn create_prescription(
         &self,
         form: CreatePrescriptionForm,
     ) -> Result<Prescription, PrescriptionError> {
@@ -89,16 +89,18 @@ impl PrescriptionService {
 
         self.prescription_repository
             .create(prescription)
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn list_prescriptions(&self) -> Result<Vec<Prescription>, PrescriptionError> {
+    pub async fn list_prescriptions(&self) -> Result<Vec<Prescription>, PrescriptionError> {
         self.prescription_repository
             .list()
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn list_prescriptions_for_patient(
+    pub async fn list_prescriptions_for_patient(
         &self,
         patient_id: &str,
     ) -> Result<Vec<Prescription>, PrescriptionError> {
@@ -110,10 +112,11 @@ impl PrescriptionService {
 
         self.prescription_repository
             .list_by_patient(patient_id.trim())
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn list_prescriptions_for_doctor(
+    pub async fn list_prescriptions_for_doctor(
         &self,
         doctor_id: &str,
     ) -> Result<Vec<Prescription>, PrescriptionError> {
@@ -125,10 +128,11 @@ impl PrescriptionService {
 
         self.prescription_repository
             .list_by_doctor(doctor_id.trim())
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn find_prescription(
+    pub async fn find_prescription(
         &self,
         prescription_id: &str,
     ) -> Result<Prescription, PrescriptionError> {
@@ -140,15 +144,16 @@ impl PrescriptionService {
 
         self.prescription_repository
             .find_by_id(prescription_id.trim())
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn update_prescription(
+    pub async fn update_prescription(
         &self,
         prescription_id: &str,
         form: UpdatePrescriptionForm,
     ) -> Result<Prescription, PrescriptionError> {
-        let mut prescription = self.find_prescription(prescription_id)?;
+        let mut prescription = self.find_prescription(prescription_id).await?;
 
         if prescription.status != PrescriptionStatus::Active {
             return Err(PrescriptionError::InvalidInput(
@@ -177,14 +182,15 @@ impl PrescriptionService {
 
         self.prescription_repository
             .update(prescription)
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn dispense_prescription(
+    pub async fn dispense_prescription(
         &self,
         prescription_id: &str,
     ) -> Result<Prescription, PrescriptionError> {
-        let mut prescription = self.find_prescription(prescription_id)?;
+        let mut prescription = self.find_prescription(prescription_id).await?;
 
         if prescription.status != PrescriptionStatus::Active {
             return Err(PrescriptionError::InvalidInput(
@@ -197,14 +203,15 @@ impl PrescriptionService {
 
         self.prescription_repository
             .update(prescription)
+            .await
             .map_err(Self::map_repository_error)
     }
 
-    pub fn cancel_prescription(
+    pub async fn cancel_prescription(
         &self,
         prescription_id: &str,
     ) -> Result<Prescription, PrescriptionError> {
-        let mut prescription = self.find_prescription(prescription_id)?;
+        let mut prescription = self.find_prescription(prescription_id).await?;
 
         if prescription.status == PrescriptionStatus::Dispensed {
             return Err(PrescriptionError::InvalidInput(
@@ -222,6 +229,7 @@ impl PrescriptionService {
 
         self.prescription_repository
             .update(prescription)
+            .await
             .map_err(Self::map_repository_error)
     }
 
@@ -316,9 +324,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn creates_active_prescription() {
-        let prescription = service().create_prescription(create_form()).unwrap();
+    #[actix_web::test]
+    async fn creates_active_prescription() {
+        let prescription = service().create_prescription(create_form()).await.unwrap();
 
         assert!(prescription.id.starts_with("RX-"));
         assert_eq!(prescription.status, PrescriptionStatus::Active);
@@ -326,12 +334,12 @@ mod tests {
         assert_eq!(prescription.unit_cost, 1.25);
     }
 
-    #[test]
-    fn rejects_missing_patient_id() {
+    #[actix_web::test]
+    async fn rejects_missing_patient_id() {
         let mut form = create_form();
         form.patient_id = " ".to_string();
 
-        let error = service().create_prescription(form).unwrap_err();
+        let error = service().create_prescription(form).await.unwrap_err();
 
         assert_eq!(
             error,
@@ -339,24 +347,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn dispenses_active_prescription() {
+    #[actix_web::test]
+    async fn dispenses_active_prescription() {
         let service = service();
-        let prescription = service.create_prescription(create_form()).unwrap();
+        let prescription = service.create_prescription(create_form()).await.unwrap();
 
-        let dispensed = service.dispense_prescription(&prescription.id).unwrap();
+        let dispensed = service.dispense_prescription(&prescription.id).await.unwrap();
 
         assert_eq!(dispensed.status, PrescriptionStatus::Dispensed);
         assert!(dispensed.dispensed_at.is_some());
     }
 
-    #[test]
-    fn rejects_cancel_after_dispense() {
+    #[actix_web::test]
+    async fn rejects_cancel_after_dispense() {
         let service = service();
-        let prescription = service.create_prescription(create_form()).unwrap();
-        service.dispense_prescription(&prescription.id).unwrap();
+        let prescription = service.create_prescription(create_form()).await.unwrap();
+        service.dispense_prescription(&prescription.id).await.unwrap();
 
-        let error = service.cancel_prescription(&prescription.id).unwrap_err();
+        let error = service.cancel_prescription(&prescription.id).await.unwrap_err();
 
         assert_eq!(
             error,

@@ -70,7 +70,7 @@ pub async fn prescriptions_page(
         return rejection;
     }
 
-    match prescription_service.list_prescriptions() {
+    match prescription_service.list_prescriptions().await {
         Ok(prescriptions) => {
             let mut context = Context::new();
             context.insert("prescriptions", &prescriptions);
@@ -99,7 +99,7 @@ pub async fn show_prescription(
         return rejection;
     }
 
-    match prescription_service.find_prescription(&path.into_inner()) {
+    match prescription_service.find_prescription(&path.into_inner()).await {
         Ok(prescription) => {
             let mut context = Context::new();
             context.insert("prescription", &prescription);
@@ -128,7 +128,7 @@ pub async fn create_prescription_form(
         return rejection;
     }
 
-    match prescription_service.create_prescription(form.into_inner()) {
+    match prescription_service.create_prescription(form.into_inner()).await {
         Ok(_) => redirect_to("/prescriptions"),
         Err(error) => render_error(&templates, error),
     }
@@ -155,7 +155,7 @@ pub async fn update_prescription_form(
     }
 
     let prescription_id = path.into_inner();
-    match prescription_service.update_prescription(&prescription_id, form.into_inner()) {
+    match prescription_service.update_prescription(&prescription_id, form.into_inner()).await {
         Ok(_) => redirect_to(&format!("/prescriptions/{prescription_id}")),
         Err(error) => render_error(&templates, error),
     }
@@ -181,7 +181,7 @@ pub async fn dispense_prescription_form(
     }
 
     let prescription_id = path.into_inner();
-    match prescription_service.dispense_prescription(&prescription_id) {
+    match prescription_service.dispense_prescription(&prescription_id).await {
         Ok(_) => redirect_to(&format!("/prescriptions/{prescription_id}")),
         Err(error) => render_error(&templates, error),
     }
@@ -207,7 +207,7 @@ pub async fn cancel_prescription_form(
     }
 
     let prescription_id = path.into_inner();
-    match prescription_service.cancel_prescription(&prescription_id) {
+    match prescription_service.cancel_prescription(&prescription_id).await {
         Ok(_) => redirect_to(&format!("/prescriptions/{prescription_id}")),
         Err(error) => render_error(&templates, error),
     }
@@ -238,11 +238,11 @@ pub async fn list_prescriptions_api(
     }
 
     let prescriptions = if let Some(patient_id) = query.patient_id.as_deref() {
-        prescription_service.list_prescriptions_for_patient(patient_id)
+        prescription_service.list_prescriptions_for_patient(patient_id).await
     } else if let Some(doctor_id) = query.doctor_id.as_deref() {
-        prescription_service.list_prescriptions_for_doctor(doctor_id)
+        prescription_service.list_prescriptions_for_doctor(doctor_id).await
     } else {
-        prescription_service.list_prescriptions()
+        prescription_service.list_prescriptions().await
     };
 
     match prescriptions {
@@ -269,7 +269,7 @@ pub async fn show_prescription_api(
         return rejection;
     }
 
-    match prescription_service.find_prescription(&path.into_inner()) {
+    match prescription_service.find_prescription(&path.into_inner()).await {
         Ok(prescription) => HttpResponse::Ok().json(prescription),
         Err(error) => prescription_error_response(error),
     }
@@ -293,7 +293,7 @@ pub async fn create_prescription_api(
         return rejection;
     }
 
-    match prescription_service.create_prescription(form.into_inner()) {
+    match prescription_service.create_prescription(form.into_inner()).await {
         Ok(prescription) => HttpResponse::Created().json(prescription),
         Err(error) => prescription_error_response(error),
     }
@@ -318,7 +318,7 @@ pub async fn update_prescription_api(
         return rejection;
     }
 
-    match prescription_service.update_prescription(&path.into_inner(), form.into_inner()) {
+    match prescription_service.update_prescription(&path.into_inner(), form.into_inner()).await {
         Ok(prescription) => HttpResponse::Ok().json(prescription),
         Err(error) => prescription_error_response(error),
     }
@@ -342,7 +342,7 @@ pub async fn dispense_prescription_api(
         return rejection;
     }
 
-    match prescription_service.dispense_prescription(&path.into_inner()) {
+    match prescription_service.dispense_prescription(&path.into_inner()).await {
         Ok(prescription) => HttpResponse::Ok().json(prescription),
         Err(error) => prescription_error_response(error),
     }
@@ -366,7 +366,7 @@ pub async fn cancel_prescription_api(
         return rejection;
     }
 
-    match prescription_service.cancel_prescription(&path.into_inner()) {
+    match prescription_service.cancel_prescription(&path.into_inner()).await {
         Ok(prescription) => HttpResponse::Ok().json(prescription),
         Err(error) => prescription_error_response(error),
     }
