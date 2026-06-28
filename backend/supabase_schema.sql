@@ -246,3 +246,4 @@ for each row
 execute function public.set_updated_at();
 
 alter table public.doctor_schedules enable row level security;
+
