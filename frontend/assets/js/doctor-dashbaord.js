@@ -168,7 +168,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     trs.forEach(tr => {
         tr.addEventListener("click", () => {
-            window.location.href = "Medical-Records.html";
+            window.location.href = "/records";
         });
     });
 });
