@@ -5,6 +5,7 @@ mod handlers;
 mod models;
 mod prescriptions;
 mod routes;
+mod staff;
 
 use actix_files::Files;
 use actix_web::{web, App, HttpResponse, HttpServer};
@@ -18,6 +19,8 @@ use dotenv::dotenv;
 use firebase_auth::FirebaseAuth;
 use prescriptions::repository::{InMemoryPrescriptionRepository, PrescriptionRepository, SupabasePrescriptionRepository};
 use prescriptions::service::PrescriptionService;
+use staff::repository::{InMemoryStaffRepository, StaffRepository, SupabaseStaffRepository};
+use staff::service::StaffService;
 use std::sync::Arc;
 use tera::Tera;
 
@@ -80,6 +83,21 @@ async fn main() -> std::io::Result<()> {
             }
         };
     let prescription_service = web::Data::new(PrescriptionService::new(prescription_repository));
+    let staff_repository: Arc<dyn StaffRepository> =
+        match std::env::var("STAFF_STORAGE").as_deref() {
+            Ok("supabase") => {
+                println!("Staff storage: Supabase PostgreSQL");
+                Arc::new(SupabaseStaffRepository::new(
+                    supabase_db.url.clone(),
+                    supabase_db.key.clone(),
+                ))
+            }
+            _ => {
+                println!("Staff storage: in-memory (set STAFF_STORAGE=supabase to persist)");
+                Arc::new(InMemoryStaffRepository::default())
+            }
+        };
+    let staff_service = web::Data::new(StaffService::new(staff_repository));
     let template_data = web::Data::new(templates);
 
     println!("Server running at http://127.0.0.1:8080");
@@ -89,6 +107,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(billing_service.clone())
             .app_data(doctor_service.clone())
             .app_data(prescription_service.clone())
+            .app_data(staff_service.clone())
             .app_data(template_data.clone())
             .app_data(web::Data::new(firebase_auth.clone()))
             .app_data(web::Data::new(firestore_db.clone()))
@@ -108,7 +127,7 @@ async fn main() -> std::io::Result<()> {
             .configure(routes::configure)
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 println!(
-                    ">>> ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â¨ ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
+                    ">>> ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
                     req.path()
                 );
                 HttpResponse::NotFound().body(format!("404 Not Found: {}", req.path()))
