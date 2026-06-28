@@ -1,70 +1,4 @@
-const staffs = [
-    {
-        id: "STF-001",
-        firstName: "Off",
-        lastName: "Jumpol",
-        dob: "2000-05-12",
-        gender: "Male",
-        role: "Receptionist",
-        nric: "S1234567D",
-        phone: "91234567",
-        email: "off.jumpol@csc.singaporehealth.sg",
-        address: "123 Bedok North Street 2, #05-67, Singapore 460123",
-        status: "Active"
-    },
-    {
-        id: "STF-002",
-        firstName: "Jimmy",
-        lastName: "Jitaraphol",
-        dob: "1999-03-22",
-        gender: "Female",
-        role: "Doctor",
-        nric: "S7654321F",
-        phone: "92345678",
-        email: "gun.atthaphan@csc.singaporehealth.sg",
-        address: "456 Jurong West Ave 1, #10-88, Singapore 640456",
-        status: "Inactive"
-    },
-    {
-        id: "STF-003",
-        firstName: "Junior",
-        lastName: "Panuwat",
-        dob: "2002-07-10",
-        gender: "Male",
-        role: "Receptionist",
-        nric: "S1122334H",
-        phone: "93456789",
-        email: "junior.panuwat@csc.singaporehealth.sg",
-        address: "789 Tampines St 3, #03-12, Singapore 500789",
-        status: "Active"
-    },
-    {
-        id: "STF-004",
-        firstName: "Mark",
-        lastName: "Siwat",
-        dob: "2001-02-05",
-        gender: "Female",
-        role: "Receptionist",
-        nric: "S4433221Z",
-        phone: "94567890",
-        email: "mark.siwat@csc.singaporehealth.sg",
-        address: "11 Woodlands Dr 50, #07-23, Singapore 730811",
-        status: "Active"
-    },
-    {
-        id: "STF-005",
-        firstName: "William",
-        lastName: "Jakrapatr",
-        dob: "2003-09-18",
-        gender: "Male",
-        role: "Doctor",
-        nric: "S5566778D",
-        phone: "95678901",
-        email: "william.jakrapatr@csc.singaporehealth.sg",
-        address: "22 Simei St 4, #09-45, Singapore 520922",
-        status: "Active"
-    }
-];
+let staffs = [];
 
 const pagination = new Pagination({
     data: [],
@@ -77,16 +11,43 @@ const pagination = new Pagination({
     renderRow: renderStaffRow
 });
 
+function emptyStaffDefaults(staff) {
+    return {
+        dob: "",
+        gender: "",
+        nric: "",
+        address: "",
+        ...staff,
+    };
+}
+function notify(message, type) {
+    if (typeof showToast === "function") {
+        showToast(message, type);
+    }
+}
+
+function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+    })[char]);
+}
 function renderStaffRow(staff, index) {
+    const fullName = `${staff.firstName} ${staff.lastName}`.trim();
+    const statusClass = (staff.status || "").toLowerCase();
+
     return `
     <tr class="hover:bg-slate-50">
-        <td>${staff.id}</td>
-        <td>${staff.firstName + " " + staff.lastName}</td>
-        <td>${staff.gender}</td>
-        <td>${staff.role}</td>
-        <td>${formatDate(staff.dob)}</td>
-        <td>${staff.phone}</td>
-        <td><span class="status ${staff.status.toLowerCase()}">${staff.status}</span></td>
+        <td>${escapeHtml(staff.id)}</td>
+        <td>${escapeHtml(fullName || "-")}</td>
+        <td>${escapeHtml(staff.gender || "-")}</td>
+        <td>${escapeHtml(staff.role)}</td>
+        <td>${escapeHtml(staff.dob ? formatDate(staff.dob) : "-")}</td>
+        <td>${escapeHtml(staff.phone || "-")}</td>
+        <td><span class="status ${escapeHtml(statusClass)}">${escapeHtml(staff.status)}</span></td>
         <td class="action">
             <div class="has-tooltip">
                 <i class="view fa-solid fa-circle-info" onclick="viewStaff(${index})"></i>
@@ -100,19 +61,87 @@ function renderStaffRow(staff, index) {
     </tr>`;
 }
 
+async function loadStaffs() {
+    try {
+        const response = await fetch("/api/staff", { headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error(await response.text());
+        staffs = (await response.json()).map(emptyStaffDefaults);
+    } catch (error) {
+        console.warn("Could not load staff from backend:", error);
+        staffs = [];
+        notify("Staff list could not be loaded", "error");
+    }
+
+    refreshStaffList();
+}
+
+function staffPayload(prefix) {
+    return {
+        firebaseUid: document.getElementById(`${prefix}-firebaseUid`)?.value.trim() || "",
+        firstName: document.getElementById(`${prefix}-firstName`)?.value.trim() || "",
+        lastName: document.getElementById(`${prefix}-lastName`)?.value.trim() || "",
+        role: document.getElementById(`${prefix}-role`)?.value || "Receptionist",
+        phone: document.getElementById(`${prefix}-phone`)?.value.trim() || "",
+        email: document.getElementById(`${prefix}-email`)?.value.trim() || "",
+        status: document.getElementById(`${prefix}-status`)?.value || "Active",
+    };
+}
+
+async function saveNewStaff(button) {
+    if (!verifyInput(button)) return;
+
+    try {
+        const response = await fetch("/api/staff", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(staffPayload("add")),
+        });
+        if (!response.ok) throw new Error(await response.text());
+        const staff = emptyStaffDefaults(await response.json());
+        staffs.push(staff);
+        refreshStaffList();
+        notify("New staff added!", "success");
+        closeModal(button);
+        clearInput(button);
+    } catch (error) {
+        notify(error.message || "Staff could not be saved", "error");
+    }
+}
+
+async function saveStaffChanges(button) {
+    if (!verifyInput(button)) return;
+
+    const staffId = document.getElementById("edit-id").value;
+    try {
+        const response = await fetch(`/api/staff/${encodeURIComponent(staffId)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(staffPayload("edit")),
+        });
+        if (!response.ok) throw new Error(await response.text());
+        const updated = emptyStaffDefaults(await response.json());
+        staffs = staffs.map((staff) => staff.id === updated.id ? updated : staff);
+        refreshStaffList();
+        notify("Changes saved!", "success");
+        closeModal(button);
+    } catch (error) {
+        notify(error.message || "Staff changes could not be saved", "error");
+    }
+}
+
 function viewStaff(index) {
     const s = pagination.paginatedData[index];
 
     document.getElementById("view-pid").innerText = s.id;
-    document.getElementById("view-fullname").innerText = s.firstName + " " + s.lastName;
-    document.getElementById("view-gender").innerText = s.gender;
-    document.getElementById("view-dob").innerText = formatDate(s.dob);
-    document.getElementById("view-nric").innerText = s.nric;
+    document.getElementById("view-fullname").innerText = `${s.firstName} ${s.lastName}`;
+    document.getElementById("view-gender").innerText = s.gender || "-";
+    document.getElementById("view-dob").innerText = s.dob ? formatDate(s.dob) : "-";
+    document.getElementById("view-nric").innerText = s.nric || "-";
     document.getElementById("view-role").innerText = s.role;
 
-    document.getElementById("view-phone").innerText = s.phone;
+    document.getElementById("view-phone").innerText = s.phone || "-";
     document.getElementById("view-email").innerText = s.email;
-    document.getElementById("view-address").innerText = s.address;
+    document.getElementById("view-address").innerText = s.address || "-";
 
     const statusEl = document.getElementById("view-status");
     statusEl.innerText = s.status;
@@ -124,18 +153,18 @@ function viewStaff(index) {
 function editStaff(index) {
     const s = pagination.paginatedData[index];
 
-    const fullIndex = staffs.findIndex(x => x.id === s.id);
-    document.getElementById("edit-index").value = fullIndex;
-
+    document.getElementById("edit-id").value = s.id;
+    document.getElementById("edit-firebaseUid").value = s.firebaseUid || "";
     document.getElementById("edit-firstName").value = s.firstName;
     document.getElementById("edit-lastName").value = s.lastName;
-    document.getElementById("edit-dob").value = s.dob;
-    document.getElementById("edit-gender").value = s.gender.toLowerCase();
-    document.getElementById("edit-nric").value = s.nric;
+    document.getElementById("edit-dob").value = s.dob || "";
+    document.getElementById("edit-gender").value = (s.gender || "male").toLowerCase();
+    document.getElementById("edit-nric").value = s.nric || "";
     document.getElementById("edit-role").value = s.role;
-    document.getElementById("edit-phone").value = s.phone;
+    document.getElementById("edit-phone").value = s.phone || "";
     document.getElementById("edit-email").value = s.email;
-    document.getElementById("edit-address").value = s.address;
+    document.getElementById("edit-status").value = s.status;
+    document.getElementById("edit-address").value = s.address || "";
 
     openModal("editStaffModal");
 }
@@ -146,7 +175,7 @@ function applySearch() {
         s.id.toLowerCase().includes(keyword) ||
         s.firstName.toLowerCase().includes(keyword) ||
         s.lastName.toLowerCase().includes(keyword) ||
-        s.phone.includes(keyword)
+        (s.phone || "").includes(keyword)
     );
 }
 
@@ -168,7 +197,7 @@ function applySort(list) {
     const sorted = [...list];
     sorted.sort((a, b) => {
         if (sortBy === "name") return (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName);
-        if (sortBy === "dob") return new Date(a.dob) - new Date(b.dob);
+        if (sortBy === "dob") return new Date(a.dob || 0) - new Date(b.dob || 0);
         if (sortBy === "status") return a.status.localeCompare(b.status);
         return a.id.localeCompare(b.id);
     });
@@ -186,13 +215,12 @@ function refreshStaffList() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Calendar disable future date
-    const today = new Date().toLocaleDateString('en-CA');
+    const today = new Date().toLocaleDateString("en-CA");
     const dateInputs = document.querySelectorAll('input[type="date"]');
 
     dateInputs.forEach(input => {
-        input.setAttribute('max', today);
+        input.setAttribute("max", today);
     });
 
-    refreshStaffList();
+    loadStaffs();
 });
