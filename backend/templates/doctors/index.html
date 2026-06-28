@@ -1,0 +1,179 @@
+{% extends "layout.html" %}
+
+{% block title %}Doctors{% endblock title %}
+
+{% block styles %}
+<style>
+    .page-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .doctor-form .form-error,
+    .schedule-form .form-error {
+        color: var(--danger);
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+
+    .doctor-form input.is-invalid,
+    .schedule-form input.is-invalid {
+        border-color: var(--danger);
+        box-shadow: 0 0 0 3px rgb(220 38 38 / 12%);
+    }
+
+    .doctor-card {
+        display: grid;
+        gap: 10px;
+    }
+
+    .doctor-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-top: 6px;
+    }
+
+    .button-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        padding: 11px 16px;
+        border-radius: var(--radius);
+        background: var(--primary);
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .button-link:hover {
+        background: var(--primary-hover);
+    }
+
+    .danger-button {
+        background: transparent !important;
+        color: var(--danger) !important;
+        border: 1px solid rgb(239 68 68 / 35%) !important;
+    }
+
+    .danger-button:hover {
+        background: rgb(239 68 68 / 8%) !important;
+    }
+
+    .success-card {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        border-left: 4px solid var(--primary);
+    }
+
+    .success-card p {
+        margin: 0;
+        font-weight: 700;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Doctor Management</h1>
+        <p class="description">Manage doctor profiles, availability, and schedule access.</p>
+    </div>
+    <button type="button" onclick="openModal('createDoctorModal')">
+        <i class="fa-solid fa-plus"></i>Add Doctor
+    </button>
+</div>
+
+{% if success_message %}
+<section class="card success-card">
+    <p>{{ success_message }}</p>
+    {% if deleted_doctor_id %}
+    <form action="/doctors/{{ deleted_doctor_id }}/undo-delete" method="post">
+        <button type="submit">Undo Delete</button>
+    </form>
+    {% endif %}
+</section>
+{% endif %}
+
+<div id="createDoctorModal" class="modal" {% if error_message %}style="display: flex;"{% endif %}>
+    <div class="modal-box card">
+        <div class="top-title">Create Doctor</div>
+        <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+        <form class="doctor-form" action="/doctors" method="post">
+            <div class="modal-content">
+                {% if error_message %}
+                <p class="form-error">{{ error_message }}</p>
+                {% endif %}
+
+                <div class="row-section">
+                    <div class="field">
+                        <label>Staff ID</label>
+                        <input class="{% if invalid_staff_id %}is-invalid{% endif %}" type="text" name="staff_id" placeholder="Staff ID" value="{{ form_staff_id | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>License number</label>
+                        <input class="{% if invalid_license_number %}is-invalid{% endif %}" type="text" name="license_number" placeholder="License number" value="{{ form_license_number | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Doctor name</label>
+                        <input class="{% if invalid_name %}is-invalid{% endif %}" type="text" name="name" placeholder="Doctor name" value="{{ form_name | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Specialization</label>
+                        <input class="{% if invalid_specialization %}is-invalid{% endif %}" type="text" name="specialization" placeholder="Specialization" value="{{ form_specialization | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Contact number</label>
+                        <input class="{% if invalid_contact_number %}is-invalid{% endif %}" type="text" name="contact_number" placeholder="Contact number" value="{{ form_contact_number | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Email</label>
+                        <input class="{% if invalid_email %}is-invalid{% endif %}" type="email" name="email" placeholder="Email" value="{{ form_email | default(value="") }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-section">
+                <button class="secondary" type="button" onclick="clearInput(this)">Reset</button>
+                <button class="secondary" type="button" onclick="closeModal(this)">Cancel</button>
+                <button type="submit"><i class="fa-solid fa-floppy-disk"></i>Create Doctor</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<h2>Doctors</h2>
+
+{% if doctors | length == 0 %}
+<p>No doctors created yet.</p>
+{% endif %}
+
+{% for doctor in doctors %}
+<section class="card doctor-card">
+    <h3><a href="/doctors/{{ doctor.id }}">{{ doctor.name }}</a></h3>
+    <p>Staff ID: {{ doctor.staff_id }}</p>
+    <p>License: {{ doctor.license_number }}</p>
+    <p>Specialization: {{ doctor.specialization }}</p>
+    <p>Contact: {{ doctor.contact_number }}</p>
+    <p>Email: {{ doctor.email }}</p>
+    <p>Status: {{ doctor.status }}</p>
+    <div class="doctor-card-actions">
+        <a class="button-link" href="/doctors/{{ doctor.id }}">View Details</a>
+        <form action="/doctors/{{ doctor.id }}/delete" method="post"
+            onsubmit="return confirm('Delete this doctor?') && confirm('This will also remove the doctor schedules. Continue?');">
+            <button class="danger-button" type="submit">Delete Doctor</button>
+        </form>
+    </div>
+</section>
+{% endfor %}
+{% endblock content %}

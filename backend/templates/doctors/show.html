@@ -1,0 +1,130 @@
+{% extends "layout.html" %}
+
+{% block title %}Doctor{% endblock title %}
+
+{% block styles %}
+<style>
+    .schedule-form .form-error {
+        color: var(--danger);
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+
+    .schedule-form input.is-invalid {
+        border-color: var(--danger);
+        box-shadow: 0 0 0 3px rgb(220 38 38 / 12%);
+    }
+
+    .button-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        padding: 11px 16px;
+        border-radius: var(--radius);
+        background: var(--primary);
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .button-link:hover {
+        background: var(--primary-hover);
+    }
+
+    .detail-actions,
+    .schedule-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-top: 12px;
+    }
+
+    .danger-button {
+        background: transparent !important;
+        color: var(--danger) !important;
+        border: 1px solid rgb(239 68 68 / 35%) !important;
+    }
+
+    .danger-button:hover {
+        background: rgb(239 68 68 / 8%) !important;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<h1>{{ doctor.name }}</h1>
+
+<section class="card">
+    <p>ID: {{ doctor.id }}</p>
+    <p>Staff ID: {{ doctor.staff_id }}</p>
+    <p>License: {{ doctor.license_number }}</p>
+    <p>Specialization: {{ doctor.specialization }}</p>
+    <p>Contact: {{ doctor.contact_number }}</p>
+    <p>Email: {{ doctor.email }}</p>
+    <p>Status: {{ doctor_status }}</p>
+
+    <form action="/doctors/{{ doctor.id }}" method="post">
+        <input type="text" name="staff_id" value="{{ doctor.staff_id }}">
+        <input type="text" name="license_number" value="{{ doctor.license_number }}">
+        <input type="text" name="name" value="{{ doctor.name }}">
+        <input type="text" name="specialization" value="{{ doctor.specialization }}">
+        <input type="text" name="contact_number" value="{{ doctor.contact_number }}">
+        <input type="email" name="email" value="{{ doctor.email }}">
+        <select name="status">
+            <option value="Available" {% if doctor_status == "Available" %}selected{% endif %}>Available</option>
+            <option value="Unavailable" {% if doctor_status == "Unavailable" %}selected{% endif %}>Unavailable</option>
+            <option value="On Leave" {% if doctor_status == "On Leave" %}selected{% endif %}>On Leave</option>
+        </select>
+        <button type="submit">Update Doctor</button>
+    </form>
+
+    <div class="detail-actions">
+        <form action="/doctors/{{ doctor.id }}/delete" method="post"
+            onsubmit="return confirm('Delete this doctor?') && confirm('This will also remove the doctor schedules. Continue?');">
+            <button class="danger-button" type="submit">Delete Doctor</button>
+        </form>
+        <a class="button-link" href="/doctors">Back to Doctors</a>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Schedules</h2>
+
+    <form class="schedule-form" action="/doctors/{{ doctor.id }}/schedules" method="post">
+        {% if schedule_error_message %}
+        <p class="form-error">{{ schedule_error_message }}</p>
+        {% endif %}
+
+        <select name="day_of_week">
+            <option value="Monday" {% if schedule_day_of_week == "Monday" %}selected{% endif %}>Monday</option>
+            <option value="Tuesday" {% if schedule_day_of_week == "Tuesday" %}selected{% endif %}>Tuesday</option>
+            <option value="Wednesday" {% if schedule_day_of_week == "Wednesday" %}selected{% endif %}>Wednesday</option>
+            <option value="Thursday" {% if schedule_day_of_week == "Thursday" %}selected{% endif %}>Thursday</option>
+            <option value="Friday" {% if schedule_day_of_week == "Friday" %}selected{% endif %}>Friday</option>
+            <option value="Saturday" {% if schedule_day_of_week == "Saturday" %}selected{% endif %}>Saturday</option>
+            <option value="Sunday" {% if schedule_day_of_week == "Sunday" %}selected{% endif %}>Sunday</option>
+        </select>
+        <input class="{% if invalid_schedule_start_time %}is-invalid{% endif %}" type="time" name="start_time" value="{{ schedule_start_time | default(value="") }}">
+        <input class="{% if invalid_schedule_end_time %}is-invalid{% endif %}" type="time" name="end_time" value="{{ schedule_end_time | default(value="") }}">
+        <button type="submit">Add Schedule</button>
+    </form>
+
+    {% if schedules | length == 0 %}
+    <p>No schedules created yet.</p>
+    {% endif %}
+
+    {% for schedule in schedules %}
+    <div class="card">
+        <p>{{ schedule.day_of_week }}: {{ schedule.start_time }} - {{ schedule.end_time }}</p>
+        <form action="/doctors/schedules/{{ schedule.id }}/delete" method="post">
+            <button class="danger-button" type="submit">Delete Schedule</button>
+        </form>
+    </div>
+    {% endfor %}
+</section>
+
+<a class="button-link" href="/doctors">Back to Doctors</a>
+{% endblock content %}
