@@ -4,100 +4,219 @@
 
 {% block styles %}
 <style>
-    .page-heading {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 18px;
-    }
-
-    .doctor-form .form-error,
-    .schedule-form .form-error {
+    .doctor-form .form-error {
         color: var(--danger);
         font-weight: 700;
         margin-bottom: 12px;
     }
 
-    .doctor-form input.is-invalid,
-    .schedule-form input.is-invalid {
+    .doctor-form input.is-invalid {
         border-color: var(--danger);
         box-shadow: 0 0 0 3px rgb(220 38 38 / 12%);
     }
 
-    .doctor-card {
-        display: grid;
-        gap: 10px;
-    }
-
-    .doctor-card-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        align-items: center;
-        margin-top: 6px;
-    }
-
-    .button-link {
+    .doctor-status {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
         width: fit-content;
-        padding: 11px 16px;
+        min-width: 92px;
+        justify-content: center;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .doctor-status.available {
+        background: rgb(34 197 94 / 12%);
+        color: #15803d;
+    }
+
+    .doctor-status.unavailable,
+    .doctor-status.on-leave {
+        background: rgb(249 115 22 / 12%);
+        color: #c2410c;
+    }
+
+    .table-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .table-actions form {
+        margin: 0;
+    }
+
+    .icon-link,
+    .danger-icon-button {
+        width: 38px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         border-radius: var(--radius);
-        background: var(--primary);
-        color: white;
-        font-size: 14px;
-        font-weight: 600;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+        color: var(--text);
         text-decoration: none;
+        padding: 0;
     }
 
-    .button-link:hover {
-        background: var(--primary-hover);
+    .icon-link:hover {
+        background: var(--hover);
     }
 
-    .danger-button {
-        background: transparent !important;
-        color: var(--danger) !important;
-        border: 1px solid rgb(239 68 68 / 35%) !important;
+    .danger-icon-button {
+        color: var(--danger);
+        border-color: rgb(239 68 68 / 35%);
     }
 
-    .danger-button:hover {
-        background: rgb(239 68 68 / 8%) !important;
+    .danger-icon-button:hover {
+        background: rgb(239 68 68 / 8%);
     }
 
     .success-card {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        align-items: center;
-        justify-content: space-between;
-        border-left: 4px solid var(--primary);
+        margin-bottom: 18px;
+        border-left: 4px solid var(--success);
+        font-weight: 700;
     }
 
-    .success-card p {
-        margin: 0;
-        font-weight: 700;
+    .empty-row {
+        text-align: center;
+        color: var(--muted);
+        font-weight: 600;
     }
 </style>
 {% endblock styles %}
 
 {% block content %}
-<div class="page-heading">
+<div class="page-title">
     <div>
-        <h1>Doctor Management</h1>
-        <p class="description">Manage doctor profiles, availability, and schedule access.</p>
+        <div class="title">Doctor Management</div>
+        <div class="description">Manage doctor profiles, availability, and schedule access</div>
     </div>
     <button type="button" onclick="openModal('createDoctorModal')">
         <i class="fa-solid fa-plus"></i>Add Doctor
     </button>
 </div>
 
+<div class="display">
+    <div class="card" id="totalDoctors">
+        <div class="details">
+            <div class="data">Total Doctors</div>
+            <div class="number">{{ doctors | length }}</div>
+        </div>
+        <div class="icon"><i class="fa-solid fa-user-doctor"></i></div>
+    </div>
+    <div class="card" id="availableDoctors">
+        <div class="details">
+            <div class="data">Available</div>
+            <div class="number">0</div>
+        </div>
+        <div class="icon"><i class="fa-solid fa-circle-check"></i></div>
+    </div>
+    <div class="card" id="unavailableDoctors">
+        <div class="details">
+            <div class="data">Unavailable</div>
+            <div class="number">0</div>
+        </div>
+        <div class="icon"><i class="fa-solid fa-user-clock"></i></div>
+    </div>
+    <div class="card" id="specialtyCount">
+        <div class="details">
+            <div class="data">Specialties</div>
+            <div class="number">0</div>
+        </div>
+        <div class="icon"><i class="fa-solid fa-stethoscope"></i></div>
+    </div>
+</div>
+
 {% if success_message %}
 <section class="card success-card">
-    <p>{{ success_message }}</p>
+    {{ success_message }}
 </section>
 {% endif %}
+
+<div class="control card">
+    <div class="search">
+        <input type="text" placeholder="Search doctor ID / name / specialty" id="doctorSearchInput" oninput="filterDoctors()" />
+        <i class="fa-solid fa-magnifying-glass"></i>
+    </div>
+    <div class="custom-select">
+        <select id="doctorStatusFilter" onchange="filterDoctors()">
+            <option value="all">All Statuses</option>
+            <option value="available">Available</option>
+            <option value="unavailable">Unavailable</option>
+            <option value="on leave">On Leave</option>
+        </select>
+    </div>
+    <div class="custom-select">
+        <select id="doctorSort" onchange="sortDoctors()">
+            <option value="name">Sort by Name</option>
+            <option value="specialization">Sort by Specialty</option>
+            <option value="status">Sort by Status</option>
+        </select>
+    </div>
+</div>
+
+<div class="table-list">
+    <table>
+        <thead>
+            <tr>
+                <th>Doctor</th>
+                <th>Staff ID</th>
+                <th>License</th>
+                <th>Specialty</th>
+                <th>Contact</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="doctorTableBody">
+            {% if doctors | length == 0 %}
+            <tr data-empty="true">
+                <td class="empty-row" colspan="7">No doctors created yet.</td>
+            </tr>
+            {% endif %}
+            {% for doctor in doctors %}
+            <tr class="doctor-row" data-name="{{ doctor.name | lower }}" data-specialization="{{ doctor.specialization | lower }}" data-status="{{ doctor.status | lower }}">
+                <td>
+                    <strong>{{ doctor.name }}</strong><br>
+                    <span class="description">{{ doctor.id }}</span>
+                </td>
+                <td>{{ doctor.staff_id }}</td>
+                <td>{{ doctor.license_number }}</td>
+                <td>{{ doctor.specialization }}</td>
+                <td>
+                    {{ doctor.contact_number }}<br>
+                    <span class="description">{{ doctor.email }}</span>
+                </td>
+                <td>
+                    <span class="doctor-status {{ doctor.status | lower | replace(from=" ", to="-") }}">{{ doctor.status }}</span>
+                </td>
+                <td>
+                    <div class="table-actions">
+                        <a class="icon-link has-tooltip" href="/doctors/{{ doctor.id }}" aria-label="View doctor details">
+                            <i class="fa-solid fa-eye"></i>
+                            <span class="tooltip-text">View Details</span>
+                        </a>
+                        <form action="/doctors/{{ doctor.id }}/delete" method="post"
+                            onsubmit="return confirm('Delete this doctor?') && confirm('This doctor cannot be deleted if appointments still reference them. Continue?');">
+                            <button class="danger-icon-button has-tooltip" type="submit" aria-label="Delete doctor">
+                                <i class="fa-solid fa-trash"></i>
+                                <span class="tooltip-text">Delete Doctor</span>
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
 <div id="createDoctorModal" class="modal" {% if error_message %}style="display: flex;"{% endif %}>
     <div class="modal-box card">
@@ -107,32 +226,32 @@
         <form class="doctor-form" action="/doctors" method="post">
             <div class="modal-content">
                 {% if error_message %}
-                <p class="form-error">{{ error_message }}</p>
+                <div class="error-box" style="display: flex;">{{ error_message }}</div>
                 {% endif %}
 
                 <div class="row-section">
                     <div class="field">
-                        <label>Staff ID</label>
+                        <label class="required">Staff ID</label>
                         <input class="{% if invalid_staff_id %}is-invalid{% endif %}" type="text" name="staff_id" placeholder="Staff ID" value="{{ form_staff_id | default(value="") }}">
                     </div>
                     <div class="field">
-                        <label>License number</label>
+                        <label class="required">License Number</label>
                         <input class="{% if invalid_license_number %}is-invalid{% endif %}" type="text" name="license_number" placeholder="License number" value="{{ form_license_number | default(value="") }}">
                     </div>
                     <div class="field">
-                        <label>Doctor name</label>
+                        <label class="required">Doctor Name</label>
                         <input class="{% if invalid_name %}is-invalid{% endif %}" type="text" name="name" placeholder="Doctor name" value="{{ form_name | default(value="") }}">
                     </div>
                     <div class="field">
-                        <label>Specialization</label>
+                        <label class="required">Specialization</label>
                         <input class="{% if invalid_specialization %}is-invalid{% endif %}" type="text" name="specialization" placeholder="Specialization" value="{{ form_specialization | default(value="") }}">
                     </div>
                     <div class="field">
-                        <label>Contact number</label>
+                        <label class="required">Contact Number</label>
                         <input class="{% if invalid_contact_number %}is-invalid{% endif %}" type="text" name="contact_number" placeholder="Contact number" value="{{ form_contact_number | default(value="") }}">
                     </div>
                     <div class="field">
-                        <label>Email</label>
+                        <label class="required">Email</label>
                         <input class="{% if invalid_email %}is-invalid{% endif %}" type="email" name="email" placeholder="Email" value="{{ form_email | default(value="") }}">
                     </div>
                 </div>
@@ -147,29 +266,39 @@
     </div>
 </div>
 
-<h2>Doctors</h2>
+<script>
+    function doctorRows() {
+        return Array.from(document.querySelectorAll('.doctor-row'));
+    }
 
-{% if doctors | length == 0 %}
-<p>No doctors created yet.</p>
-{% endif %}
+    function updateDoctorMetrics() {
+        const rows = doctorRows();
+        const statuses = rows.map((row) => row.dataset.status);
+        const specialties = new Set(rows.map((row) => row.dataset.specialization).filter(Boolean));
+        document.querySelector('#availableDoctors .number').textContent = statuses.filter((status) => status === 'available').length;
+        document.querySelector('#unavailableDoctors .number').textContent = statuses.filter((status) => status !== 'available').length;
+        document.querySelector('#specialtyCount .number').textContent = specialties.size;
+    }
 
-{% for doctor in doctors %}
-<section class="card doctor-card">
-    <h3><a href="/doctors/{{ doctor.id }}">{{ doctor.name }}</a></h3>
-    <p>Staff ID: {{ doctor.staff_id }}</p>
-    <p>License: {{ doctor.license_number }}</p>
-    <p>Specialization: {{ doctor.specialization }}</p>
-    <p>Contact: {{ doctor.contact_number }}</p>
-    <p>Email: {{ doctor.email }}</p>
-    <p>Status: {{ doctor.status }}</p>
-    <div class="doctor-card-actions">
-        <a class="button-link" href="/doctors/{{ doctor.id }}">View Details</a>
-        <form action="/doctors/{{ doctor.id }}/delete" method="post"
-            onsubmit="return confirm('Delete this doctor?') && confirm('This will also remove the doctor schedules. Continue?');">
-            <button class="danger-button" type="submit">Delete Doctor</button>
-        </form>
-    </div>
-</section>
-{% endfor %}
+    function filterDoctors() {
+        const search = document.getElementById('doctorSearchInput').value.trim().toLowerCase();
+        const status = document.getElementById('doctorStatusFilter').value;
+        doctorRows().forEach((row) => {
+            const matchesSearch = [row.dataset.name, row.dataset.specialization, row.textContent.toLowerCase()].some((value) => value.includes(search));
+            const matchesStatus = status === 'all' || row.dataset.status === status;
+            row.style.display = matchesSearch && matchesStatus ? '' : 'none';
+        });
+    }
+
+    function sortDoctors() {
+        const sortBy = document.getElementById('doctorSort').value;
+        const tableBody = document.getElementById('doctorTableBody');
+        doctorRows()
+            .sort((left, right) => (left.dataset[sortBy] || '').localeCompare(right.dataset[sortBy] || ''))
+            .forEach((row) => tableBody.appendChild(row));
+        filterDoctors();
+    }
+
+    updateDoctorMetrics();
+</script>
 {% endblock content %}
-

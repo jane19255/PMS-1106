@@ -270,7 +270,18 @@ impl SupabaseDoctorRepository {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         eprintln!("Supabase doctor error {status}: {body}");
-        RepositoryError::StorageUnavailable
+
+        if status.as_u16() == 409 && body.contains("appointments_doctor_id_fkey") {
+            RepositoryError::DoctorHasAppointments
+        } else if status.as_u16() == 409 && body.contains("doctors_staff_id_fkey") {
+            RepositoryError::InvalidStaffId
+        } else if status.as_u16() == 409
+            && (body.contains("doctors_staff_id_key") || body.contains("doctors_license_number_key"))
+        {
+            RepositoryError::DuplicateDoctor
+        } else {
+            RepositoryError::StorageUnavailable
+        }
     }
 }
 
@@ -538,3 +549,4 @@ impl From<DatabaseDoctorSchedule> for DoctorSchedule {
 fn trim_seconds(value: String) -> String {
     value.strip_suffix(":00").unwrap_or(&value).to_string()
 }
+

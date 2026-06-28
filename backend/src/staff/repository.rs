@@ -114,7 +114,18 @@ impl SupabaseStaffRepository {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         eprintln!("Supabase staff error {status}: {body}");
-        RepositoryError::StorageUnavailable
+
+        if body.contains("staff_phone_check") {
+            RepositoryError::InvalidPhone
+        } else if body.contains("staff_email_check") {
+            RepositoryError::InvalidEmail
+        } else if body.contains("staff_email_key") || body.contains("staff_email_lower_uidx") {
+            RepositoryError::DuplicateEmail
+        } else if body.contains("staff_firebase_uid_key") {
+            RepositoryError::DuplicateFirebaseUid
+        } else {
+            RepositoryError::StorageUnavailable
+        }
     }
 }
 
@@ -251,3 +262,4 @@ fn display_status(status: &str) -> String {
         "Active".to_string()
     }
 }
+
