@@ -1,6 +1,7 @@
 mod billing;
 mod db;
 mod doctors;
+mod doctor_dashboard;
 mod handlers;
 mod models;
 mod prescriptions;
@@ -15,6 +16,10 @@ use billing::repository::{
 use billing::service::BillingService;
 use doctors::repository::{DoctorRepository, InMemoryDoctorRepository, SupabaseDoctorRepository};
 use doctors::service::DoctorService;
+use doctor_dashboard::repository::{
+    DoctorDashboardRepository, InMemoryDoctorDashboardRepository, SupabaseDoctorDashboardRepository,
+};
+use doctor_dashboard::service::DoctorDashboardService;
 use dotenv::dotenv;
 use firebase_auth::FirebaseAuth;
 use prescriptions::repository::{InMemoryPrescriptionRepository, PrescriptionRepository, SupabasePrescriptionRepository};
@@ -68,6 +73,21 @@ async fn main() -> std::io::Result<()> {
             }
         };
     let doctor_service = web::Data::new(DoctorService::new(doctor_repository));
+    let doctor_dashboard_repository: Arc<dyn DoctorDashboardRepository> =
+        match std::env::var("DOCTOR_DASHBOARD_STORAGE").as_deref() {
+            Ok("supabase") => {
+                println!("Doctor dashboard storage: Supabase PostgreSQL");
+                Arc::new(SupabaseDoctorDashboardRepository::new(
+                    supabase_db.url.clone(),
+                    supabase_db.key.clone(),
+                ))
+            }
+            _ => {
+                println!("Doctor dashboard storage: in-memory (set DOCTOR_DASHBOARD_STORAGE=supabase to persist)");
+                Arc::new(InMemoryDoctorDashboardRepository::default())
+            }
+        };
+    let doctor_dashboard_service = web::Data::new(DoctorDashboardService::new(doctor_dashboard_repository));
     let prescription_repository: Arc<dyn PrescriptionRepository> =
         match std::env::var("PRESCRIPTION_STORAGE").as_deref() {
             Ok("supabase") => {
@@ -106,6 +126,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(billing_service.clone())
             .app_data(doctor_service.clone())
+            .app_data(doctor_dashboard_service.clone())
             .app_data(prescription_service.clone())
             .app_data(staff_service.clone())
             .app_data(template_data.clone())
