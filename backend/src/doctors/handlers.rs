@@ -507,6 +507,9 @@ fn doctor_error_response(error: DoctorError) -> HttpResponse {
 fn doctor_error_message(error: DoctorError) -> String {
     match error {
         DoctorError::InvalidInput(message) => message,
+        DoctorError::DoctorHasAppointments => {
+            "Cannot delete this doctor because existing appointments reference them.".to_string()
+        }
         DoctorError::DoctorNotFound => "Doctor was not found.".to_string(),
         DoctorError::StorageUnavailable => "Doctor storage is unavailable.".to_string(),
     }

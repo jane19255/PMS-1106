@@ -7,6 +7,7 @@ use uuid::Uuid;
 #[derive(Debug, PartialEq)]
 pub enum DoctorError {
     InvalidInput(String),
+    DoctorHasAppointments,
     DoctorNotFound,
     StorageUnavailable,
 }
@@ -295,6 +296,13 @@ impl DoctorService {
 
     fn map_repository_error(error: RepositoryError) -> DoctorError {
         match error {
+            RepositoryError::DoctorHasAppointments => DoctorError::DoctorHasAppointments,
+            RepositoryError::DuplicateDoctor => DoctorError::InvalidInput(
+                "Doctor staff ID or license number is already used".to_string(),
+            ),
+            RepositoryError::InvalidStaffId => DoctorError::InvalidInput(
+                "Staff ID does not exist. Create the staff member first.".to_string(),
+            ),
             RepositoryError::NotFound => DoctorError::DoctorNotFound,
             RepositoryError::StorageUnavailable => DoctorError::StorageUnavailable,
         }

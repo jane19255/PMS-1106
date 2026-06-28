@@ -12,6 +12,10 @@ pub type RepositoryFuture<'a, T> =
 
 #[derive(Debug)]
 pub enum RepositoryError {
+    InvalidEmail,
+    InvalidPhone,
+    DuplicateEmail,
+    DuplicateFirebaseUid,
     NotFound,
     StorageUnavailable,
 }
@@ -150,14 +154,19 @@ impl StaffRepository for SupabaseStaffRepository {
         Box::pin(async move {
             let encoded_id = urlencoding::encode(&staff.id);
             let response = self
-                .request(self.client.patch(self.staff_url(&format!("id=eq.{encoded_id}&select=*"))))
+                .request(
+                    self.client
+                        .patch(self.staff_url(&format!("id=eq.{encoded_id}&select=*"))),
+                )
                 .header("Prefer", "return=representation")
                 .json(&database_payload(&staff))
                 .send()
                 .await
                 .map_err(|_| RepositoryError::StorageUnavailable)?;
             let mut rows = Self::decode_rows(response).await?;
-            rows.pop().map(StaffMember::from).ok_or(RepositoryError::NotFound)
+            rows.pop()
+                .map(StaffMember::from)
+                .ok_or(RepositoryError::NotFound)
         })
     }
 }
