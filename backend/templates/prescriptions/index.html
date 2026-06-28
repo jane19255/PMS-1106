@@ -1,0 +1,147 @@
+{% extends "layout.html" %}
+
+{% block title %}Prescriptions{% endblock title %}
+
+{% block styles %}
+<style>
+    .page-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .prescription-form .form-error {
+        color: var(--danger);
+        font-weight: 700;
+        margin-bottom: 12px;
+    }
+
+    .prescription-form input.is-invalid {
+        border-color: var(--danger);
+        box-shadow: 0 0 0 3px rgb(220 38 38 / 12%);
+    }
+
+    .prescription-card {
+        display: grid;
+        gap: 10px;
+    }
+
+    .prescription-card h3 {
+        margin: 0;
+    }
+
+    .button-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        padding: 11px 16px;
+        border-radius: var(--radius);
+        background: var(--primary);
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .button-link:hover {
+        background: var(--primary-hover);
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Prescription Tracking</h1>
+        <p class="description">Create and monitor prescribed medicines.</p>
+    </div>
+    <button type="button" onclick="openModal('createPrescriptionModal')">
+        <i class="fa-solid fa-plus"></i>Add Prescription
+    </button>
+</div>
+
+<div id="createPrescriptionModal" class="modal" {% if show_create_modal | default(value=false) %}style="display: flex;"{% endif %}>
+    <div class="modal-box card">
+        <div class="top-title">Create Prescription</div>
+        <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+        <form class="prescription-form" action="/prescriptions" method="post">
+            <div class="modal-content">
+                {% if error_message %}
+                <p class="form-error">{{ error_message }}</p>
+                {% endif %}
+
+                <div class="row-section">
+                    <div class="field">
+                        <label>Patient ID</label>
+                        <input class="{% if invalid_patient_id | default(value=false) %}is-invalid{% endif %}" type="text" name="patient_id" placeholder="Patient ID" value="{{ form_patient_id | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Doctor ID</label>
+                        <input class="{% if invalid_doctor_id | default(value=false) %}is-invalid{% endif %}" type="text" name="doctor_id" placeholder="Doctor ID" value="{{ form_doctor_id | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Medical record ID</label>
+                        <input type="text" name="medical_record_id" placeholder="Medical record ID" value="{{ form_medical_record_id | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Medication name</label>
+                        <input class="{% if invalid_medication_name | default(value=false) %}is-invalid{% endif %}" type="text" name="medication_name" placeholder="Medication name" value="{{ form_medication_name | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Dosage</label>
+                        <input class="{% if invalid_dosage | default(value=false) %}is-invalid{% endif %}" type="text" name="dosage" placeholder="Dosage" value="{{ form_dosage | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Frequency</label>
+                        <input class="{% if invalid_frequency | default(value=false) %}is-invalid{% endif %}" type="text" name="frequency" placeholder="Frequency" value="{{ form_frequency | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Duration</label>
+                        <input class="{% if invalid_duration | default(value=false) %}is-invalid{% endif %}" type="text" name="duration" placeholder="Duration" value="{{ form_duration | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Quantity</label>
+                        <input class="{% if invalid_quantity | default(value=false) %}is-invalid{% endif %}" type="number" name="quantity" placeholder="Quantity" min="1" value="{{ form_quantity | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Unit cost</label>
+                        <input class="{% if invalid_unit_cost | default(value=false) %}is-invalid{% endif %}" type="number" name="unit_cost" placeholder="Unit cost" min="0" step="0.01" value="{{ form_unit_cost | default(value="") }}">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Instructions</label>
+                    <input type="text" name="instructions" placeholder="Instructions" value="{{ form_instructions | default(value="") }}">
+                </div>
+            </div>
+
+            <div class="button-section">
+                <button class="secondary" type="button" onclick="clearInput(this)">Reset</button>
+                <button class="secondary" type="button" onclick="closeModal(this)">Cancel</button>
+                <button type="submit"><i class="fa-solid fa-floppy-disk"></i>Create Prescription</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<h2>Prescriptions</h2>
+
+{% if prescriptions | length == 0 %}
+<p>No prescriptions created yet.</p>
+{% endif %}
+
+{% for prescription in prescriptions %}
+<section class="card prescription-card">
+    <h3><a href="/prescriptions/{{ prescription.id }}">{{ prescription.medication_name }}</a></h3>
+    <p>Patient ID: {{ prescription.patient_id }}</p>
+    <p>Doctor ID: {{ prescription.doctor_id }}</p>
+    <p>Dosage: {{ prescription.dosage }}</p>
+    <p>Status: {{ prescription.status }}</p>
+    <a class="button-link" href="/prescriptions/{{ prescription.id }}">View Details</a>
+</section>
+{% endfor %}
+{% endblock content %}

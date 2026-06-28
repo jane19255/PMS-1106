@@ -306,6 +306,8 @@ fn render_template(templates: &Tera, template_name: &str, context: &Context) -> 
 fn render_error(templates: &Tera, error: BillingError) -> HttpResponse {
     let mut context = Context::new();
     context.insert("message", &billing_error_message(error));
+    context.insert("back_url", "/billing");
+    context.insert("back_label", "Back to Billing");
     render_template(templates, "error.html", &context)
 }
 

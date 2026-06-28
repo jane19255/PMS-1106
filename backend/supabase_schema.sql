@@ -223,3 +223,26 @@ alter table public.medical_records enable row level security;
 alter table public.medicine_inventory enable row level security;
 alter table public.prescriptions enable row level security;
 alter table public.prescription_items enable row level security;
+
+create table if not exists public.doctor_schedules (
+  id text primary key,
+  doctor_id text not null references public.doctors(id) on delete cascade,
+  day_of_week text not null
+    check (day_of_week in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')),
+  start_time time not null,
+  end_time time not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint doctor_schedule_time_range check (start_time < end_time)
+);
+
+create index if not exists doctor_schedules_doctor_id_idx on public.doctor_schedules(doctor_id);
+create index if not exists doctor_schedules_day_idx on public.doctor_schedules(day_of_week);
+
+drop trigger if exists set_doctor_schedules_updated_at on public.doctor_schedules;
+create trigger set_doctor_schedules_updated_at
+before update on public.doctor_schedules
+for each row
+execute function public.set_updated_at();
+
+alter table public.doctor_schedules enable row level security;

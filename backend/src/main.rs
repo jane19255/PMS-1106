@@ -1,8 +1,12 @@
 mod billing;
 mod db;
+mod doctors;
+mod doctor_dashboard;
 mod handlers;
 mod models;
+mod prescriptions;
 mod routes;
+mod staff;
 
 use actix_files::Files;
 use actix_web::{web, App, HttpResponse, HttpServer};
@@ -10,8 +14,18 @@ use billing::repository::{
     InMemoryInvoiceRepository, InvoiceRepository, SupabaseInvoiceRepository,
 };
 use billing::service::BillingService;
+use doctors::repository::{DoctorRepository, InMemoryDoctorRepository, SupabaseDoctorRepository};
+use doctors::service::DoctorService;
+use doctor_dashboard::repository::{
+    DoctorDashboardRepository, InMemoryDoctorDashboardRepository, SupabaseDoctorDashboardRepository,
+};
+use doctor_dashboard::service::DoctorDashboardService;
 use dotenv::dotenv;
 use firebase_auth::FirebaseAuth;
+use prescriptions::repository::{InMemoryPrescriptionRepository, PrescriptionRepository, SupabasePrescriptionRepository};
+use prescriptions::service::PrescriptionService;
+use staff::repository::{InMemoryStaffRepository, StaffRepository, SupabaseStaffRepository};
+use staff::service::StaffService;
 use std::sync::Arc;
 use tera::Tera;
 
@@ -44,6 +58,66 @@ async fn main() -> std::io::Result<()> {
             }
         };
     let billing_service = web::Data::new(BillingService::new(invoice_repository));
+    let doctor_repository: Arc<dyn DoctorRepository> =
+        match std::env::var("DOCTOR_STORAGE").as_deref() {
+            Ok("supabase") => {
+                println!("Doctor storage: Supabase PostgreSQL");
+                Arc::new(SupabaseDoctorRepository::new(
+                    supabase_db.url.clone(),
+                    supabase_db.key.clone(),
+                ))
+            }
+            _ => {
+                println!("Doctor storage: in-memory (set DOCTOR_STORAGE=supabase to persist)");
+                Arc::new(InMemoryDoctorRepository::default())
+            }
+        };
+    let doctor_service = web::Data::new(DoctorService::new(doctor_repository));
+    let doctor_dashboard_repository: Arc<dyn DoctorDashboardRepository> =
+        match std::env::var("DOCTOR_DASHBOARD_STORAGE").as_deref() {
+            Ok("supabase") => {
+                println!("Doctor dashboard storage: Supabase PostgreSQL");
+                Arc::new(SupabaseDoctorDashboardRepository::new(
+                    supabase_db.url.clone(),
+                    supabase_db.key.clone(),
+                ))
+            }
+            _ => {
+                println!("Doctor dashboard storage: in-memory (set DOCTOR_DASHBOARD_STORAGE=supabase to persist)");
+                Arc::new(InMemoryDoctorDashboardRepository::default())
+            }
+        };
+    let doctor_dashboard_service = web::Data::new(DoctorDashboardService::new(doctor_dashboard_repository));
+    let prescription_repository: Arc<dyn PrescriptionRepository> =
+        match std::env::var("PRESCRIPTION_STORAGE").as_deref() {
+            Ok("supabase") => {
+                println!("Prescription storage: Supabase PostgreSQL");
+                Arc::new(SupabasePrescriptionRepository::new(
+                    supabase_db.url.clone(),
+                    supabase_db.key.clone(),
+                ))
+            }
+            _ => {
+                println!("Prescription storage: in-memory (set PRESCRIPTION_STORAGE=supabase to persist)");
+                Arc::new(InMemoryPrescriptionRepository::default())
+            }
+        };
+    let prescription_service = web::Data::new(PrescriptionService::new(prescription_repository));
+    let staff_repository: Arc<dyn StaffRepository> =
+        match std::env::var("STAFF_STORAGE").as_deref() {
+            Ok("supabase") => {
+                println!("Staff storage: Supabase PostgreSQL");
+                Arc::new(SupabaseStaffRepository::new(
+                    supabase_db.url.clone(),
+                    supabase_db.key.clone(),
+                ))
+            }
+            _ => {
+                println!("Staff storage: in-memory (set STAFF_STORAGE=supabase to persist)");
+                Arc::new(InMemoryStaffRepository::default())
+            }
+        };
+    let staff_service = web::Data::new(StaffService::new(staff_repository));
     let template_data = web::Data::new(templates);
 
     println!("Server running at http://127.0.0.1:8080");
@@ -51,6 +125,10 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(billing_service.clone())
+            .app_data(doctor_service.clone())
+            .app_data(doctor_dashboard_service.clone())
+            .app_data(prescription_service.clone())
+            .app_data(staff_service.clone())
             .app_data(template_data.clone())
             .app_data(web::Data::new(firebase_auth.clone()))
             .app_data(web::Data::new(firestore_db.clone()))
@@ -70,7 +148,7 @@ async fn main() -> std::io::Result<()> {
             .configure(routes::configure)
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
                 println!(
-                    ">>> 🚨 ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
+                    ">>> ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
                     req.path()
                 );
                 HttpResponse::NotFound().body(format!("404 Not Found: {}", req.path()))
@@ -88,5 +166,37 @@ mod template_tests {
     #[test]
     fn all_tera_templates_parse() {
         Tera::new("templates/**/*.html").expect("all Tera templates should parse");
+    }
+    #[test]
+    fn doctor_detail_template_renders_without_schedule_form_context() {
+        use crate::doctors::models::{Doctor, DoctorStatus};
+        use tera::Context;
+
+        let templates = Tera::new("templates/**/*.html").expect("all Tera templates should parse");
+        let doctor = Doctor {
+            id: "DOC-TEST".to_string(),
+            staff_id: "STAFF-TEST".to_string(),
+            license_number: "M-TEST".to_string(),
+            name: "Dr. Test".to_string(),
+            specialization: "General Medicine".to_string(),
+            contact_number: "80000000".to_string(),
+            email: "test@example.com".to_string(),
+            status: DoctorStatus::Available,
+        };
+        let mut context = Context::new();
+        context.insert("doctor", &doctor);
+        context.insert("doctor_status", "Available");
+        context.insert("schedules", &Vec::<crate::doctors::models::DoctorSchedule>::new());
+        context.insert("schedule_day_of_week", "");
+        context.insert("schedule_start_time", "");
+        context.insert("schedule_end_time", "");
+        context.insert("invalid_schedule_start_time", &false);
+        context.insert("invalid_schedule_end_time", &false);
+
+        let html = templates
+            .render("doctors/show.html", &context)
+            .expect("doctor detail template should render");
+
+        assert!(html.contains("Dr. Test"));
     }
 }
