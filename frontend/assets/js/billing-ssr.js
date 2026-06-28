@@ -33,7 +33,7 @@
       return;
     }
 
-    const display = `${patient.id} â€” ${patient.firstName} ${patient.lastName}`;
+    const display = `${patient.id} - ${patient.firstName} ${patient.lastName}`;
     patientSearch.value = display;
     patientId.value = patient.id;
     selectedPatientDetails.textContent = [
@@ -55,7 +55,7 @@
 
       const patients = await response.json();
       patients.forEach((patient) => {
-        const display = `${patient.id} â€” ${patient.firstName} ${patient.lastName}`;
+        const display = `${patient.id} - ${patient.firstName} ${patient.lastName}`;
         const option = document.createElement("option");
         option.value = display;
         patientOptions.appendChild(option);
@@ -310,7 +310,7 @@
 
     empty.hidden = matches.length !== 0;
     pageInfo.textContent = matches.length
-      ? `Showing ${start + 1}â€“${Math.min(start + size, matches.length)} of ${matches.length}`
+      ? `Showing ${start + 1}-${Math.min(start + size, matches.length)} of ${matches.length}`
       : "Showing 0 invoices";
     previous.disabled = page === 1;
     next.disabled = page === pageCount;

@@ -71,11 +71,7 @@ pub async fn prescriptions_page(
     }
 
     match prescription_service.list_prescriptions().await {
-        Ok(prescriptions) => {
-            let mut context = Context::new();
-            context.insert("prescriptions", &prescriptions);
-            render_template(&templates, "prescriptions/index.html", &context)
-        }
+        Ok(prescriptions) => render_prescriptions_page(&templates, prescriptions, None, None),
         Err(error) => render_error(&templates, error),
     }
 }
@@ -128,8 +124,19 @@ pub async fn create_prescription_form(
         return rejection;
     }
 
-    match prescription_service.create_prescription(form.into_inner()).await {
+    let submitted_form = form.into_inner();
+
+    match prescription_service.create_prescription(submitted_form.clone()).await {
         Ok(_) => redirect_to("/prescriptions"),
+        Err(error @ PrescriptionError::InvalidInput(_)) => match prescription_service.list_prescriptions().await {
+            Ok(prescriptions) => render_prescriptions_page(
+                &templates,
+                prescriptions,
+                Some(&submitted_form),
+                Some(error),
+            ),
+            Err(error) => render_error(&templates, error),
+        },
         Err(error) => render_error(&templates, error),
     }
 }
@@ -381,6 +388,47 @@ async fn require_prescription_permission(
     require_auth_and_permission(req, firebase_auth, firestore_db, action).await
 }
 
+fn render_prescriptions_page(
+    templates: &Tera,
+    prescriptions: Vec<super::models::Prescription>,
+    form: Option<&CreatePrescriptionForm>,
+    error: Option<PrescriptionError>,
+) -> HttpResponse {
+    let mut context = Context::new();
+    context.insert("prescriptions", &prescriptions);
+
+    if let Some(form) = form {
+        context.insert("form_patient_id", &form.patient_id);
+        context.insert("form_doctor_id", &form.doctor_id);
+        context.insert(
+            "form_medical_record_id",
+            &form.medical_record_id.as_deref().unwrap_or_default(),
+        );
+        context.insert("form_medication_name", &form.medication_name);
+        context.insert("form_dosage", &form.dosage);
+        context.insert("form_frequency", &form.frequency);
+        context.insert("form_duration", &form.duration);
+        context.insert("form_instructions", &form.instructions);
+        context.insert("form_quantity", &form.quantity);
+        context.insert("form_unit_cost", &form.unit_cost);
+    }
+
+    if let Some(error) = error {
+        let message = prescription_error_message(error);
+        context.insert("error_message", &message);
+        context.insert("show_create_modal", &true);
+        context.insert("invalid_patient_id", &(message == "Patient ID is required"));
+        context.insert("invalid_doctor_id", &(message == "Doctor ID is required"));
+        context.insert("invalid_medication_name", &(message == "Medication name is required"));
+        context.insert("invalid_dosage", &(message == "Dosage is required"));
+        context.insert("invalid_frequency", &(message == "Frequency is required"));
+        context.insert("invalid_duration", &(message == "Duration is required"));
+        context.insert("invalid_quantity", &(message == "Quantity must be a whole number" || message == "Quantity must be greater than zero"));
+        context.insert("invalid_unit_cost", &(message == "Unit cost must be a valid number" || message == "Unit cost cannot be negative"));
+    }
+
+    render_template(templates, "prescriptions/index.html", &context)
+}
 fn render_template(templates: &Tera, template_name: &str, context: &Context) -> HttpResponse {
     match templates.render(template_name, context) {
         Ok(body) => HttpResponse::Ok().content_type("text/html").body(body),
@@ -393,6 +441,8 @@ fn render_template(templates: &Tera, template_name: &str, context: &Context) -> 
 fn render_error(templates: &Tera, error: PrescriptionError) -> HttpResponse {
     let mut context = Context::new();
     context.insert("message", &prescription_error_message(error));
+    context.insert("back_url", "/prescriptions");
+    context.insert("back_label", "Back to Prescriptions");
     render_template(templates, "error.html", &context)
 }
 

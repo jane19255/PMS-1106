@@ -4,6 +4,14 @@
 
 {% block styles %}
 <style>
+    .page-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
     .doctor-form .form-error,
     .schedule-form .form-error {
         color: var(--danger);
@@ -57,6 +65,7 @@
     .danger-button:hover {
         background: rgb(239 68 68 / 8%) !important;
     }
+
     .success-card {
         display: flex;
         flex-wrap: wrap;
@@ -74,7 +83,15 @@
 {% endblock styles %}
 
 {% block content %}
-<h1>Doctor Management</h1>
+<div class="page-heading">
+    <div>
+        <h1>Doctor Management</h1>
+        <p class="description">Manage doctor profiles, availability, and schedule access.</p>
+    </div>
+    <button type="button" onclick="openModal('createDoctorModal')">
+        <i class="fa-solid fa-plus"></i>Add Doctor
+    </button>
+</div>
 
 {% if success_message %}
 <section class="card success-card">
@@ -86,19 +103,54 @@
     {% endif %}
 </section>
 {% endif %}
-<form class="card doctor-form" action="/doctors" method="post">
-    {% if error_message %}
-    <p class="form-error">{{ error_message }}</p>
-    {% endif %}
 
-    <input class="{% if invalid_staff_id %}is-invalid{% endif %}" type="text" name="staff_id" placeholder="Staff ID" value="{{ form_staff_id | default(value="") }}">
-    <input class="{% if invalid_license_number %}is-invalid{% endif %}" type="text" name="license_number" placeholder="License number" value="{{ form_license_number | default(value="") }}">
-    <input class="{% if invalid_name %}is-invalid{% endif %}" type="text" name="name" placeholder="Doctor name" value="{{ form_name | default(value="") }}">
-    <input class="{% if invalid_specialization %}is-invalid{% endif %}" type="text" name="specialization" placeholder="Specialization" value="{{ form_specialization | default(value="") }}">
-    <input class="{% if invalid_contact_number %}is-invalid{% endif %}" type="text" name="contact_number" placeholder="Contact number" value="{{ form_contact_number | default(value="") }}">
-    <input class="{% if invalid_email %}is-invalid{% endif %}" type="email" name="email" placeholder="Email" value="{{ form_email | default(value="") }}">
-    <button type="submit">Create Doctor</button>
-</form>
+<div id="createDoctorModal" class="modal" {% if error_message %}style="display: flex;"{% endif %}>
+    <div class="modal-box card">
+        <div class="top-title">Create Doctor</div>
+        <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+        <form class="doctor-form" action="/doctors" method="post">
+            <div class="modal-content">
+                {% if error_message %}
+                <p class="form-error">{{ error_message }}</p>
+                {% endif %}
+
+                <div class="row-section">
+                    <div class="field">
+                        <label>Staff ID</label>
+                        <input class="{% if invalid_staff_id %}is-invalid{% endif %}" type="text" name="staff_id" placeholder="Staff ID" value="{{ form_staff_id | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>License number</label>
+                        <input class="{% if invalid_license_number %}is-invalid{% endif %}" type="text" name="license_number" placeholder="License number" value="{{ form_license_number | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Doctor name</label>
+                        <input class="{% if invalid_name %}is-invalid{% endif %}" type="text" name="name" placeholder="Doctor name" value="{{ form_name | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Specialization</label>
+                        <input class="{% if invalid_specialization %}is-invalid{% endif %}" type="text" name="specialization" placeholder="Specialization" value="{{ form_specialization | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Contact number</label>
+                        <input class="{% if invalid_contact_number %}is-invalid{% endif %}" type="text" name="contact_number" placeholder="Contact number" value="{{ form_contact_number | default(value="") }}">
+                    </div>
+                    <div class="field">
+                        <label>Email</label>
+                        <input class="{% if invalid_email %}is-invalid{% endif %}" type="email" name="email" placeholder="Email" value="{{ form_email | default(value="") }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-section">
+                <button class="secondary" type="button" onclick="clearInput(this)">Reset</button>
+                <button class="secondary" type="button" onclick="closeModal(this)">Cancel</button>
+                <button type="submit"><i class="fa-solid fa-floppy-disk"></i>Create Doctor</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <h2>Doctors</h2>
 

@@ -484,6 +484,10 @@ fn render_doctors_page(
         let message = doctor_error_message(error);
         context.insert("error_message", &message);
         context.insert("invalid_staff_id", &(message == "Staff ID is required"));
+        context.insert(
+            "invalid_license_number",
+            &(message == "License number is required"),
+        );
         context.insert("invalid_name", &(message == "Doctor name is required"));
         context.insert(
             "invalid_specialization",
