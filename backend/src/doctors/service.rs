@@ -1,8 +1,7 @@
 use super::models::{DayOfWeek, Doctor, DoctorSchedule, DoctorStatus};
 use super::repository::{DoctorRepository, RepositoryError};
 use serde::Deserialize;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, PartialEq)]
@@ -42,20 +41,11 @@ pub struct CreateDoctorScheduleForm {
 
 pub struct DoctorService {
     doctor_repository: Arc<dyn DoctorRepository>,
-    deleted_doctors: Mutex<HashMap<String, DeletedDoctor>>,
-}
-
-struct DeletedDoctor {
-    doctor: Doctor,
-    schedules: Vec<DoctorSchedule>,
 }
 
 impl DoctorService {
     pub fn new(doctor_repository: Arc<dyn DoctorRepository>) -> Self {
-        Self {
-            doctor_repository,
-            deleted_doctors: Mutex::new(HashMap::new()),
-        }
+        Self { doctor_repository }
     }
 
     pub async fn create_doctor(&self, form: CreateDoctorForm) -> Result<Doctor, DoctorError> {
@@ -144,55 +134,10 @@ impl DoctorService {
             ));
         }
 
-        let doctor_id = doctor_id.trim();
-        let doctor = self.find_doctor(doctor_id).await?;
-        let schedules = self.list_schedules(doctor_id).await?;
-
         self.doctor_repository
-            .delete(doctor_id)
+            .delete(doctor_id.trim())
             .await
-            .map_err(Self::map_repository_error)?;
-
-        let mut deleted_doctors = self
-            .deleted_doctors
-            .lock()
-            .map_err(|_| DoctorError::StorageUnavailable)?;
-        deleted_doctors.insert(doctor_id.to_string(), DeletedDoctor { doctor, schedules });
-
-        Ok(())
-    }
-
-    pub async fn undo_delete_doctor(&self, doctor_id: &str) -> Result<(), DoctorError> {
-        if doctor_id.trim().is_empty() {
-            return Err(DoctorError::InvalidInput(
-                "Doctor ID is required".to_string(),
-            ));
-        }
-
-        let doctor_id = doctor_id.trim();
-        let deleted_doctor = {
-            let mut deleted_doctors = self
-                .deleted_doctors
-                .lock()
-                .map_err(|_| DoctorError::StorageUnavailable)?;
-            deleted_doctors
-                .remove(doctor_id)
-                .ok_or(DoctorError::DoctorNotFound)?
-        };
-
-        self.doctor_repository
-            .create(deleted_doctor.doctor)
-            .await
-            .map_err(Self::map_repository_error)?;
-
-        for schedule in deleted_doctor.schedules {
-            self.doctor_repository
-                .create_schedule(schedule)
-                .await
-                .map_err(Self::map_repository_error)?;
-        }
-
-        Ok(())
+            .map_err(Self::map_repository_error)
     }
 
     pub async fn create_schedule(
@@ -217,7 +162,10 @@ impl DoctorService {
             .map_err(Self::map_repository_error)
     }
 
-    pub async fn list_schedules(&self, doctor_id: &str) -> Result<Vec<DoctorSchedule>, DoctorError> {
+    pub async fn list_schedules(
+        &self,
+        doctor_id: &str,
+    ) -> Result<Vec<DoctorSchedule>, DoctorError> {
         if doctor_id.trim().is_empty() {
             return Err(DoctorError::InvalidInput(
                 "Doctor ID is required".to_string(),
@@ -265,7 +213,9 @@ impl DoctorService {
         email: &str,
     ) -> Result<(), DoctorError> {
         if staff_id.trim().is_empty() {
-            return Err(DoctorError::InvalidInput("Staff ID is required".to_string()));
+            return Err(DoctorError::InvalidInput(
+                "Staff ID is required".to_string(),
+            ));
         }
 
         if license_number.trim().is_empty() {
@@ -475,29 +425,6 @@ mod tests {
             service.find_doctor(&doctor.id).await,
             Err(DoctorError::DoctorNotFound)
         );
-    }
-
-    #[actix_web::test]
-    async fn restores_deleted_doctor_and_schedules() {
-        let service = service();
-        let doctor = service.create_doctor(create_form()).await.unwrap();
-        service
-            .create_schedule(
-                &doctor.id,
-                CreateDoctorScheduleForm {
-                    day_of_week: DayOfWeek::Monday,
-                    start_time: "09:00".to_string(),
-                    end_time: "17:00".to_string(),
-                },
-            )
-            .await
-            .unwrap();
-
-        service.delete_doctor(&doctor.id).await.unwrap();
-        service.undo_delete_doctor(&doctor.id).await.unwrap();
-
-        assert_eq!(service.find_doctor(&doctor.id).await.unwrap().name, doctor.name);
-        assert_eq!(service.list_schedules(&doctor.id).await.unwrap().len(), 1);
     }
 
     #[actix_web::test]

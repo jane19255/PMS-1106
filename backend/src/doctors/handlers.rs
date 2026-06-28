@@ -21,10 +21,6 @@ pub fn routes(config: &mut web::ServiceConfig) {
             web::post().to(delete_doctor_form),
         )
         .route(
-            "/doctors/{doctor_id}/undo-delete",
-            web::post().to(undo_delete_doctor_form),
-        )
-        .route(
             "/doctors/{doctor_id}/schedules",
             web::post().to(create_schedule_form),
         )
@@ -56,8 +52,7 @@ pub fn routes(config: &mut web::ServiceConfig) {
 
 #[derive(Deserialize)]
 pub struct DoctorsPageQuery {
-    deleted_doctor_id: Option<String>,
-    restored: Option<String>,
+    deleted: Option<String>,
 }
 
 pub async fn doctors_page(
@@ -73,14 +68,9 @@ pub async fn doctors_page(
     }
 
     match doctor_service.list_doctors().await {
-        Ok(doctors) => render_doctors_page(
-            &templates,
-            doctors,
-            None,
-            None,
-            query.deleted_doctor_id.as_deref(),
-            query.restored.as_deref(),
-        ),
+        Ok(doctors) => {
+            render_doctors_page(&templates, doctors, None, None, query.deleted.as_deref())
+        }
         Err(error) => render_error(&templates, error),
     }
 }
@@ -130,16 +120,13 @@ pub async fn create_doctor_form(
     match doctor_service.create_doctor(submitted_form.clone()).await {
         Ok(_) => redirect_to("/doctors"),
         Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.list_doctors().await {
-            Ok(doctors) => {
-                render_doctors_page(
-                    &templates,
-                    doctors,
-                    Some(&submitted_form),
-                    Some(error),
-                    None,
-                    None,
-                )
-            }
+            Ok(doctors) => render_doctors_page(
+                &templates,
+                doctors,
+                Some(&submitted_form),
+                Some(error),
+                None,
+            ),
             Err(error) => render_error(&templates, error),
         },
         Err(error) => render_error(&templates, error),
@@ -160,7 +147,10 @@ pub async fn update_doctor_form(
     }
 
     let doctor_id = path.into_inner();
-    match doctor_service.update_doctor(&doctor_id, form.into_inner()).await {
+    match doctor_service
+        .update_doctor(&doctor_id, form.into_inner())
+        .await
+    {
         Ok(_) => redirect_to(&format!("/doctors/{doctor_id}")),
         Err(error) => render_error(&templates, error),
     }
@@ -180,29 +170,10 @@ pub async fn delete_doctor_form(
 
     let doctor_id = path.into_inner();
     match doctor_service.delete_doctor(&doctor_id).await {
-        Ok(_) => redirect_to(&format!("/doctors?deleted_doctor_id={doctor_id}")),
+        Ok(_) => redirect_to("/doctors?deleted=1"),
         Err(error) => render_error(&templates, error),
     }
 }
-
-pub async fn undo_delete_doctor_form(
-    req: HttpRequest,
-    doctor_service: web::Data<DoctorService>,
-    templates: web::Data<Tera>,
-    path: web::Path<String>,
-    firebase_auth: web::Data<FirebaseAuth>,
-    firestore_db: web::Data<FirebaseRestDb>,
-) -> impl Responder {
-    if let Err(rejection) = require_doctor_admin(&req, &firebase_auth, &firestore_db).await {
-        return rejection;
-    }
-
-    match doctor_service.undo_delete_doctor(&path.into_inner()).await {
-        Ok(_) => redirect_to("/doctors?restored=1"),
-        Err(error) => render_error(&templates, error),
-    }
-}
-
 pub async fn create_schedule_form(
     req: HttpRequest,
     doctor_service: web::Data<DoctorService>,
@@ -219,21 +190,26 @@ pub async fn create_schedule_form(
     let doctor_id = path.into_inner();
     let submitted_form = form.into_inner();
 
-    match doctor_service.create_schedule(&doctor_id, submitted_form.clone()).await {
+    match doctor_service
+        .create_schedule(&doctor_id, submitted_form.clone())
+        .await
+    {
         Ok(_) => redirect_to(&format!("/doctors/{doctor_id}")),
-        Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.find_doctor(&doctor_id).await {
-            Ok(doctor) => render_doctor_detail_page(
-                &templates,
-                doctor,
-                doctor_service
-                    .list_schedules(&doctor_id)
-                    .await
-                    .unwrap_or_default(),
-                Some(&submitted_form),
-                Some(error),
-            ),
-            Err(error) => render_error(&templates, error),
-        },
+        Err(error @ DoctorError::InvalidInput(_)) => {
+            match doctor_service.find_doctor(&doctor_id).await {
+                Ok(doctor) => render_doctor_detail_page(
+                    &templates,
+                    doctor,
+                    doctor_service
+                        .list_schedules(&doctor_id)
+                        .await
+                        .unwrap_or_default(),
+                    Some(&submitted_form),
+                    Some(error),
+                ),
+                Err(error) => render_error(&templates, error),
+            }
+        }
         Err(error) => render_error(&templates, error),
     }
 }
@@ -318,7 +294,10 @@ pub async fn update_doctor_api(
         return rejection;
     }
 
-    match doctor_service.update_doctor(&path.into_inner(), form.into_inner()).await {
+    match doctor_service
+        .update_doctor(&path.into_inner(), form.into_inner())
+        .await
+    {
         Ok(doctor) => HttpResponse::Ok().json(doctor),
         Err(error) => doctor_error_response(error),
     }
@@ -370,7 +349,10 @@ pub async fn create_schedule_api(
         return rejection;
     }
 
-    match doctor_service.create_schedule(&path.into_inner(), form.into_inner()).await {
+    match doctor_service
+        .create_schedule(&path.into_inner(), form.into_inner())
+        .await
+    {
         Ok(schedule) => HttpResponse::Created().json(schedule),
         Err(error) => doctor_error_response(error),
     }
@@ -455,20 +437,12 @@ fn render_doctors_page(
     doctors: Vec<super::models::Doctor>,
     form: Option<&CreateDoctorForm>,
     error: Option<DoctorError>,
-    deleted_doctor_id: Option<&str>,
-    restored: Option<&str>,
+    deleted: Option<&str>,
 ) -> HttpResponse {
     let mut context = Context::new();
     context.insert("doctors", &doctors);
-
-    if let Some(doctor_id) = deleted_doctor_id {
-        context.insert("deleted_doctor_id", doctor_id);
-        context.insert(
-            "success_message",
-            "Doctor deleted. You can undo this action while the server is still running.",
-        );
-    } else if restored == Some("1") {
-        context.insert("success_message", "Doctor restored successfully.");
+    if deleted == Some("1") {
+        context.insert("success_message", "Doctor deleted successfully.");
     }
 
     if let Some(form) = form {
