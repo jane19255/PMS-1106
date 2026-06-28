@@ -12,6 +12,9 @@ pub type RepositoryFuture<'a, T> =
 
 #[derive(Debug)]
 pub enum RepositoryError {
+    DoctorHasAppointments,
+    DuplicateDoctor,
+    InvalidStaffId,
     NotFound,
     StorageUnavailable,
 }
@@ -239,7 +242,9 @@ impl SupabaseDoctorRepository {
         format!("{}/rest/v1/doctor_schedules?{}", self.url, query)
     }
 
-    async fn decode_doctor_rows(response: Response) -> Result<Vec<DatabaseDoctor>, RepositoryError> {
+    async fn decode_doctor_rows(
+        response: Response,
+    ) -> Result<Vec<DatabaseDoctor>, RepositoryError> {
         if !response.status().is_success() {
             return Err(Self::response_error(response).await);
         }
@@ -309,7 +314,9 @@ impl DoctorRepository for SupabaseDoctorRepository {
                 .await
                 .map_err(|_| RepositoryError::StorageUnavailable)?;
             let mut rows = Self::decode_doctor_rows(response).await?;
-            rows.pop().map(Doctor::from).ok_or(RepositoryError::NotFound)
+            rows.pop()
+                .map(Doctor::from)
+                .ok_or(RepositoryError::NotFound)
         })
     }
 
@@ -336,7 +343,10 @@ impl DoctorRepository for SupabaseDoctorRepository {
         Box::pin(async move {
             let encoded_id = urlencoding::encode(&doctor.id);
             let response = self
-                .request(self.client.patch(self.doctors_url(&format!("id=eq.{encoded_id}"))))
+                .request(
+                    self.client
+                        .patch(self.doctors_url(&format!("id=eq.{encoded_id}"))),
+                )
                 .header("Prefer", "return=minimal")
                 .json(&json!({
                     "staff_id": doctor.staff_id,
@@ -362,7 +372,10 @@ impl DoctorRepository for SupabaseDoctorRepository {
         Box::pin(async move {
             let encoded_id = urlencoding::encode(&doctor_id);
             let response = self
-                .request(self.client.delete(self.doctors_url(&format!("id=eq.{encoded_id}"))))
+                .request(
+                    self.client
+                        .delete(self.doctors_url(&format!("id=eq.{encoded_id}"))),
+                )
                 .send()
                 .await
                 .map_err(|_| RepositoryError::StorageUnavailable)?;

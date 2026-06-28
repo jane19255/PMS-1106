@@ -246,3 +246,31 @@ for each row
 execute function public.set_updated_at();
 
 alter table public.doctor_schedules enable row level security;
+create table if not exists public.appointment_queue (
+  id uuid primary key default gen_random_uuid(),
+  appointment_id text not null references public.appointments(id) on update cascade on delete cascade,
+  patient_id text not null references public.patients(id) on update cascade on delete restrict,
+  doctor_id text not null references public.doctors(id) on update cascade on delete restrict,
+  priority integer not null default 3 check (priority between 1 and 4),
+  status text not null default 'Waiting'
+    check (status in ('Waiting', 'InProgress', 'Completed', 'Cancelled', 'Skipped')),
+  queue_position integer,
+  checked_in_at timestamptz,
+  called_at timestamptz,
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists appointment_queue_doctor_idx on public.appointment_queue(doctor_id);
+create index if not exists appointment_queue_status_idx on public.appointment_queue(status);
+create index if not exists appointment_queue_priority_idx on public.appointment_queue(priority);
+
+drop trigger if exists set_appointment_queue_updated_at on public.appointment_queue;
+create trigger set_appointment_queue_updated_at
+before update on public.appointment_queue
+for each row
+execute function public.set_updated_at();
+
+alter table public.appointment_queue enable row level security;
+

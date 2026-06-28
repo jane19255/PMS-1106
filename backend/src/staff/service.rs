@@ -42,7 +42,11 @@ impl StaffService {
             role: normalize_role(&form.role),
             phone: form.phone.trim().to_string(),
             email: form.email.trim().to_string(),
-            status: form.status.as_deref().map(normalize_status).unwrap_or_else(|| "Active".to_string()),
+            status: form
+                .status
+                .as_deref()
+                .map(normalize_status)
+                .unwrap_or_else(|| "Active".to_string()),
         };
 
         self.staff_repository
@@ -58,7 +62,11 @@ impl StaffService {
             .map_err(Self::map_repository_error)
     }
 
-    pub async fn update_staff(&self, staff_id: &str, form: StaffForm) -> Result<StaffMember, StaffError> {
+    pub async fn update_staff(
+        &self,
+        staff_id: &str,
+        form: StaffForm,
+    ) -> Result<StaffMember, StaffError> {
         if staff_id.trim().is_empty() {
             return Err(StaffError::InvalidInput("Staff ID is required".to_string()));
         }
@@ -71,7 +79,11 @@ impl StaffService {
             role: normalize_role(&form.role),
             phone: form.phone.trim().to_string(),
             email: form.email.trim().to_string(),
-            status: form.status.as_deref().map(normalize_status).unwrap_or_else(|| "Active".to_string()),
+            status: form
+                .status
+                .as_deref()
+                .map(normalize_status)
+                .unwrap_or_else(|| "Active".to_string()),
         };
 
         self.staff_repository
@@ -89,17 +101,39 @@ impl StaffService {
             ("Email", form.email.as_str()),
         ] {
             if value.trim().is_empty() {
-                return Err(StaffError::InvalidInput(format!("{field_name} is required")));
+                return Err(StaffError::InvalidInput(format!(
+                    "{field_name} is required"
+                )));
             }
         }
 
-        if !matches!(form.role.trim().to_lowercase().as_str(), "admin" | "doctor" | "receptionist" | "pharmacist") {
-            return Err(StaffError::InvalidInput("Role must be admin, doctor, receptionist, or pharmacist".to_string()));
+        if !matches!(
+            form.role.trim().to_lowercase().as_str(),
+            "admin" | "doctor" | "receptionist" | "pharmacist"
+        ) {
+            return Err(StaffError::InvalidInput(
+                "Role must be admin, doctor, receptionist, or pharmacist".to_string(),
+            ));
         }
         if let Some(status) = form.status.as_deref() {
             if !matches!(status.trim().to_lowercase().as_str(), "active" | "inactive") {
-                return Err(StaffError::InvalidInput("Status must be Active or Inactive".to_string()));
+                return Err(StaffError::InvalidInput(
+                    "Status must be Active or Inactive".to_string(),
+                ));
             }
+        }
+
+        let phone = form.phone.trim();
+        if !phone.is_empty() && !is_singapore_phone(phone) {
+            return Err(StaffError::InvalidInput(
+                "Phone number must be 8 digits and start with 6, 8, or 9".to_string(),
+            ));
+        }
+
+        if !is_valid_email(form.email.trim()) {
+            return Err(StaffError::InvalidInput(
+                "Email format is invalid".to_string(),
+            ));
         }
 
         Ok(())
@@ -107,6 +141,18 @@ impl StaffService {
 
     fn map_repository_error(error: RepositoryError) -> StaffError {
         match error {
+            RepositoryError::InvalidEmail => {
+                StaffError::InvalidInput("Email format is invalid".to_string())
+            }
+            RepositoryError::InvalidPhone => StaffError::InvalidInput(
+                "Phone number must be 8 digits and start with 6, 8, or 9".to_string(),
+            ),
+            RepositoryError::DuplicateEmail => StaffError::InvalidInput(
+                "Email is already used by another staff member".to_string(),
+            ),
+            RepositoryError::DuplicateFirebaseUid => StaffError::InvalidInput(
+                "Firebase UID is already used by another staff member".to_string(),
+            ),
             RepositoryError::NotFound => StaffError::StaffNotFound,
             RepositoryError::StorageUnavailable => StaffError::StorageUnavailable,
         }
@@ -130,6 +176,22 @@ fn normalize_status(status: &str) -> String {
     }
 }
 
+fn is_singapore_phone(phone: &str) -> bool {
+    phone.len() == 8
+        && phone.chars().all(|character| character.is_ascii_digit())
+        && matches!(phone.as_bytes().first(), Some(b'6' | b'8' | b'9'))
+}
+
+fn is_valid_email(email: &str) -> bool {
+    let Some((local, domain)) = email.split_once('@') else {
+        return false;
+    };
+
+    !local.trim().is_empty()
+        && domain.contains('.')
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,7 +229,10 @@ mod tests {
 
         let error = service().create_staff(form).await.unwrap_err();
 
-        assert_eq!(error, StaffError::InvalidInput("Firebase UID is required".to_string()));
+        assert_eq!(
+            error,
+            StaffError::InvalidInput("Firebase UID is required".to_string())
+        );
     }
 
     #[actix_web::test]

@@ -96,11 +96,6 @@
 {% if success_message %}
 <section class="card success-card">
     <p>{{ success_message }}</p>
-    {% if deleted_doctor_id %}
-    <form action="/doctors/{{ deleted_doctor_id }}/undo-delete" method="post">
-        <button type="submit">Undo Delete</button>
-    </form>
-    {% endif %}
 </section>
 {% endif %}
 
@@ -177,3 +172,4 @@
 </section>
 {% endfor %}
 {% endblock content %}
+

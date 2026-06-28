@@ -7,6 +7,8 @@ mod models;
 mod prescriptions;
 mod routes;
 mod staff;
+mod appointments;
+mod queue;
 
 use actix_files::Files;
 use actix_web::{web, App, HttpResponse, HttpServer};
@@ -200,3 +202,4 @@ mod template_tests {
         assert!(html.contains("Dr. Test"));
     }
 }
+
