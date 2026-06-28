@@ -1,18 +1,10 @@
 use crate::billing::handlers as billing_handlers;
-use crate::doctors::handlers as doctor_handlers;
-use crate::doctor_dashboard::handlers as doctor_dashboard_handlers;
 use crate::handlers::{auth, patients};
-use crate::prescriptions::handlers as prescription_handlers;
-use crate::staff::handlers as staff_handlers;
 use actix_web::web;
 
 pub fn configure(config: &mut web::ServiceConfig) {
     config.configure(auth::routes);
     config.configure(patients::routes);
-    config.configure(doctor_handlers::routes);
-    config.configure(doctor_dashboard_handlers::routes);
-    config.configure(prescription_handlers::routes);
-    config.configure(staff_handlers::routes);
 
     config.service(
         web::scope("/billing")

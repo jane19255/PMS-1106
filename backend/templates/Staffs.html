@@ -21,7 +21,7 @@
   </script>
   <script src="/assets/js/FirebaseService.js"></script>
   <script src="/assets/js/general.js"></script>
-  <script src="/assets/js/staffs.js?v=staff-api-1"></script>
+  <script src="/assets/js/staffs.js"></script>
 </head>
 
 <body>
@@ -141,31 +141,26 @@
 
           <div class="error-box"></div>
 
-          <div class="field">
-            <label class="required">Firebase UID</label>
-            <input type="text" id="add-firebaseUid" placeholder="Firebase user UID" required>
-          </div>
-
           <div class="row-section">
             <div class="field">
               <label class="required">First Name</label>
-              <input type="text" id="add-firstName" placeholder="First Name" required>
+              <input type="text" placeholder="First Name" required>
             </div>
 
             <div class="field">
               <label class="required">Last Name</label>
-              <input type="text" id="add-lastName" placeholder="Last Name" required>
+              <input type="text" placeholder="Last Name" required>
             </div>
 
             <div class="field">
-              <label>Date of Birth</label>
-              <input type="date" id="add-dob">
+              <label class="required">Date of Birth</label>
+              <input type="date" required>
             </div>
 
             <div class="field">
-              <label>Gender</label>
+              <label class="required">Gender</label>
               <div class="custom-select">
-                <select id="add-gender">
+                <select required>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                 </select>
@@ -173,8 +168,8 @@
             </div>
 
             <div class="field">
-              <label>NRIC/FIN/Passport Number</label>
-              <input type="text" id="add-nric" placeholder="SXXXXXXXF">
+              <label class="required">NRIC/FIN/Passport Number</label>
+              <input type="text" placeholder="SXXXXXXXF" required>
             </div>
 
             <div class="field">
@@ -183,36 +178,25 @@
                 <select id="add-role" required>
                   <option>Receptionist</option>
                   <option>Doctor</option>
-                  <option>Pharmacist</option>
-                  <option>Admin</option>
                 </select>
               </div>
             </div>
 
             <div class="field">
-              <label>Phone Number</label>
-              <input type="tel" id="add-phone" maxlength="8" placeholder="e.g. 9123 4567" oninput="this.value = this.value.replace(/[^\d]/g, '')">
+              <label class="required">Phone Number</label>
+              <input type="tel" maxlength="8" placeholder="e.g. 9123 4567"
+                oninput="this.value = this.value.replace(/[^\d]/g, '')" required>
             </div>
 
             <div class="field">
               <label class="required">Email Address</label>
-              <input type="email" id="add-email" placeholder="example@csc.singaporehealth.sg" required>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Status</label>
-            <div class="custom-select">
-              <select id="add-status">
-                <option>Active</option>
-                <option>Inactive</option>
-              </select>
+              <input type="email" placeholder="example@csc.singaporehealth.sg" required>
             </div>
           </div>
 
           <div class="field">
             <label>Home Address</label>
-            <textarea id="add-address" rows="4" placeholder="Enter street, block, unit, and postal code"></textarea>
+            <textarea type="textarea" rows="4" placeholder="Enter street, block, unit, and postal code"></textarea>
           </div>
         </div>
 
@@ -220,7 +204,7 @@
           <button class="secondary" onclick="clearInput(this)">Reset</button>
           <button class="secondary" onclick="closeModal(this)&&clearInput(this)">Cancel</button>
           <button
-            onclick="saveNewStaff(this)"><i
+            onclick="verifyInput(this)&&showToast('New staff added!', 'success')&&closeModal(this)&&clearInput(this)"><i
               class="fas fa-save"></i>Save New Staff</button>
         </div>
       </div>
@@ -233,9 +217,9 @@
 
         <div class="modal-content">
           <div class="personal-info card">
-            <div>STAFF INFORMATION</div>
+            <div>PATIENT INFORMATION</div>
             <div class="row">
-              <span>Staff ID:</span>
+              <span>Patient ID:</span>
               <span id="view-pid"></span>
             </div>
             <div class="row">
@@ -299,12 +283,7 @@
         <div class="modal-content">
 
           <div class="error-box"></div>
-
-          <input type="hidden" id="edit-id">
-          <div class="field">
-            <label class="required">Firebase UID</label>
-            <input type="text" id="edit-firebaseUid" placeholder="Firebase user UID" required>
-          </div>
+          <input type="hidden" id="edit-index">
 
           <div class="row-section">
             <div class="field">
@@ -318,14 +297,14 @@
             </div>
 
             <div class="field">
-              <label>Date of Birth</label>
-              <input type="date" id="edit-dob">
+              <label class="required">Date of Birth</label>
+              <input type="date" id="edit-dob" required>
             </div>
 
             <div class="field">
-              <label>Gender</label>
+              <label class="required">Gender</label>
               <div class="custom-select">
-                <select id="edit-gender">
+                <select id="edit-gender" required>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                 </select>
@@ -333,8 +312,8 @@
             </div>
 
             <div class="field">
-              <label>NRIC/FIN/Passport Number</label>
-              <input type="text" id="edit-nric" placeholder="SXXXXXXXF">
+              <label class="required">NRIC/FIN/Passport Number</label>
+              <input type="text" id="edit-nric" placeholder="SXXXXXXXF" required>
             </div>
 
             <div class="field">
@@ -343,31 +322,19 @@
                 <select id="edit-role" required>
                   <option>Receptionist</option>
                   <option>Doctor</option>
-                  <option>Pharmacist</option>
-                  <option>Admin</option>
                 </select>
               </div>
             </div>
 
             <div class="field">
-              <label>Phone Number</label>
+              <label class="required">Phone Number</label>
               <input type="tel" id="edit-phone" maxlength="8" placeholder="e.g. 9123 4567"
-                oninput="this.value = this.value.replace(/[^\d]/g, '')">
+                oninput="this.value = this.value.replace(/[^\d]/g, '')" required>
             </div>
 
             <div class="field">
               <label class="required">Email Address</label>
               <input type="email" id="edit-email" placeholder="example@csc.singaporehealth.sg" required>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Status</label>
-            <div class="custom-select">
-              <select id="edit-status">
-                <option>Active</option>
-                <option>Inactive</option>
-              </select>
             </div>
           </div>
 
@@ -380,7 +347,7 @@
         <div class="button-section">
           <button class="secondary" onclick="clearInput(this)">Reset</button>
           <button class="secondary" onclick="closeModal(this)">Cancel</button>
-          <button onclick="saveStaffChanges(this)"><i
+          <button onclick="verifyInput(this)&&showToast('Changes saved!', 'success')&&closeModal(this)"><i
               class="fas fa-save"></i>Save Changes</button>
         </div>
       </div>
