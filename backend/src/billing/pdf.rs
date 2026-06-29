@@ -15,6 +15,7 @@ pub fn render_medical_report_pdf(
     patient: Option<&PatientView>,
     clinical: Option<&ClinicalSummary>,
 ) -> Result<Vec<u8>, String> {
+    // Build each part in order because they all share the same vertical position.
     let (document, page, layer) =
         PdfDocument::new("Invoice", Mm(PAGE_WIDTH), Mm(PAGE_HEIGHT), "Page 1");
     let font = document
@@ -46,6 +47,7 @@ pub fn render_medical_report_pdf(
 
 struct InvoicePdf {
     layer: PdfLayerReference,
+    // Current writing position, measured from the bottom of the page.
     y: f32,
 }
 
@@ -311,6 +313,7 @@ impl InvoicePdf {
     }
 
     fn table_row(&mut self, values: &[&str], widths: &[f32], font: &IndirectFontRef) {
+        // Move across the row using each column width instead of fixed positions.
         let mut x = LEFT;
         for (index, (value, width)) in values.iter().zip(widths.iter()).enumerate() {
             if index == values.len() - 1 {
@@ -354,6 +357,7 @@ impl InvoicePdf {
     }
 
     fn text_right(&self, text: &str, x: f32, y: f32, size: f32, font: &IndirectFontRef) {
+        // printpdf does not align text for us, so estimate its width first.
         self.text_at(text, x - estimate_text_width(text, size), y, size, font);
     }
 
@@ -381,6 +385,7 @@ impl InvoicePdf {
 }
 
 fn truncate(text: &str, limit: usize) -> String {
+    // Keep long database values from overflowing into the next PDF column.
     if text.chars().count() <= limit {
         return text.to_string();
     }

@@ -8,6 +8,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Mutex;
 
+// Repository methods return boxed futures so both memory and Supabase storage use one interface.
 pub type RepositoryFuture<'a, T> =
     Pin<Box<dyn Future<Output = Result<T, RepositoryError>> + Send + 'a>>;
 
@@ -154,6 +155,7 @@ impl SupabaseInvoiceRepository {
 impl InvoiceRepository for SupabaseInvoiceRepository {
     fn create(&self, invoice: Invoice) -> RepositoryFuture<'_, Invoice> {
         Box::pin(async move {
+            // The RPC saves the invoice and its items together to avoid half-saved invoices.
             let url = format!("{}/rest/v1/rpc/billing_create_invoice", self.url);
             let response = self
                 .request(self.client.post(url))
@@ -210,6 +212,7 @@ impl InvoiceRepository for SupabaseInvoiceRepository {
 
     fn update(&self, invoice: Invoice) -> RepositoryFuture<'_, Invoice> {
         Box::pin(async move {
+            // Payments and invoice totals must be updated in the same database transaction.
             let url = format!("{}/rest/v1/rpc/billing_update_invoice", self.url);
             let response = self
                 .request(self.client.post(url))

@@ -30,10 +30,15 @@ create table if not exists public.staff (
   id text primary key,
   firebase_uid text not null unique,
   full_name text not null check (length(trim(full_name)) > 0),
+  dob date check (dob is null or dob <= current_date),
+  gender text check (gender is null or gender in ('Male', 'Female')),
+  nric text,
   email text not null unique check (email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$'),
   phone text check (phone is null or phone ~ '^[689][0-9]{7}$'),
   role text not null check (role in ('admin', 'doctor', 'receptionist', 'pharmacist')),
   status text not null default 'active' check (status in ('active', 'inactive')),
+  address text,
+  emergency_contact text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

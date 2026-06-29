@@ -247,6 +247,7 @@ impl BillingService {
     }
 
     fn calculate_total(&self, items: &[InvoiceItem]) -> f64 {
+        // Round once at the end to prevent small floating-point differences in totals.
         self.round_money(items.iter().map(|item| item.cost).sum())
     }
 
@@ -674,6 +675,7 @@ mod tests {
 
     #[test]
     fn concurrent_requests_create_only_one_invoice_per_appointment() {
+        // Simulates two users billing the same appointment at almost the same time.
         let service = Arc::new(service());
         let barrier = Arc::new(Barrier::new(2));
         let mut workers = Vec::new();

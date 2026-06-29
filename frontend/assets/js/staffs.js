@@ -17,6 +17,7 @@ function emptyStaffDefaults(staff) {
         gender: "",
         nric: "",
         address: "",
+        emergency: "",
         ...staff,
     };
 }
@@ -57,6 +58,10 @@ function renderStaffRow(staff, index) {
                 <i class="edit fa-solid fa-pen-to-square" onclick="editStaff(${index})"></i>
                 <span class="tooltip-text">Edit Details</span>
             </div>
+            <div class="has-tooltip">
+                <i class="delete fa-solid fa-trash" onclick="deleteStaff('${escapeHtml(staff.id)}')"></i>
+                <span class="tooltip-text">Delete Staff</span>
+            </div>
         </td>
     </tr>`;
 }
@@ -77,17 +82,32 @@ async function loadStaffs() {
 
 function staffPayload(prefix) {
     return {
+        // The backend creates the Firebase account and fills this UID for new staff.
         firebaseUid: document.getElementById(`${prefix}-firebaseUid`)?.value.trim() || "",
         firstName: document.getElementById(`${prefix}-firstName`)?.value.trim() || "",
         lastName: document.getElementById(`${prefix}-lastName`)?.value.trim() || "",
+        dob: document.getElementById(`${prefix}-dob`)?.value || "",
+        gender: document.getElementById(`${prefix}-gender`)?.value || "",
+        nric: document.getElementById(`${prefix}-nric`)?.value.trim() || "",
         role: document.getElementById(`${prefix}-role`)?.value || "Receptionist",
         phone: document.getElementById(`${prefix}-phone`)?.value.trim() || "",
         email: document.getElementById(`${prefix}-email`)?.value.trim() || "",
         status: document.getElementById(`${prefix}-status`)?.value || "Active",
+        address: document.getElementById(`${prefix}-address`)?.value.trim() || "",
+        emergency: document.getElementById(`${prefix}-emergency`)?.value.trim() || "",
     };
 }
 
 async function saveNewStaff(button) {
+    const isDoctor = document.getElementById("add-role").value === "Doctor";
+    if (isDoctor) {
+        const license = document.getElementById("add-doctorLicense").value.trim();
+        const specialization = document.getElementById("add-doctorSpecialization").value.trim();
+        if (!license || !specialization) {
+            notify("License number and specialization are required for doctors", "error");
+            return;
+        }
+    }
     if (!verifyInput(button)) return;
 
     try {
@@ -98,9 +118,32 @@ async function saveNewStaff(button) {
         });
         if (!response.ok) throw new Error(await response.text());
         const staff = emptyStaffDefaults(await response.json());
+
+        if (isDoctor) {
+            // A doctor needs a normal staff account first because the doctors table links by staff ID.
+            const doctorResponse = await fetch("/api/doctors", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({
+                    staff_id: staff.id,
+                    license_number: document.getElementById("add-doctorLicense").value.trim(),
+                    name: `${staff.firstName} ${staff.lastName}`.trim(),
+                    specialization: document.getElementById("add-doctorSpecialization").value.trim(),
+                    contact_number: staff.phone,
+                    email: staff.email,
+                }),
+            });
+            if (!doctorResponse.ok) {
+                staffs.push(staff);
+                refreshStaffList();
+                throw new Error(`Staff was created, but the doctor profile failed: ${await doctorResponse.text()}`);
+            }
+            if (typeof loadDoctors === "function") await loadDoctors();
+        }
+
         staffs.push(staff);
         refreshStaffList();
-        notify("New staff added!", "success");
+        notify(isDoctor ? "Doctor staff and profile added!" : "New staff added!", "success");
         closeModal(button);
         clearInput(button);
     } catch (error) {
@@ -108,10 +151,53 @@ async function saveNewStaff(button) {
     }
 }
 
+function toggleAddDoctorFields() {
+    // Only ask for medical details when the selected staff role is Doctor.
+    const isDoctor = document.getElementById("add-role")?.value === "Doctor";
+    const fields = document.getElementById("addDoctorFields");
+    if (!fields) return;
+    fields.hidden = !isDoctor;
+    fields.querySelectorAll("input").forEach(input => {
+        input.required = isDoctor;
+        input.disabled = !isDoctor;
+    });
+}
+
+function doctorForStaff(staffId) {
+    return typeof managedDoctors === "undefined"
+        ? null
+        : managedDoctors.find(doctor => doctor.staff_id === staffId) || null;
+}
+
+function toggleEditDoctorFields() {
+    const isDoctor = document.getElementById("edit-role")?.value === "Doctor";
+    const fields = document.getElementById("editDoctorFields");
+    if (!fields) return;
+    fields.hidden = !isDoctor;
+    fields.querySelectorAll("input").forEach(input => {
+        input.required = isDoctor;
+        input.disabled = !isDoctor;
+    });
+}
+
 async function saveStaffChanges(button) {
+    const staffId = document.getElementById("edit-id").value;
+    const existingDoctor = doctorForStaff(staffId);
+    const isDoctor = document.getElementById("edit-role").value === "Doctor";
+    if (existingDoctor && !isDoctor) {
+        notify("A linked doctor must keep the Doctor role", "error");
+        return;
+    }
+    if (isDoctor) {
+        const license = document.getElementById("edit-doctorLicense").value.trim();
+        const specialization = document.getElementById("edit-doctorSpecialization").value.trim();
+        if (!license || !specialization) {
+            notify("License number and specialization are required for doctors", "error");
+            return;
+        }
+    }
     if (!verifyInput(button)) return;
 
-    const staffId = document.getElementById("edit-id").value;
     try {
         const response = await fetch(`/api/staff/${encodeURIComponent(staffId)}`, {
             method: "PUT",
@@ -120,12 +206,62 @@ async function saveStaffChanges(button) {
         });
         if (!response.ok) throw new Error(await response.text());
         const updated = emptyStaffDefaults(await response.json());
+
+        if (isDoctor) {
+            const doctorPayload = {
+                staff_id: updated.id,
+                license_number: document.getElementById("edit-doctorLicense").value.trim(),
+                name: `${updated.firstName} ${updated.lastName}`.trim(),
+                specialization: document.getElementById("edit-doctorSpecialization").value.trim(),
+                contact_number: updated.phone,
+                email: updated.email,
+            };
+            if (existingDoctor) {
+                doctorPayload.status = document.getElementById("edit-doctorAvailability").value;
+            }
+
+            const doctorResponse = await fetch(
+                existingDoctor ? `/api/doctors/${encodeURIComponent(existingDoctor.id)}` : "/api/doctors",
+                {
+                    method: existingDoctor ? "PUT" : "POST",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify(doctorPayload),
+                }
+            );
+            if (!doctorResponse.ok) {
+                throw new Error(`Staff details were saved, but doctor details failed: ${await doctorResponse.text()}`);
+            }
+            if (typeof loadDoctors === "function") await loadDoctors();
+        }
+
         staffs = staffs.map((staff) => staff.id === updated.id ? updated : staff);
         refreshStaffList();
         notify("Changes saved!", "success");
         closeModal(button);
     } catch (error) {
         notify(error.message || "Staff changes could not be saved", "error");
+    }
+}
+
+async function deleteStaff(staffId) {
+    const staff = staffs.find(item => item.id === staffId);
+    const name = staff ? `${staff.firstName} ${staff.lastName}`.trim() : staffId;
+    const warning = staff?.role === "Doctor"
+        ? `Delete ${name}, their doctor profile, schedules, and login account?`
+        : `Delete ${name} and their login account?`;
+    if (!confirm(`${warning} This action cannot be undone.`)) return;
+
+    try {
+        const response = await fetch(`/api/staff/${encodeURIComponent(staffId)}`, {
+            method: "DELETE",
+            headers: { Accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(await response.text());
+        staffs = staffs.filter(item => item.id !== staffId);
+        refreshStaffList();
+        notify("Staff member deleted", "success");
+    } catch (error) {
+        notify(error.message || "Staff member could not be deleted", "error");
     }
 }
 
@@ -142,6 +278,7 @@ function viewStaff(index) {
     document.getElementById("view-phone").innerText = s.phone || "-";
     document.getElementById("view-email").innerText = s.email;
     document.getElementById("view-address").innerText = s.address || "-";
+    document.getElementById("view-emergency").innerText = s.emergency || "-";
 
     const statusEl = document.getElementById("view-status");
     statusEl.innerText = s.status;
@@ -165,6 +302,15 @@ function editStaff(index) {
     document.getElementById("edit-email").value = s.email;
     document.getElementById("edit-status").value = s.status;
     document.getElementById("edit-address").value = s.address || "";
+    document.getElementById("edit-emergency").value = s.emergency || "";
+
+    const doctor = doctorForStaff(s.id);
+    document.getElementById("edit-doctorLicense").value = doctor?.license_number || "";
+    document.getElementById("edit-doctorSpecialization").value = doctor?.specialization || "";
+    document.getElementById("edit-doctorAvailability").value = doctor
+        ? doctorStatusText(doctor.status)
+        : "Available";
+    toggleEditDoctorFields();
 
     openModal("editStaffModal");
 }

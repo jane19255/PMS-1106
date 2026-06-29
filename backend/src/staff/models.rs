@@ -7,14 +7,21 @@ pub struct StaffMember {
     pub firebase_uid: String,
     pub first_name: String,
     pub last_name: String,
+    pub dob: String,
+    pub gender: String,
+    pub nric: String,
     pub role: String,
     pub phone: String,
     pub email: String,
     pub status: String,
+    pub address: String,
+    pub emergency: String,
 }
 
 impl StaffMember {
     pub fn full_name(&self) -> String {
-        format!("{} {}", self.first_name, self.last_name).trim().to_string()
+        format!("{} {}", self.first_name, self.last_name)
+            .trim()
+            .to_string()
     }
 }
