@@ -204,6 +204,17 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
+    pub async fn delete_medical_record(&self, record_id: &str) -> Result<String, String> {
+        let encoded_id = urlencoding::encode(record_id);
+        let url = self.rest_url(&format!("medical_records?id=eq.{}", encoded_id));
+        let response = self
+            .authed(self.http_client.delete(url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Self::read_response(response).await
+    }
+
     // Appointment Scheduling methods
     pub async fn list_appointments(&self) -> Result<String, String> {
         let url = self.rest_url("appointments?select=*&order=scheduled_at");

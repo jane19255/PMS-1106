@@ -109,6 +109,15 @@ create table if not exists public.medical_records (
 alter table public.medical_records
   add column if not exists doctor_id text references public.doctors(id) on update cascade on delete set null;
 
+alter table public.medical_records
+  add column if not exists reason_of_visit text,
+  add column if not exists clinical_findings text,
+  add column if not exists blood_pressure text,
+  add column if not exists temperature text,
+  add column if not exists pulse_rate text,
+  add column if not exists height_cm text,
+  add column if not exists weight_kg text;
+
 create index if not exists medical_records_patient_id_idx on public.medical_records(patient_id);
 create index if not exists medical_records_appointment_id_idx on public.medical_records(appointment_id);
 create index if not exists medical_records_doctor_id_idx on public.medical_records(doctor_id);

@@ -1,0 +1,197 @@
+{% extends "layout.html" %}
+
+{% block title %}New Medical Record{% endblock title %}
+
+{% block styles %}
+<style>
+    .page-heading { margin-bottom: 24px; }
+    .page-heading h1 { margin: 0 0 4px; }
+    .page-heading p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .form-section { margin-bottom: 20px; }
+
+    .section-label {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .form-group label .req { color: var(--danger, #dc2626); margin-left: 2px; }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .form-group textarea { min-height: 90px; resize: vertical; }
+
+    .form-actions { display: flex; gap: 10px; margin-top: 8px; }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: var(--radius); font-size: 14px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface); }
+
+    .patient-banner {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px 18px;
+        margin-bottom: 20px;
+    }
+
+    .patient-banner i { font-size: 22px; color: var(--primary); }
+    .patient-banner .name { font-weight: 700; font-size: 16px; }
+    .patient-banner .meta { font-size: 13px; color: var(--muted); }
+
+    .error-banner {
+        background: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fca5a5;
+        border-radius: var(--radius);
+        padding: 12px 16px;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<div class="page-heading">
+    <h1><i class="fa-solid fa-file-medical" style="margin-right:8px;color:var(--primary)"></i>New Medical Record</h1>
+    <p>Create a clinical record for this patient visit.</p>
+</div>
+
+{% if error_message %}
+<div class="error-banner">
+    <i class="fa-solid fa-circle-exclamation"></i> {{ error_message }}
+</div>
+{% endif %}
+
+{% if patient %}
+<div class="patient-banner">
+    <i class="fa-solid fa-user-injured"></i>
+    <div>
+        <div class="name">{{ patient.first_name }} {{ patient.last_name }}</div>
+        <div class="meta">NRIC: {{ patient.nric }} &nbsp;·&nbsp; DOB: {{ patient.dob }} &nbsp;·&nbsp; {{ patient.gender }}</div>
+        {% if patient.allergies %}<div class="meta" style="color:#b45309"><i class="fa-solid fa-triangle-exclamation"></i> Allergies: {{ patient.allergies }}</div>{% endif %}
+    </div>
+</div>
+{% endif %}
+
+<form method="post" action="/medical-records">
+    <!-- Hidden linkage IDs -->
+    <input type="hidden" name="patient_id" value="{{ prefill_patient_id }}">
+    <input type="hidden" name="appointment_id" value="{{ prefill_appointment_id }}">
+
+    {% if not patient %}
+    <section class="card form-section">
+        <div class="section-label"><i class="fa-solid fa-user"></i> Patient</div>
+        <div class="form-group" style="max-width:340px">
+            <label>Patient ID <span class="req">*</span></label>
+            <input type="text" name="patient_id" value="{{ prefill_patient_id }}" placeholder="PAT-…" required>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="card form-section">
+        <div class="section-label"><i class="fa-solid fa-heart-pulse"></i> Vitals</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Blood Pressure</label>
+                <input type="text" name="blood_pressure" placeholder="e.g. 120/80">
+            </div>
+            <div class="form-group">
+                <label>Temperature (°C)</label>
+                <input type="text" name="temperature" placeholder="e.g. 36.8">
+            </div>
+            <div class="form-group">
+                <label>Pulse Rate (bpm)</label>
+                <input type="text" name="pulse_rate" placeholder="e.g. 72">
+            </div>
+            <div class="form-group">
+                <label>Height (cm)</label>
+                <input type="text" name="height_cm" placeholder="e.g. 170">
+            </div>
+            <div class="form-group">
+                <label>Weight (kg)</label>
+                <input type="text" name="weight_kg" placeholder="e.g. 65">
+            </div>
+        </div>
+    </section>
+
+    <section class="card form-section">
+        <div class="section-label"><i class="fa-solid fa-stethoscope"></i> Clinical Notes</div>
+        <div style="display:grid;gap:14px">
+            <div class="form-group">
+                <label>Reason of Visit</label>
+                <textarea name="reason_of_visit" placeholder="Patient's main complaint or reason for today's visit..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Clinical Findings</label>
+                <textarea name="clinical_findings" placeholder="Physical examination findings..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Diagnosis</label>
+                <textarea name="diagnosis" placeholder="Final diagnosis..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Treatment Plan</label>
+                <textarea name="treatment_plan" placeholder="Prescribed treatment, medication instructions, follow-up plan..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Doctor Notes</label>
+                <textarea name="doctor_notes" placeholder="Additional clinical notes or observations..."></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section class="card form-section">
+        <div class="section-label"><i class="fa-solid fa-link"></i> Linked References</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Doctor ID</label>
+                <input type="text" name="doctor_id" placeholder="DOC-…">
+            </div>
+        </div>
+    </section>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+            <i class="fa-solid fa-floppy-disk"></i> Save Record
+        </button>
+        {% if prefill_patient_id %}
+            <a href="/patients/{{ prefill_patient_id }}/timeline" class="btn btn-ghost">Cancel</a>
+        {% else %}
+            <a href="/medical-records" class="btn btn-ghost">Cancel</a>
+        {% endif %}
+    </div>
+</form>
+{% endblock content %}

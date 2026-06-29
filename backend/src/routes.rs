@@ -4,6 +4,7 @@ use crate::doctors::handlers as doctor_handlers;
 use crate::admindashboard::handlers as admindashboard_handlers;
 use crate::doctor_dashboard::handlers as doctor_dashboard_handlers;
 use crate::handlers::{auth, patients};
+use crate::medical_records::handlers as medical_record_handlers;
 use crate::prescriptions::handlers as prescription_handlers;
 use crate::staff::handlers as staff_handlers;
 use crate::queue::handlers as queue_handlers;
@@ -17,6 +18,7 @@ pub fn configure(config: &mut web::ServiceConfig) {
     config.configure(patients::routes);
     config.configure(doctor_handlers::routes);
     config.configure(doctor_dashboard_handlers::routes);
+    config.configure(medical_record_handlers::routes);
     config.configure(prescription_handlers::routes);
     config.configure(staff_handlers::routes);
 
