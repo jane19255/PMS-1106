@@ -3,6 +3,7 @@ mod db;
 mod doctors;
 mod doctor_dashboard;
 mod handlers;
+mod medical_records;
 mod models;
 mod prescriptions;
 mod routes;
@@ -18,6 +19,10 @@ use billing::repository::{
 use billing::service::BillingService;
 use doctors::repository::{DoctorRepository, InMemoryDoctorRepository, SupabaseDoctorRepository};
 use doctors::service::DoctorService;
+use medical_records::repository::{
+    InMemoryMedicalRecordRepository, MedicalRecordRepository, SupabaseMedicalRecordRepository,
+};
+use medical_records::service::MedicalRecordService;
 use doctor_dashboard::repository::{
     DoctorDashboardRepository, InMemoryDoctorDashboardRepository, SupabaseDoctorDashboardRepository,
 };
@@ -105,6 +110,21 @@ async fn main() -> std::io::Result<()> {
             }
         };
     let prescription_service = web::Data::new(PrescriptionService::new(prescription_repository));
+    let medical_record_repository: Arc<dyn MedicalRecordRepository> =
+        match std::env::var("MEDICAL_RECORDS_STORAGE").as_deref() {
+            Ok("supabase") => {
+                println!("Medical records storage: Supabase PostgreSQL");
+                Arc::new(SupabaseMedicalRecordRepository::new(
+                    supabase_db.url.clone(),
+                    supabase_db.key.clone(),
+                ))
+            }
+            _ => {
+                println!("Medical records storage: in-memory (set MEDICAL_RECORDS_STORAGE=supabase to persist)");
+                Arc::new(InMemoryMedicalRecordRepository::default())
+            }
+        };
+    let medical_record_service = web::Data::new(MedicalRecordService::new(medical_record_repository));
     let staff_repository: Arc<dyn StaffRepository> =
         match std::env::var("STAFF_STORAGE").as_deref() {
             Ok("supabase") => {
@@ -129,6 +149,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(billing_service.clone())
             .app_data(doctor_service.clone())
             .app_data(doctor_dashboard_service.clone())
+            .app_data(medical_record_service.clone())
             .app_data(prescription_service.clone())
             .app_data(staff_service.clone())
             .app_data(template_data.clone())

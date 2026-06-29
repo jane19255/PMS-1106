@@ -1,0 +1,161 @@
+{% extends "layout.html" %}
+
+{% block title %}Medical Records{% endblock title %}
+
+{% block styles %}
+<style>
+    .page-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .page-heading h1 { margin: 0; }
+    .page-heading p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+
+    .filter-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .filter-bar input {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .records-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .records-table th,
+    .records-table td {
+        padding: 12px 14px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+    }
+
+    .records-table th {
+        background: var(--surface);
+        font-weight: 600;
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .records-table tr:hover td { background: var(--surface); }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: var(--radius); font-size: 14px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface); }
+
+    .empty-state {
+        text-align: center;
+        padding: 64px 24px;
+        color: var(--muted);
+    }
+
+    .empty-state i { font-size: 40px; margin-bottom: 12px; display: block; }
+
+    .tag {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--surface);
+        color: var(--muted);
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Medical Records</h1>
+        <p class="description">View and manage clinical records across all patients.</p>
+    </div>
+    <a href="/medical-records/new" class="btn btn-primary">
+        <i class="fa-solid fa-plus"></i> New Record
+    </a>
+</div>
+
+<form class="filter-bar" method="get" action="/medical-records">
+    <div style="flex:1">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Filter by Patient ID</label>
+        <input type="text" name="patient_id" value="{{ filter_patient_id }}" placeholder="e.g. PAT-abc123">
+    </div>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    {% if filter_patient_id %}
+        <a href="/medical-records" class="btn btn-ghost">Clear</a>
+    {% endif %}
+</form>
+
+{% if records | length == 0 %}
+<div class="card empty-state">
+    <i class="fa-solid fa-file-medical"></i>
+    <p>No medical records found.</p>
+    {% if filter_patient_id %}
+        <p style="font-size:13px">No records for patient ID <strong>{{ filter_patient_id }}</strong>.</p>
+        <a href="/medical-records" class="btn btn-ghost" style="margin-top:12px">Clear Filter</a>
+    {% else %}
+        <a href="/medical-records/new" class="btn btn-primary" style="margin-top:12px">Create First Record</a>
+    {% endif %}
+</div>
+{% else %}
+<section class="card" style="padding:0;overflow:hidden">
+    <table class="records-table">
+        <thead>
+            <tr>
+                <th>Record ID</th>
+                <th>Patient ID</th>
+                <th>Diagnosis</th>
+                <th>Date Recorded</th>
+                <th>Doctor ID</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in records %}
+            <tr>
+                <td><code style="font-size:12px">{{ record.id }}</code></td>
+                <td>
+                    <a href="/patients/{{ record.patient_id }}/timeline" style="color:var(--primary);font-weight:500">
+                        {{ record.patient_id }}
+                    </a>
+                </td>
+                <td>
+                    {% if record.diagnosis %}
+                        {{ record.diagnosis }}
+                    {% else %}
+                        <span class="tag">—</span>
+                    {% endif %}
+                </td>
+                <td>{{ record.recorded_at | date(format="%d %b %Y %H:%M") }}</td>
+                <td>
+                    {% if record.doctor_id %}
+                        {{ record.doctor_id }}
+                    {% else %}
+                        <span class="tag">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/medical-records/{{ record.id }}" class="btn btn-ghost btn-sm">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+{% endblock content %}

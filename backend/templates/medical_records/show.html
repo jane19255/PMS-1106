@@ -1,0 +1,427 @@
+{% extends "layout.html" %}
+
+{% block title %}Medical Record – {{ record.id }}{% endblock title %}
+
+{% block styles %}
+<style>
+    .record-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+
+    .record-header h1 { margin: 0; font-size: 22px; }
+    .record-header p  { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+
+    .section-card {
+        margin-bottom: 20px;
+    }
+
+    .section-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 14px;
+    }
+
+    .info-item label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 4px;
+    }
+
+    .info-item p {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 500;
+    }
+
+    .clinical-block {
+        display: grid;
+        gap: 16px;
+    }
+
+    .clinical-field label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 6px;
+    }
+
+    .clinical-field p {
+        margin: 0;
+        white-space: pre-wrap;
+        line-height: 1.6;
+    }
+
+    .vitals-row {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    .vital-chip {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 20px;
+        min-width: 100px;
+    }
+
+    .vital-chip .vital-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 4px;
+    }
+
+    .vital-chip .vital-value {
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    .edit-form {
+        display: none;
+    }
+
+    .edit-form.active {
+        display: block;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .form-group textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: var(--radius); font-size: 14px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-danger  { background: var(--danger, #dc2626); color: white; }
+    .btn-ghost   { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface); }
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+    .danger-zone {
+        border: 1px solid var(--danger, #dc2626);
+        border-radius: var(--radius);
+        padding: 20px;
+    }
+
+    .na-text { color: var(--muted); font-style: italic; font-size: 14px; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<div class="record-header">
+    <div>
+        <h1><i class="fa-solid fa-file-medical" style="margin-right:8px;color:var(--primary)"></i>Medical Record</h1>
+        <p>
+            Record ID: <code>{{ record.id }}</code> &nbsp;·&nbsp;
+            Recorded: {{ record.recorded_at | date(format="%d %b %Y %H:%M") }}
+            {% if record.patient_id %}
+                &nbsp;·&nbsp; Patient:
+                <a href="/patients/{{ record.patient_id }}/timeline" style="color:var(--primary)">
+                    {{ record.patient_id }}
+                </a>
+            {% endif %}
+        </p>
+    </div>
+    <div class="header-actions">
+        <button class="btn btn-ghost" onclick="toggleEdit()">
+            <i class="fa-solid fa-pen"></i> Edit
+        </button>
+        <a href="/medical-records" class="btn btn-ghost">
+            <i class="fa-solid fa-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+{% if patient %}
+<section class="card section-card">
+    <div class="section-title"><i class="fa-solid fa-user"></i> Patient Information</div>
+    <div class="info-grid">
+        <div class="info-item">
+            <label>Full Name</label>
+            <p>{{ patient.first_name }} {{ patient.last_name }}</p>
+        </div>
+        <div class="info-item">
+            <label>NRIC</label>
+            <p>{{ patient.nric }}</p>
+        </div>
+        <div class="info-item">
+            <label>Date of Birth</label>
+            <p>{{ patient.dob }}</p>
+        </div>
+        <div class="info-item">
+            <label>Gender</label>
+            <p>{{ patient.gender }}</p>
+        </div>
+        {% if patient.allergies %}
+        <div class="info-item">
+            <label>Known Allergies</label>
+            <p>{{ patient.allergies }}</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endif %}
+
+<!-- VIEW MODE -->
+<div id="view-mode">
+
+    {% if record.blood_pressure or record.temperature or record.pulse_rate or record.height_cm or record.weight_kg %}
+    <section class="card section-card">
+        <div class="section-title"><i class="fa-solid fa-heart-pulse"></i> Vitals</div>
+        <div class="vitals-row">
+            {% if record.blood_pressure %}
+            <div class="vital-chip">
+                <span class="vital-label">Blood Pressure</span>
+                <span class="vital-value">{{ record.blood_pressure }}</span>
+                <span style="font-size:11px;color:var(--muted)">mmHg</span>
+            </div>
+            {% endif %}
+            {% if record.temperature %}
+            <div class="vital-chip">
+                <span class="vital-label">Temperature</span>
+                <span class="vital-value">{{ record.temperature }}</span>
+                <span style="font-size:11px;color:var(--muted)">°C</span>
+            </div>
+            {% endif %}
+            {% if record.pulse_rate %}
+            <div class="vital-chip">
+                <span class="vital-label">Pulse Rate</span>
+                <span class="vital-value">{{ record.pulse_rate }}</span>
+                <span style="font-size:11px;color:var(--muted)">bpm</span>
+            </div>
+            {% endif %}
+            {% if record.height_cm %}
+            <div class="vital-chip">
+                <span class="vital-label">Height</span>
+                <span class="vital-value">{{ record.height_cm }}</span>
+                <span style="font-size:11px;color:var(--muted)">cm</span>
+            </div>
+            {% endif %}
+            {% if record.weight_kg %}
+            <div class="vital-chip">
+                <span class="vital-label">Weight</span>
+                <span class="vital-value">{{ record.weight_kg }}</span>
+                <span style="font-size:11px;color:var(--muted)">kg</span>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="card section-card">
+        <div class="section-title"><i class="fa-solid fa-stethoscope"></i> Clinical Notes</div>
+        <div class="clinical-block">
+            <div class="clinical-field">
+                <label>Reason of Visit</label>
+                {% if record.reason_of_visit %}
+                    <p>{{ record.reason_of_visit }}</p>
+                {% else %}
+                    <p class="na-text">Not recorded</p>
+                {% endif %}
+            </div>
+            <div class="clinical-field">
+                <label>Clinical Findings</label>
+                {% if record.clinical_findings %}
+                    <p>{{ record.clinical_findings }}</p>
+                {% else %}
+                    <p class="na-text">Not recorded</p>
+                {% endif %}
+            </div>
+            <div class="clinical-field">
+                <label>Diagnosis</label>
+                {% if record.diagnosis %}
+                    <p>{{ record.diagnosis }}</p>
+                {% else %}
+                    <p class="na-text">Not recorded</p>
+                {% endif %}
+            </div>
+            <div class="clinical-field">
+                <label>Treatment Plan</label>
+                {% if record.treatment_plan %}
+                    <p>{{ record.treatment_plan }}</p>
+                {% else %}
+                    <p class="na-text">Not recorded</p>
+                {% endif %}
+            </div>
+            <div class="clinical-field">
+                <label>Doctor Notes</label>
+                {% if record.doctor_notes %}
+                    <p>{{ record.doctor_notes }}</p>
+                {% else %}
+                    <p class="na-text">Not recorded</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section class="card section-card">
+        <div class="section-title"><i class="fa-solid fa-link"></i> Linked References</div>
+        <div class="info-grid">
+            <div class="info-item">
+                <label>Doctor ID</label>
+                <p>{{ record.doctor_id | default(value="—") }}</p>
+            </div>
+            <div class="info-item">
+                <label>Appointment ID</label>
+                <p>{{ record.appointment_id | default(value="—") }}</p>
+            </div>
+            <div class="info-item">
+                <label>Last Updated</label>
+                <p>{{ record.updated_at | date(format="%d %b %Y %H:%M") }}</p>
+            </div>
+        </div>
+    </section>
+
+</div><!-- /#view-mode -->
+
+<!-- EDIT MODE -->
+<div id="edit-mode" style="display:none">
+    <section class="card section-card">
+        <div class="section-title"><i class="fa-solid fa-pen"></i> Edit Record</div>
+        <form method="post" action="/medical-records/{{ record.id }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Doctor ID</label>
+                    <input type="text" name="doctor_id" value="{{ record.doctor_id | default(value='') }}">
+                </div>
+            </div>
+
+            <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 10px">Vitals</p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Blood Pressure</label>
+                    <input type="text" name="blood_pressure" placeholder="e.g. 120/80" value="{{ record.blood_pressure | default(value='') }}">
+                </div>
+                <div class="form-group">
+                    <label>Temperature (°C)</label>
+                    <input type="text" name="temperature" placeholder="e.g. 36.8" value="{{ record.temperature | default(value='') }}">
+                </div>
+                <div class="form-group">
+                    <label>Pulse Rate (bpm)</label>
+                    <input type="text" name="pulse_rate" placeholder="e.g. 72" value="{{ record.pulse_rate | default(value='') }}">
+                </div>
+                <div class="form-group">
+                    <label>Height (cm)</label>
+                    <input type="text" name="height_cm" placeholder="e.g. 170" value="{{ record.height_cm | default(value='') }}">
+                </div>
+                <div class="form-group">
+                    <label>Weight (kg)</label>
+                    <input type="text" name="weight_kg" placeholder="e.g. 65" value="{{ record.weight_kg | default(value='') }}">
+                </div>
+            </div>
+
+            <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 10px">Clinical Notes</p>
+            <div style="display:grid;gap:14px">
+                <div class="form-group">
+                    <label>Reason of Visit</label>
+                    <textarea name="reason_of_visit" placeholder="Patient's main complaint...">{{ record.reason_of_visit | default(value='') }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Clinical Findings</label>
+                    <textarea name="clinical_findings" placeholder="Physical examination findings...">{{ record.clinical_findings | default(value='') }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Diagnosis</label>
+                    <textarea name="diagnosis" placeholder="Final diagnosis...">{{ record.diagnosis | default(value='') }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Treatment Plan</label>
+                    <textarea name="treatment_plan" placeholder="Prescribed treatment...">{{ record.treatment_plan | default(value='') }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Doctor Notes</label>
+                    <textarea name="doctor_notes" placeholder="Additional clinical notes...">{{ record.doctor_notes | default(value='') }}</textarea>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:20px">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                </button>
+                <button type="button" class="btn btn-ghost" onclick="toggleEdit()">Cancel</button>
+            </div>
+        </form>
+    </section>
+</div><!-- /#edit-mode -->
+
+<details style="margin-top:8px">
+    <summary style="cursor:pointer;font-size:13px;color:var(--danger,#dc2626);font-weight:600;padding:8px 0">
+        Delete this record
+    </summary>
+    <div class="danger-zone" style="margin-top:12px">
+        <p style="margin:0 0 12px;font-size:14px">
+            This action is permanent. The medical record will be removed and cannot be recovered.
+        </p>
+        <form method="post" action="/medical-records/{{ record.id }}/delete"
+              onsubmit="return confirm('Delete this medical record? This cannot be undone.')">
+            <button type="submit" class="btn btn-danger btn-sm">
+                <i class="fa-solid fa-trash"></i> Confirm Delete
+            </button>
+        </form>
+    </div>
+</details>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+function toggleEdit() {
+    const viewMode = document.getElementById('view-mode');
+    const editMode = document.getElementById('edit-mode');
+    const isEditing = editMode.style.display !== 'none';
+    viewMode.style.display = isEditing ? 'block' : 'none';
+    editMode.style.display = isEditing ? 'none' : 'block';
+}
+</script>
+{% endblock scripts %}

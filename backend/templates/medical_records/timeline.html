@@ -1,0 +1,387 @@
+{% extends "layout.html" %}
+
+{% block title %}Patient History Timeline{% endblock title %}
+
+{% block styles %}
+<style>
+    .page-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+
+    .page-heading h1 { margin: 0 0 4px; }
+    .page-heading p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .patient-banner {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px 22px;
+        margin-bottom: 28px;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 16px;
+        align-items: center;
+    }
+
+    .patient-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--primary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .patient-info .name { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
+    .patient-info .meta { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.6; }
+    .patient-info .allergy { color: #b45309; font-weight: 600; }
+
+    /* Timeline */
+    .timeline {
+        position: relative;
+        padding-left: 36px;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 14px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--border);
+    }
+
+    .timeline-entry {
+        position: relative;
+        margin-bottom: 28px;
+    }
+
+    .timeline-entry::before {
+        content: '';
+        position: absolute;
+        left: -29px;
+        top: 18px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--primary);
+        border: 3px solid var(--background, white);
+        box-shadow: 0 0 0 2px var(--primary);
+    }
+
+    .timeline-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    .timeline-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        background: var(--surface);
+        cursor: pointer;
+        gap: 12px;
+        user-select: none;
+    }
+
+    .timeline-head:hover { background: var(--border); }
+
+    .timeline-date {
+        font-weight: 700;
+        font-size: 15px;
+    }
+
+    .timeline-summary {
+        font-size: 13px;
+        color: var(--muted);
+        flex: 1;
+    }
+
+    .timeline-head-actions { display: flex; gap: 8px; align-items: center; }
+
+    .timeline-body {
+        display: none;
+        padding: 18px;
+    }
+
+    .timeline-body.open { display: block; }
+
+    .vitals-strip {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .vital-pill {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .vital-pill span { color: var(--muted); font-weight: 400; margin-right: 4px; }
+
+    .clinical-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 14px;
+    }
+
+    .clinical-item label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 4px;
+    }
+
+    .clinical-item p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+    }
+
+    .na { color: var(--muted); font-style: italic; }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--radius); font-size: 13px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    .chevron { transition: transform .2s; }
+    .chevron.open { transform: rotate(180deg); }
+
+    .empty-timeline {
+        text-align: center;
+        padding: 64px 24px;
+        color: var(--muted);
+    }
+    .empty-timeline i { font-size: 40px; margin-bottom: 12px; display: block; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1><i class="fa-solid fa-clock-rotate-left" style="margin-right:8px;color:var(--primary)"></i>Patient History Timeline</h1>
+        <p>Chronological medical history for this patient.</p>
+    </div>
+    <div style="display:flex;gap:10px">
+        <a href="/medical-records/new?patient_id={{ patient_id }}" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> New Record
+        </a>
+        <a href="/medical-records?patient_id={{ patient_id }}" class="btn btn-ghost">
+            <i class="fa-solid fa-table-list"></i> Table View
+        </a>
+    </div>
+</div>
+
+{% if patient %}
+<div class="patient-banner">
+    <div class="patient-avatar">{{ patient.first_name | truncate(length=1, end="") }}</div>
+    <div class="patient-info">
+        <p class="name">{{ patient.first_name }} {{ patient.last_name }}</p>
+        <p class="meta">
+            NRIC: <strong>{{ patient.nric }}</strong> &nbsp;·&nbsp;
+            DOB: {{ patient.dob }} &nbsp;·&nbsp;
+            {{ patient.gender }} &nbsp;·&nbsp;
+            {{ patient.nationality }}
+        </p>
+        {% if patient.allergies %}
+        <p class="meta allergy"><i class="fa-solid fa-triangle-exclamation"></i> Allergies: {{ patient.allergies }}</p>
+        {% endif %}
+        {% if patient.conditions %}
+        <p class="meta">Conditions: {{ patient.conditions }}</p>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="card" style="margin-bottom:24px;padding:14px 18px;color:var(--muted);font-size:14px">
+    <i class="fa-solid fa-user"></i> Patient ID: <strong>{{ patient_id }}</strong>
+</div>
+{% endif %}
+
+{% if entries | length == 0 %}
+<div class="card empty-timeline">
+    <i class="fa-solid fa-file-circle-question"></i>
+    <p>No medical records found for this patient.</p>
+    <a href="/medical-records/new?patient_id={{ patient_id }}" class="btn btn-primary" style="margin-top:12px">
+        <i class="fa-solid fa-plus"></i> Create First Record
+    </a>
+</div>
+{% else %}
+<p style="font-size:13px;color:var(--muted);margin-bottom:20px">
+    {{ entries | length }} visit{% if entries | length != 1 %}s{% endif %} recorded
+    &nbsp;·&nbsp;
+    <button onclick="expandAll()" style="background:none;border:none;cursor:pointer;color:var(--primary);font-weight:600;font-size:13px;padding:0">Expand all</button>
+    &nbsp;·&nbsp;
+    <button onclick="collapseAll()" style="background:none;border:none;cursor:pointer;color:var(--primary);font-weight:600;font-size:13px;padding:0">Collapse all</button>
+</p>
+
+<div class="timeline">
+    {% for entry in entries %}
+    <div class="timeline-entry">
+        <div class="timeline-card">
+            <div class="timeline-head" onclick="toggleEntry(this)">
+                <div>
+                    <div class="timeline-date">
+                        <i class="fa-regular fa-calendar" style="margin-right:6px;color:var(--primary)"></i>
+                        {{ entry.record.recorded_at | date(format="%d %b %Y") }}
+                        <span style="font-size:13px;font-weight:400;color:var(--muted);margin-left:6px">
+                            {{ entry.record.recorded_at | date(format="%H:%M") }}
+                        </span>
+                    </div>
+                    <div class="timeline-summary">
+                        {% if entry.record.diagnosis %}
+                            {{ entry.record.diagnosis | truncate(length=80) }}
+                        {% elif entry.record.reason_of_visit %}
+                            {{ entry.record.reason_of_visit | truncate(length=80) }}
+                        {% else %}
+                            <em>No diagnosis recorded</em>
+                        {% endif %}
+                        {% if entry.doctor_name %}
+                            &nbsp;·&nbsp; Dr. {{ entry.doctor_name }}
+                        {% elif entry.record.doctor_id %}
+                            &nbsp;·&nbsp; {{ entry.record.doctor_id }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="timeline-head-actions">
+                    <a href="/medical-records/{{ entry.record.id }}" class="btn btn-ghost btn-sm"
+                       onclick="event.stopPropagation()">
+                        View
+                    </a>
+                    <i class="fa-solid fa-chevron-down chevron"></i>
+                </div>
+            </div>
+
+            <div class="timeline-body">
+                {% set r = entry.record %}
+
+                {% if r.blood_pressure or r.temperature or r.pulse_rate or r.height_cm or r.weight_kg %}
+                <div class="vitals-strip">
+                    {% if r.blood_pressure %}
+                    <div class="vital-pill"><span>BP</span>{{ r.blood_pressure }} mmHg</div>
+                    {% endif %}
+                    {% if r.temperature %}
+                    <div class="vital-pill"><span>Temp</span>{{ r.temperature }}°C</div>
+                    {% endif %}
+                    {% if r.pulse_rate %}
+                    <div class="vital-pill"><span>Pulse</span>{{ r.pulse_rate }} bpm</div>
+                    {% endif %}
+                    {% if r.height_cm %}
+                    <div class="vital-pill"><span>Height</span>{{ r.height_cm }} cm</div>
+                    {% endif %}
+                    {% if r.weight_kg %}
+                    <div class="vital-pill"><span>Weight</span>{{ r.weight_kg }} kg</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="clinical-grid">
+                    {% if r.reason_of_visit %}
+                    <div class="clinical-item">
+                        <label>Reason of Visit</label>
+                        <p>{{ r.reason_of_visit }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if r.clinical_findings %}
+                    <div class="clinical-item">
+                        <label>Clinical Findings</label>
+                        <p>{{ r.clinical_findings }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if r.diagnosis %}
+                    <div class="clinical-item">
+                        <label>Diagnosis</label>
+                        <p>{{ r.diagnosis }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if r.treatment_plan %}
+                    <div class="clinical-item">
+                        <label>Treatment Plan</label>
+                        <p>{{ r.treatment_plan }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if r.doctor_notes %}
+                    <div class="clinical-item">
+                        <label>Doctor Notes</label>
+                        <p>{{ r.doctor_notes }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if not r.reason_of_visit and not r.clinical_findings and not r.diagnosis and not r.treatment_plan and not r.doctor_notes %}
+                    <div class="clinical-item" style="grid-column:1/-1">
+                        <p class="na">No clinical notes recorded for this visit.</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if r.appointment_id %}
+                <p style="margin:14px 0 0;font-size:12px;color:var(--muted)">
+                    Appointment: <code>{{ r.appointment_id }}</code>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock content %}
+
+{% block scripts %}
+<script>
+function toggleEntry(head) {
+    const body = head.nextElementSibling;
+    const chevron = head.querySelector('.chevron');
+    const isOpen = body.classList.toggle('open');
+    chevron.classList.toggle('open', isOpen);
+}
+
+function expandAll() {
+    document.querySelectorAll('.timeline-body').forEach(b => b.classList.add('open'));
+    document.querySelectorAll('.chevron').forEach(c => c.classList.add('open'));
+}
+
+function collapseAll() {
+    document.querySelectorAll('.timeline-body').forEach(b => b.classList.remove('open'));
+    document.querySelectorAll('.chevron').forEach(c => c.classList.remove('open'));
+}
+
+// Auto-expand the most recent entry
+const first = document.querySelector('.timeline-body');
+if (first) {
+    first.classList.add('open');
+    first.previousElementSibling?.querySelector('.chevron')?.classList.add('open');
+}
+</script>
+{% endblock scripts %}
