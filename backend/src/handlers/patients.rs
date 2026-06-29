@@ -90,6 +90,7 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/api/patients/{id}", web::delete().to(delete_patient));
     cfg.route("/api/patients/{id}/history", web::get().to(get_patient_history));
     cfg.route("/api/medical-records", web::post().to(create_medical_record));
+    cfg.route("/api/medical-records/{id}", web::delete().to(delete_medical_record));
 }
 
 pub async fn patients_page(
@@ -704,6 +705,34 @@ pub async fn create_medical_record(
         Err(e) => {
             eprintln!("Failed to create medical record: {e}");
             HttpResponse::InternalServerError().body(format!("Failed to save medical record: {e}"))
+        }
+    }
+}
+
+pub async fn delete_medical_record(
+    req: HttpRequest,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_auth_and_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::EditMedicalRecords,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    let record_id = path.into_inner();
+    match supabase_db.delete_medical_record(&record_id).await {
+        Ok(_) => HttpResponse::Ok().json(json!({ "status": "deleted" })),
+        Err(e) => {
+            eprintln!("Failed to delete medical record {record_id}: {e}");
+            HttpResponse::InternalServerError().body("Failed to delete medical record.")
         }
     }
 }
