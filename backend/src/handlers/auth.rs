@@ -52,7 +52,6 @@ pub enum AppAction {
 
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/login", web::get().to(login_page));
-    cfg.route("/dashboard", web::get().to(dashboard_page));
     cfg.route("/doctor-dashboard", web::get().to(doctorDashboard_page));
     cfg.route("/staff", web::get().to(staffs_page));
     cfg.route("/appointments", web::get().to(appointments_page));
@@ -63,11 +62,18 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/api/me", web::get().to(current_user));
 }
 
-pub async fn login_page(req: HttpRequest, tera: web::Data<Tera>) -> impl Responder {
-    if is_authenticated(&req) {
-        return HttpResponse::Found()
-            .append_header(("Location", "/dashboard"))
-            .finish();
+pub async fn login_page(
+    req: HttpRequest,
+    tera: web::Data<Tera>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Ok(uid) = require_auth(&req, &firebase_auth).await {
+        if let Some(role) = get_staff_role(&firestore_db, &uid).await {
+            return HttpResponse::Found()
+                .append_header(("Location", default_landing_path(&role)))
+                .finish();
+        }
     }
 
     let mut ctx = Context::new();
@@ -85,34 +91,13 @@ pub async fn login_page(req: HttpRequest, tera: web::Data<Tera>) -> impl Respond
     render_login(&tera, ctx)
 }
 
-pub async fn dashboard_page(
-    req: HttpRequest,
-    tera: web::Data<Tera>,
-    firebase_auth: web::Data<FirebaseAuth>,
-) -> impl Responder {
-    if let Err(redirect) = require_auth(&req, &firebase_auth).await {
-        return redirect;
+fn default_landing_path(role: &str) -> &'static str {
+    match role.trim().to_lowercase().as_str() {
+        "doctor" => "/doctor-dashboard",
+        "pharmacist" => "/prescriptions",
+        _ => "/dashboard",
     }
-
-    render_template(&tera, "dashboard.html")
 }
-
-// pub async fn settings_page(
-//     req: HttpRequest,
-//     tera: web::Data<Tera>,
-//     firebase_auth: web::Data<FirebaseAuth>,
-//     firestore_db: web::Data<FirebaseRestDb>,
-// ) -> impl Responder {
-//     render_protected_page(
-//         req,
-//         tera,
-//         firebase_auth,
-//         Some(firestore_db),
-//         "Settings.html",
-//         Some(AppAction::ManageUsers),
-//     )
-//     .await
-// }
 
 pub async fn doctorDashboard_page(
     req: HttpRequest,
@@ -255,7 +240,9 @@ pub async fn create_session(
             HttpResponse::Ok()
                 .cookie(auth_cookie)
                 .cookie(role_cookie)
-                .finish()
+                .json(serde_json::json!({
+                    "redirect_to": default_landing_path(&user_role)
+                }))
         }
         Err(_) => HttpResponse::Unauthorized().body("Invalid login credentials"),
     }
@@ -271,8 +258,8 @@ pub async fn current_user(
         Err(rejection) => return rejection,
     };
 
-    let role = match get_staff_role(&firestore_db, &uid).await {
-        Some(role) => role,
+    let (name, role) = match get_staff_profile(&firestore_db, &uid).await {
+        Some(profile) => profile,
         None => {
             return HttpResponse::Forbidden().body("Access Denied: No active staff profile found.")
         }
@@ -280,6 +267,7 @@ pub async fn current_user(
 
     HttpResponse::Ok().json(serde_json::json!({
         "uid": uid,
+        "name": name,
         "role": role,
         "permissions": {
             "canViewPatients": has_permission(&role, AppAction::ViewPatient),
@@ -294,7 +282,9 @@ pub async fn current_user(
             "canCreatePrescriptions": has_permission(&role, AppAction::CreatePrescription),
             "canDispenseMedicine": has_permission(&role, AppAction::DispenseMedicine),
             "canManageMedicines": has_permission(&role, AppAction::ManageMedicines),
-            "canManageUsers": has_permission(&role, AppAction::ManageUsers)
+            "canManageUsers": has_permission(&role, AppAction::ManageUsers),
+            "canViewBilling": has_permission(&role, AppAction::ViewBilling),
+            "canGenerateBillingReport": has_permission(&role, AppAction::GenerateBillingReport)
         }
     }))
 }
@@ -357,7 +347,10 @@ pub async fn require_auth(
     }
 }
 
-pub async fn get_staff_role(firestore_db: &FirebaseRestDb, uid: &str) -> Option<String> {
+pub async fn get_staff_profile(
+    firestore_db: &FirebaseRestDb,
+    uid: &str,
+) -> Option<(String, String)> {
     let json_str = firestore_db.get_document("staff", uid).await.ok()?;
     let parsed = serde_json::from_str::<serde_json::Value>(&json_str).ok()?;
 
@@ -366,17 +359,29 @@ pub async fn get_staff_role(firestore_db: &FirebaseRestDb, uid: &str) -> Option<
         .trim()
         .to_lowercase();
 
-    let status = parsed["fields"]["status"]["stringValue"]
+    let first_name = parsed["fields"]["firstName"]["stringValue"]
         .as_str()
-        .unwrap_or("active")
-        .trim()
-        .to_lowercase();
+        .unwrap_or("")
+        .trim();
 
-    if role.is_empty() || role == "unauthorized" || status != "active" {
+    let last_name = parsed["fields"]["lastName"]["stringValue"]
+        .as_str()
+        .unwrap_or("")
+        .trim();
+
+    let name = format!("{} {}", first_name, last_name).trim().to_string();
+
+    if role.is_empty() || role == "unauthorized" {
         None
     } else {
-        Some(role)
+        Some((name, role))
     }
+}
+
+pub async fn get_staff_role(firestore_db: &FirebaseRestDb, uid: &str) -> Option<String> {
+    get_staff_profile(firestore_db, uid)
+        .await
+        .map(|(_, role)| role)
 }
 
 pub async fn require_auth_and_permission(
@@ -406,21 +411,18 @@ pub fn has_permission(role: &str, action: AppAction) -> bool {
     let normalized_role = role.trim().to_lowercase();
 
     if normalized_role == "admin" {
-        return true;
+        return !matches!(action, AppAction::ManageDoctorAppt);
     }
 
     match normalized_role.as_str() {
         "doctor" => matches!(
             action,
             AppAction::ViewPatient
-                | AppAction::ManageAppointments
                 | AppAction::ManageDoctorAppt
                 | AppAction::ViewMedicalRecords
                 | AppAction::EditMedicalRecords
                 | AppAction::ViewPrescriptions
                 | AppAction::CreatePrescription
-                | AppAction::ViewBilling
-                | AppAction::GenerateBillingReport
         ),
 
         "receptionist" => matches!(
@@ -474,7 +476,7 @@ fn render_template(tera: &Tera, template_name: &str) -> HttpResponse {
     }
 }
 
-fn insert_firebase_config(ctx: &mut Context) {
+pub fn insert_firebase_config(ctx: &mut Context) {
     ctx.insert(
         "firebase_api_key",
         &std::env::var("FIREBASE_API_KEY").unwrap_or_default(),
@@ -483,12 +485,6 @@ fn insert_firebase_config(ctx: &mut Context) {
         "firebase_project_id",
         &std::env::var("FIREBASE_PROJECT_ID").unwrap_or_default(),
     );
-}
-
-fn is_authenticated(req: &HttpRequest) -> bool {
-    req.cookie("firebase_token")
-        .map(|c| !c.value().is_empty())
-        .unwrap_or(false)
 }
 
 fn flash_message(code: &str) -> &'static str {
@@ -533,10 +529,7 @@ mod tests {
         assert!(has_permission("receptionist", AppAction::CreateInvoice));
         assert!(has_permission("receptionist", AppAction::RecordPayment));
         assert!(has_permission("receptionist", AppAction::CancelInvoice));
-        assert!(has_permission(
-            "receptionist",
-            AppAction::GenerateBillingReport
-        ));
+        assert!(has_permission("receptionist", AppAction::GenerateBillingReport));
     }
 
     #[test]
@@ -553,9 +546,9 @@ mod tests {
     }
 
     #[test]
-    fn doctor_has_read_only_billing_access() {
-        assert!(has_permission("doctor", AppAction::ViewBilling));
-        assert!(has_permission("doctor", AppAction::GenerateBillingReport));
+    fn doctor_do_not_have_any_billing_access() {
+        assert!(!has_permission("doctor", AppAction::ViewBilling));
+        assert!(!has_permission("doctor", AppAction::GenerateBillingReport));
         assert!(!has_permission("doctor", AppAction::CreateInvoice));
         assert!(!has_permission("doctor", AppAction::RecordPayment));
         assert!(!has_permission("doctor", AppAction::CancelInvoice));
@@ -575,6 +568,7 @@ mod tests {
         assert!(!has_permission("receptionist", AppAction::CreatePrescription));
         assert!(!has_permission("receptionist", AppAction::DispenseMedicine));
     }
+
     #[test]
     fn pharmacist_cannot_change_billing_records() {
         assert!(has_permission("pharmacist", AppAction::ViewBilling));
@@ -594,5 +588,10 @@ mod tests {
         ] {
             assert!(has_permission("admin", action));
         }
+    }
+
+    #[test]
+    fn admin_cannot_access_doctor_dashboard() {
+        assert!(!has_permission("admin", AppAction::ManageDoctorAppt));
     }
 }

@@ -1,15 +1,22 @@
-let appointments = [];
+let currentSelectedDate = "";
+let globalAppointments = [];
+let globalRooms = [];
 
-let activeDoctorNames = null;
-let currentSelectedDate = getTodayDate();
+async function readApiResponse(res) {
+    const text = await res.text();
 
-function getDashboardAppointments() {
-    if (activeDoctorNames === null) return appointments;
-    return appointments.filter(appointment => activeDoctorNames.includes(appointment.doctor));
+    try {
+        return text ? JSON.parse(text) : null;
+    } catch {
+        if (!res.ok) {
+            throw new Error(text || "Request failed");
+        }
+        return text;
+    }
 }
 
 const pagination = new Pagination({
-    data: getDashboardAppointments(),
+    data: [],
     rowsPerPage: 3,
     tbodyId: "appBody",
     pageInfoId: "pageInfo",
@@ -21,51 +28,115 @@ const pagination = new Pagination({
 
 function getTodayDate() {
     const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
+function formatIsoTime(isoStr) {
+    const dt = new Date(isoStr);
+    let hours = dt.getHours();
+    const minutes = String(dt.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    return `${hours}:${minutes} ${ampm}`;
+}
+
+function extractIsoDate(isoStr) {
+    return isoStr.split("T")[0];
+}
+
+function updateStatsCards() {
+    const todayAppointments = globalAppointments.length;
+
+    const patientArrived = globalAppointments.filter(app =>
+        ["Checked In", "Vitals Recorded", "In Consultation", "Completed"].includes(app.status)
+    ).length;
+
+    const pendingVitals = globalAppointments.filter(app =>
+        app.status === "Checked In"
+    ).length;
+
+    const potentialNoShow = globalAppointments.filter(app =>
+        app.status === "Scheduled"
+    ).length;
+
+    document.querySelector("#todayAppointments .number").textContent = todayAppointments;
+    document.querySelector("#patientArrived .number").textContent = patientArrived;
+    document.querySelector("#pendingViral .number").textContent = pendingVitals;
+    document.querySelector("#noshow .number").textContent = potentialNoShow;
+}
+
+async function fetchRooms() {
+    try {
+        const res = await fetch("/api/dashboard/rooms");
+        if (!res.ok) throw new Error("Failed to load rooms");
+
+        const rawRooms = await res.json();
+
+        globalRooms = rawRooms.map(row => ({
+            doctorId: row.doctor_id,
+            doctor: row.doctors?.staff?.full_name || "Unknown Doctor",
+            roomNumber: row.room || "Unassigned",
+            roomStatus: row.status || "Unavailable",
+            currentAppointmentId: row.current_appointment_id || null
+        }));
+
+        return globalRooms;
+    } catch (err) {
+        console.error(err);
+        showToast("Failed to load room data", "danger");
+        globalRooms = [];
+        return [];
+    }
 }
 
 function getTodaysDoctors() {
-    const today = getTodayDate();
-    if (activeDoctorNames !== null) return activeDoctorNames;
-
-    const todaysApps = getDashboardAppointments().filter(a => a.date === today);
+    const todaysApps = globalAppointments.filter(a => a.date === currentSelectedDate);
     return [...new Set(todaysApps.map(a => a.doctor))];
 }
 
-function getRoomStatuses() {
-    const today = getTodayDate();
-    const doctors = getTodaysDoctors();
-    const roomList = ["Room 1", "Room 2", "Room 3"];
-    const rooms = doctors.map((doc, i) => ({ doctor: doc, roomNumber: roomList[i] }));
-    while (rooms.length < 3) rooms.push({ doctor: "Unassigned", roomNumber: roomList[rooms.length] });
-
-    return rooms.map(room => {
-        const todaysApps = getDashboardAppointments().filter(a => a.date === today && a.doctor === room.doctor).sort((a, b) => a.time.localeCompare(b.time));
-        const inRoomPatient = todaysApps.find(a => a.status === "In-Room");
-        const nextApp = todaysApps.find(a => ["Scheduled", "Checked-In", "Vitals-Done"].includes(a.status));
-        return {
-            doctor: room.doctor, roomNumber: room.roomNumber, isVacant: !inRoomPatient,
-            currentPatient: inRoomPatient ? `${inRoomPatient.patient.firstName} ${inRoomPatient.patient.lastName}` : "None",
-            nextAppointment: nextApp ? `${nextApp.time} | ${nextApp.patient.firstName} ${nextApp.patient.lastName}` : "No upcoming",
-            freeGap: !inRoomPatient ? "Free slot available for Early/Walk-In" : "No available free time"
-        };
+async function loadDoctors() {
+    const doctorFilter = document.getElementById("doctorFilter");
+    doctorFilter.innerHTML = `<option value="all">All Doctors</option>`;
+    const todayStr = getTodayDate();
+    await refreshAppointmentTable(todayStr);
+    const uniqueDoctors = [...new Set(globalAppointments.map(i => i.doctor))];
+    uniqueDoctors.forEach(name => {
+        doctorFilter.innerHTML += `<option value="${name}">${name}</option>`;
     });
 }
 
-function getPatientStatus(app) {
-    switch (app.status) {
-        case "Scheduled": return { class: "badge badge-notarrive", text: "Not Arrived" };
-        case "Checked-In": return { class: "badge badge-pendingvital", text: "Pending Vitals" };
-        case "Vitals-Done": return { class: "badge badge-ready", text: "Ready for Doctor" };
-        case "In-Room": return { class: "badge badge-inroom", text: "In Consultation Room" };
-        case "Completed": return { class: "badge badge-completed", text: "Completed" };
-        case "No-Show": return { class: "badge badge-noshow", text: "No Show" };
-        case "Cancelled": return { class: "badge badge-cancelled", text: "Cancelled" };
-        default: return { class: "badge", text: app.status };
-    }
+function getRoomStatuses() {
+    const todaysApps = globalAppointments.filter(a => a.date === currentSelectedDate);
+
+    return globalRooms.map(room => {
+        const roomApps = todaysApps
+            .filter(a => a.doctorId === room.doctorId)
+            .sort((a, b) => new Date(a.raw.scheduled_at) - new Date(b.raw.scheduled_at));
+
+        const currentApp =
+            roomApps.find(a => a.appointmentId === room.currentAppointmentId) ||
+            roomApps.find(a => a.status === "In Consultation");
+
+        const nextApp = roomApps.find(a =>
+            ["Scheduled", "Checked In", "Vitals Recorded"].includes(a.status)
+        );
+
+        return {
+            doctorId: room.doctorId,
+            doctor: room.doctor,
+            roomNumber: room.roomNumber,
+            roomStatus: currentApp,
+            currentPatient: currentApp
+                ? `${currentApp.patient.firstName} ${currentApp.patient.lastName}`
+                : "None",
+            nextAppointment: nextApp
+                ? `${nextApp.time} | ${nextApp.patient.firstName} ${nextApp.patient.lastName}`
+                : "No upcoming"
+        };
+    });
 }
 
 function renderRoomTable() {
@@ -76,128 +147,197 @@ function renderRoomTable() {
     rooms.forEach(room => {
         const row = document.createElement("tr");
         row.dataset.doc = room.doctor;
-        row.dataset.roomvacant = room.isVacant;
+        row.dataset.roomStatus = room.roomStatus;
 
         row.innerHTML = `
             <td>${room.doctor}</td>
             <td>${room.roomNumber}</td>
-            <td><span class="${room.isVacant ? 'tag-vacant' : 'tag-occupied'}">${room.isVacant ? 'VACANT' : 'OCCUPIED'}</span></td>
+            <td><span class="${room.roomStatus ? 'tag-occupied' : 'tag-vacant'}">${room.roomStatus ? 'OCCUPIED' : 'VACANT'}</span></td>
             <td>${room.currentPatient}</td>
             <td>${room.nextAppointment}</td>
-            <td>${room.freeGap}</td>
         `;
         roomTableBody.appendChild(row);
     });
 }
 
+function getPatientStatus(app) {
+    switch (app.status) {
+        case "Scheduled": return { class: "badge badge-notarrive", text: "Not Arrived" };
+        case "Checked In": return { class: "badge badge-pendingvital", text: "Pending Vitals" };
+        case "Vitals Recorded": return { class: "badge badge-ready", text: "Ready for Doctor" };
+        case "In Consultation": return { class: "badge badge-inroom", text: "In Consultation" };
+        case "Completed": return { class: "badge badge-completed", text: "Completed" };
+        case "No Show": return { class: "badge badge-noshow", text: "No Show" };
+        case "Cancelled": return { class: "badge badge-cancelled", text: "Cancelled" };
+        default: return { class: "badge", text: app.status };
+    }
+}
+
+async function fetchAppointmentsByDate(dateStr) {
+    try {
+        const res = await fetch(`/api/dashboard/appointments?date=${dateStr}`);
+        if (!res.ok) throw new Error("Failed to load appointments");
+        const rawList = await res.json();
+        globalAppointments = rawList.map(row => {
+            return {
+                appointmentId: row.id,
+                doctorId: row.doctor_id,
+                date: extractIsoDate(row.scheduled_at),
+                time: formatIsoTime(row.scheduled_at),
+                status: row.status,
+                priority: row.reason || "Normal",
+                room: row.doctors?.room || "Unassigned",
+                roomStatus: row.doctors?.room_status?.[0]?.status || "Available",
+                currentAppointmentId: row.doctors?.room_status?.[0]?.current_appointment_id || null,
+                doctor: row.doctors?.staff?.full_name || "Unknown Doctor",
+                patient: {
+                    firstName: row.patients?.first_name || "",
+                    lastName: row.patients?.last_name || "",
+                    id: row.patients?.id || ""
+                },
+                raw: row
+            };
+        });
+        return globalAppointments;
+    } catch (err) {
+        console.error(err);
+        showToast("Failed to load appointment data", "danger");
+        return [];
+    }
+}
+
 function renderAppointmentRow(app, index) {
     const status = getPatientStatus(app);
     const fullName = `${app.patient.firstName} ${app.patient.lastName}`;
-    const isToday = app.date === getTodayDate();
-    const isArrived = ["Checked-In", "Vitals-Done", "In-Room"].includes(app.status);
-    const canEnterVitals = app.status === "Checked-In";
-    const canSendRoom = app.status === "Vitals-Done";
+    const todayStr = getTodayDate();
+    const isToday = app.date === todayStr;
+    const isArrived = ["Checked In", "Vitals Recorded", "In Consultation", "Completed"].includes(app.status);
+    const canEnterVitals = app.status === "Checked In";
+    const canSendRoom = app.status === "Vitals Recorded" && app.roomStatus === "Available";
 
     let html = `
-    <tr data-doctor="${app.doctor}" data-status="${app.status}">
-        <td>${fullName}</td>
-        <td>${app.doctor}</td>
-        <td>${app.time}</td>`;
+        <tr data-doctor="${app.doctor}" data-status="${app.status}" data-app-id="${app.appointmentId}">
+            <td>${fullName}</td>
+            <td>${app.doctor}</td>
+            <td>${app.time}</td>`;
 
     if (isToday) {
         html += `
         <td><span class="${status.class}">${status.text}</span></td>
         <td class="action">
             <div class="has-tooltip">
-                <button class="btn btn-arrive ${isArrived ? 'disabled' : ''}" ${isArrived ? 'disabled' : ''} onclick="confirmArrive('${fullName}')"><i class="fa-solid fa-user-check"></i></button>
+                <button class="btn btn-arrive ${isArrived ? 'disabled' : ''}" ${isArrived ? 'disabled' : ''} onclick="handleMarkArrive('${app.appointmentId}', '${fullName}')"><i class="fa-solid fa-user-check"></i></button>
                 <span class="tooltip-text">Arrive</span>
             </div>
             <div class="has-tooltip">
-                <button class="btn btn-vitals ${!canEnterVitals ? 'disabled' : ''}" ${!canEnterVitals ? 'disabled' : ''} onclick="openVital('${fullName}')"><i class="fa-solid fa-file-waveform"></i></button>
+                <button class="btn btn-vitals ${!canEnterVitals ? 'disabled' : ''}" onclick="openVital('${fullName}', '${app.appointmentId}')"><i class="fa-solid fa-file-waveform"></i></button>
                 <span class="tooltip-text">Enter Vitals</span>
             </div>
             <div class="has-tooltip">
-                <button class="btn btn-sendRoom ${!canSendRoom ? 'disabled' : ''}" ${!canSendRoom ? 'disabled' : ''} onclick="sendToRoom('${fullName}')"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
+                <button class="btn btn-sendRoom ${!canSendRoom ? 'disabled' : ''}" onclick="sendToRoom('${app.appointmentId}', '${fullName}', '${app.doctorId}')"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
                 <span class="tooltip-text">Send to room</span>
             </div>
         </td>`;
     } else {
-        html += `<td><span class="${status.class}">${status.text}</span></td><td class="action"></td>`;
+        html += `<td><span class="${status.class}">${status.text}</td><td class="action"></td>`;
     }
 
     html += `</tr>`;
     return html;
 }
 
-function refreshAppointmentTable(selectedDate) {
-    currentSelectedDate = selectedDate;
-    const filtered = getDashboardAppointments().filter(p => p.date === selectedDate);
+async function apiMarkArrived(appointmentId) {
+    try {
+        const res = await fetch("/api/dashboard/mark-arrived", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ appointment_id: appointmentId })
+        });
 
-    // Update pagination data
-    pagination.data = filtered;
+        const data = await readApiResponse(res);
+
+        if (!res.ok) {
+            throw new Error(data || "Check-in failed");
+        }
+
+        showToast("Patient marked arrived successfully!", "success");
+        await fetchRooms();
+        await refreshAppointmentTable(currentSelectedDate);
+        renderRoomTable();
+    } catch (err) {
+        showToast(err.message, "danger");
+    }
+}
+
+async function apiSaveVitals(appointmentId, vitalsPayload) {
+    try {
+        const res = await fetch("/api/dashboard/save-vitals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                appointment_id: appointmentId,
+                bp: vitalsPayload.bp,
+                temp: Number(vitalsPayload.temp),
+                pulse: Number(vitalsPayload.pulse),
+                height: Number(vitalsPayload.height),
+                weight: Number(vitalsPayload.weight)
+            })
+        });
+        const data = await readApiResponse(res);
+
+        if (!res.ok) {
+            throw new Error(data || "Save failed");
+        }
+        showToast("Vitals saved, patient ready for doctor!", "success");
+        await fetchRooms();
+        await refreshAppointmentTable(currentSelectedDate);
+        renderRoomTable();
+    } catch (err) {
+        showToast(err.message, "danger");
+    }
+}
+
+async function refreshAppointmentTable(selectedDateStr) {
+    currentSelectedDate = selectedDateStr;
+    await fetchAppointmentsByDate(selectedDateStr);
+
+    pagination.data = globalAppointments;
     pagination.currentPage = 1;
     pagination.renderTable();
-    updateDashboardMetrics();
-}
 
-function findAppointmentByName(fullName) {
-    return getDashboardAppointments().find(a => `${a.patient.firstName} ${a.patient.lastName}` === fullName);
-}
-
-function confirmArrive(patientName) {
-    const app = findAppointmentByName(patientName);
-    if (app) app.status = "Checked-In";
-    refreshAppointmentTable(getTodayDate());
-    renderRoomTable();
-}
-
-function openVital(name) {
-    document.getElementById("currentPatientName").textContent = name;
-    const app = findAppointmentByName(name);
-    if (app?.vitals) {
-        document.getElementById("bp").value = app.vitals.bp || "";
-        document.getElementById("temp").value = app.vitals.temp || "";
-        document.getElementById("pulse").value = app.vitals.pulse || "";
-        document.getElementById("height").value = app.vitals.height || "";
-        document.getElementById("weight").value = app.vitals.weight || "";
+    if (globalAppointments.length === 0) {
+        document.getElementById("appBody").innerHTML =
+            `<tr><td colspan="5" class="empty-row">No appointments found for this date.</td></tr>`;
     }
+}
+
+async function handleMarkArrive(appointmentId, patientName) {
+    await apiMarkArrived(appointmentId);
+}
+
+let activeVitalAppId = "";
+function openVital(patientName, appId) {
+    activeVitalAppId = appId;
+    document.getElementById("currentPatientName").textContent = patientName;
+    // Clear vital form inputs
+    document.getElementById("bp").value = "";
+    document.getElementById("temp").value = "";
+    document.getElementById("pulse").value = "";
+    document.getElementById("height").value = "";
+    document.getElementById("weight").value = "";
     openModal('vitalModal');
 }
 
-function saveVital() {
-    const pName = document.getElementById("currentPatientName").textContent;
-    const app = findAppointmentByName(pName);
-    if (app) {
-        app.status = "Vitals-Done";
-        app.vitals = {
-            bp: document.getElementById("bp").value,
-            temp: document.getElementById("temp").value,
-            pulse: document.getElementById("pulse").value,
-            height: document.getElementById("height").value,
-            weight: document.getElementById("weight").value
-        };
-        showToast("Vitals saved!", "success");
-    }
-    refreshAppointmentTable(getTodayDate());
-    renderRoomTable();
-    return true;
-}
-
-function sendToRoom(patientName) {
-    const app = findAppointmentByName(patientName);
-    if (!app) return;
-
-    const rooms = getRoomStatuses();
-    const room = rooms.find(r => r.doctor === app.doctor);
-    if (!room || !room.isVacant) {
-        showToast("Room is occupied!", "danger");
-        return;
-    }
-
-    app.status = "In-Room";
-    showToast(`${patientName} sent to room!`, "success");
-    refreshAppointmentTable(getTodayDate());
-    renderRoomTable();
+async function saveVital() {
+    const patientName = document.getElementById("currentPatientName").textContent;
+    const payload = {
+        bp: document.getElementById("bp").value,
+        temp: document.getElementById("temp").value,
+        pulse: document.getElementById("pulse").value,
+        height: document.getElementById("height").value,
+        weight: document.getElementById("weight").value
+    };
+    await apiSaveVitals(activeVitalAppId, payload);
 }
 
 function applyAllFiltersAndRefresh() {
@@ -205,9 +345,13 @@ function applyAllFiltersAndRefresh() {
     const selectedDoctor = document.getElementById("doctorFilter").value;
     const selectedStatus = document.getElementById("statusFilter").value;
 
-    let filtered = getDashboardAppointments().filter(item => item.date === currentSelectedDate);
+    let filtered = globalAppointments.filter(p => p.date === currentSelectedDate);
 
-    // Search by patient name / doctor name
+    if (filtered.length === 0) {
+        document.getElementById("appBody").innerHTML =
+            `<tr><td colspan="5" class="empty-row">No appointments found for this date.</td></tr>`;
+    }
+
     if (searchKeyword) {
         filtered = filtered.filter(item => {
             const fullName = `${item.patient.firstName} ${item.patient.lastName}`.toLowerCase();
@@ -216,21 +360,17 @@ function applyAllFiltersAndRefresh() {
         });
     }
 
-    // Doctor filter
     if (selectedDoctor !== "all") {
         filtered = filtered.filter(item => item.doctor === selectedDoctor);
     }
 
-    // Status filter
     if (selectedStatus !== "all") {
         filtered = filtered.filter(item => item.status === selectedStatus);
     }
 
-    // Update pagination
     pagination.data = filtered;
     pagination.currentPage = 1;
     pagination.renderTable();
-    updateDashboardMetrics();
 }
 
 function initFilters() {
@@ -243,75 +383,52 @@ function initFilters() {
     status.addEventListener("change", applyAllFiltersAndRefresh);
 }
 
+async function apiSendToRoom(appointmentId, doctorId) {
+    const res = await fetch("/api/dashboard/send-to-room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            appointment_id: appointmentId,
+            doctor_id: doctorId
+        })
+    });
 
-async function loadDashboardAppointments() {
+    const data = await readApiResponse(res);
+
+    if (!res.ok) {
+        throw new Error(data || "Send to room failed");
+    }
+}
+
+async function sendToRoom(appointmentId, patientName, doctorId) {
     try {
-        const response = await fetch("/api/doctor-dashboard/appointments", {
-            headers: { Accept: "application/json" },
-        });
-        if (!response.ok) throw new Error(`Dashboard API returned ${response.status}`);
-        appointments = await response.json();
-    } catch (error) {
-        console.warn("Could not load dashboard appointments:", error);
-        appointments = [];
-        if (typeof showToast === "function") {
-            showToast("Dashboard appointments could not be loaded", "error");
-        }
+        await apiSendToRoom(appointmentId, doctorId);
+        showToast(`${patientName} sent to consultation room`, "success");
+        await fetchRooms();
+        await refreshAppointmentTable(currentSelectedDate);
+        renderRoomTable();
+    } catch (err) {
+        showToast(err.message, "danger");
     }
-}
-
-function setDashboardMetric(cardId, value) {
-    const number = document.querySelector(`#${cardId} .number`);
-    if (number) number.textContent = value;
-}
-
-function updateDashboardMetrics() {
-    const today = getTodayDate();
-    const todaysAppointments = getDashboardAppointments().filter(app => app.date === today);
-    const arrivedStatuses = ["Checked-In", "Vitals-Done", "In-Room", "Completed"];
-
-    setDashboardMetric("todayAppointments", todaysAppointments.length);
-    setDashboardMetric("patientArrived", todaysAppointments.filter(app => arrivedStatuses.includes(app.status)).length);
-    setDashboardMetric("pendingViral", todaysAppointments.filter(app => app.status === "Checked-In").length);
-    setDashboardMetric("noshow", todaysAppointments.filter(app => app.status === "No-Show").length);
-}
-async function loadDoctors() {
-    const doctorFilter = document.getElementById("doctorFilter");
-
-    try {
-        const response = await fetch("/api/doctors");
-        if (!response.ok) throw new Error(`Doctor API returned ${response.status}`);
-
-        const doctors = await response.json();
-        activeDoctorNames = doctors.map(doctor => doctor.name).filter(Boolean);
-    } catch (error) {
-        console.warn("Could not load doctors from backend:", error);
-        activeDoctorNames = [];
-    }
-
-    if (doctorFilter) {
-        doctorFilter.innerHTML = `<option value="all">All Doctors</option>`;
-        activeDoctorNames.forEach(name => {
-            doctorFilter.innerHTML += `<option value="${name}">${name}</option>`;
-        });
-    }
-
-    pagination.data = getDashboardAppointments().filter(item => item.date === currentSelectedDate);
-    pagination.currentPage = 1;
-    pagination.renderTable();
-    updateDashboardMetrics();
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+    const todayStr = getTodayDate();
+    currentSelectedDate = todayStr;
+    await fetchRooms();
     await loadDoctors();
-    await loadDashboardAppointments();
-    updateDashboardMetrics();
     renderRoomTable();
     initFilters();
+    updateStatsCards();
     flatpickr("#fullCalendar", {
-        inline: true, dateFormat: "Y-m-d", defaultDate: getTodayDate(),
-        onChange: (_, dateStr) => refreshAppointmentTable(dateStr)
+        inline: true,
+        dateFormat: "Y-m-d",
+        defaultDate: todayStr,
+        onChange: async (_, dateStr) => {
+            await fetchRooms();
+            await refreshAppointmentTable(dateStr);
+            renderRoomTable();
+        }
     });
-    refreshAppointmentTable(getTodayDate());
+    await refreshAppointmentTable(todayStr);
 });
-

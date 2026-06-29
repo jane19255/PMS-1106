@@ -1,7 +1,8 @@
-use super::models::{DashboardAppointment, DashboardPatient};
-use chrono::{DateTime, Timelike, Utc};
+use super::models::DoctorQueueAppointment;
+use chrono::{DateTime, NaiveDate, Timelike, Utc};
 use reqwest::{Client, Response};
 use serde::Deserialize;
+use serde_json::{json, Value};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -14,15 +15,35 @@ pub enum RepositoryError {
 }
 
 pub trait DoctorDashboardRepository: Send + Sync {
-    fn list_appointments(&self) -> RepositoryFuture<'_, Vec<DashboardAppointment>>;
+    fn list_appointments(
+        &self,
+        firebase_uid: &str,
+        date: NaiveDate,
+    ) -> RepositoryFuture<'_, Vec<DoctorQueueAppointment>>;
+
+    fn start_consultation(&self, appointment_id: &str) -> RepositoryFuture<'_, ()>;
+
+    fn complete_consultation(&self, appointment_id: &str) -> RepositoryFuture<'_, ()>;
 }
 
 #[derive(Default)]
 pub struct InMemoryDoctorDashboardRepository;
 
 impl DoctorDashboardRepository for InMemoryDoctorDashboardRepository {
-    fn list_appointments(&self) -> RepositoryFuture<'_, Vec<DashboardAppointment>> {
+    fn list_appointments(
+        &self,
+        _firebase_uid: &str,
+        _date: NaiveDate,
+    ) -> RepositoryFuture<'_, Vec<DoctorQueueAppointment>> {
         Box::pin(async { Ok(Vec::new()) })
+    }
+
+    fn start_consultation(&self, _appointment_id: &str) -> RepositoryFuture<'_, ()> {
+        Box::pin(async { Ok(()) })
+    }
+
+    fn complete_consultation(&self, _appointment_id: &str) -> RepositoryFuture<'_, ()> {
+        Box::pin(async { Ok(()) })
     }
 }
 
@@ -45,6 +66,7 @@ impl SupabaseDoctorDashboardRepository {
         let builder = builder
             .header("apikey", &self.key)
             .header("Content-Type", "application/json");
+
         if self.key.starts_with("eyJ") {
             builder.header("Authorization", format!("Bearer {}", self.key))
         } else {
@@ -52,22 +74,92 @@ impl SupabaseDoctorDashboardRepository {
         }
     }
 
-    fn appointments_url(&self) -> String {
-        let select = "id,scheduled_at,reason,status,patient:patient_id(id,first_name,last_name,dob,gender,phone,email),doctor:doctor_id(id,room,staff:staff_id(full_name))";
+    fn staff_doctor_url(&self, firebase_uid: &str) -> String {
         format!(
-            "{}/rest/v1/appointments?select={}&order=scheduled_at.asc",
-            self.url, select
+            "{}/rest/v1/doctors?select=id,staff!inner(firebase_uid)&staff.firebase_uid=eq.{}&limit=1",
+            self.url,
+            urlencoding::encode(firebase_uid)
         )
     }
 
-    async fn decode_rows(response: Response) -> Result<Vec<DatabaseAppointment>, RepositoryError> {
+    fn appointments_url(&self, doctor_id: &str, date: NaiveDate) -> String {
+        let next_day = date.succ_opt().unwrap_or(date);
+        let select = "id,patient_id,scheduled_at,patients(id,first_name,last_name),patient_queue(status)";
+
+        format!(
+            "{}/rest/v1/appointments?select={}&doctor_id=eq.{}&scheduled_at=gte.{}T00:00:00Z&scheduled_at=lt.{}T00:00:00Z&order=scheduled_at.asc",
+            self.url,
+            select,
+            urlencoding::encode(doctor_id),
+            date,
+            next_day
+        )
+    }
+
+    fn appointment_patch_url(&self, appointment_id: &str) -> String {
+        format!(
+            "{}/rest/v1/appointments?id=eq.{}",
+            self.url,
+            urlencoding::encode(appointment_id)
+        )
+    }
+
+    fn queue_patch_url(&self, appointment_id: &str) -> String {
+        format!(
+            "{}/rest/v1/patient_queue?appointment_id=eq.{}",
+            self.url,
+            urlencoding::encode(appointment_id)
+        )
+    }
+
+    fn room_patch_url(&self, appointment_id: &str) -> String {
+        format!(
+            "{}/rest/v1/room_status?current_appointment_id=eq.{}",
+            self.url,
+            urlencoding::encode(appointment_id)
+        )
+    }
+
+    async fn decode_doctor_id(response: Response) -> Result<String, RepositoryError> {
         if !response.status().is_success() {
             return Err(Self::response_error(response).await);
         }
-        response
-            .json::<Vec<DatabaseAppointment>>()
+
+        let rows = response
+            .json::<Vec<DoctorIdRow>>()
             .await
-            .map_err(|_| RepositoryError::StorageUnavailable)
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+        rows.first()
+            .map(|row| row.id.clone())
+            .ok_or(RepositoryError::StorageUnavailable)
+    }
+
+        async fn decode_appointments(
+            response: Response,
+        ) -> Result<Vec<DatabaseAppointment>, RepositoryError> {
+            if !response.status().is_success() {
+                return Err(Self::response_error(response).await);
+            }
+
+            let body = response
+                .text()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            serde_json::from_str::<Vec<DatabaseAppointment>>(&body).map_err(|error| {
+                eprintln!("Doctor dashboard decode error: {error}");
+                eprintln!("Doctor dashboard response body: {body}");
+                RepositoryError::StorageUnavailable
+            })
+        }
+
+    async fn ensure_success(response: Response) -> Result<(), RepositoryError> {
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(Self::response_error(response).await)
+        }
     }
 
     async fn response_error(response: Response) -> RepositoryError {
@@ -79,103 +171,163 @@ impl SupabaseDoctorDashboardRepository {
 }
 
 impl DoctorDashboardRepository for SupabaseDoctorDashboardRepository {
-    fn list_appointments(&self) -> RepositoryFuture<'_, Vec<DashboardAppointment>> {
+    fn list_appointments(
+        &self,
+        firebase_uid: &str,
+        date: NaiveDate,
+    ) -> RepositoryFuture<'_, Vec<DoctorQueueAppointment>> {
+        let firebase_uid = firebase_uid.to_string();
+
         Box::pin(async move {
-            let response = self
-                .request(self.client.get(self.appointments_url()))
+            let doctor_response = self
+                .request(self.client.get(self.staff_doctor_url(&firebase_uid)))
                 .send()
                 .await
                 .map_err(|_| RepositoryError::StorageUnavailable)?;
-            let rows = Self::decode_rows(response).await?;
-            Ok(rows.into_iter().map(DashboardAppointment::from).collect())
+
+            let doctor_id = Self::decode_doctor_id(doctor_response).await?;
+
+            let appointment_response = self
+                .request(self.client.get(self.appointments_url(&doctor_id, date)))
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            let rows = Self::decode_appointments(appointment_response).await?;
+
+            Ok(rows.into_iter().map(DoctorQueueAppointment::from).collect())
+        })
+    }
+
+    fn start_consultation(&self, appointment_id: &str) -> RepositoryFuture<'_, ()> {
+        let appointment_id = appointment_id.to_string();
+
+        Box::pin(async move {
+            let payload = json!({
+                "status": "In Consultation",
+                "updated_at": Utc::now().to_rfc3339()
+            });
+
+            let response = self
+                .request(self.client.patch(self.queue_patch_url(&appointment_id)))
+                .header("Prefer", "return=minimal")
+                .json(&payload)
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            Self::ensure_success(response).await
+        })
+    }
+
+    fn complete_consultation(&self, appointment_id: &str) -> RepositoryFuture<'_, ()> {
+        let appointment_id = appointment_id.to_string();
+
+        Box::pin(async move {
+            let now = Utc::now().to_rfc3339();
+
+            let appointment_payload = json!({
+                "status": "Completed",
+                "updated_at": now
+            });
+
+            let appointment_response = self
+                .request(self.client.patch(self.appointment_patch_url(&appointment_id)))
+                .header("Prefer", "return=minimal")
+                .json(&appointment_payload)
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            Self::ensure_success(appointment_response).await?;
+
+            let queue_payload = json!({
+                "status": "Completed",
+                "completed_at": now,
+                "updated_at": now
+            });
+
+            let queue_response = self
+                .request(self.client.patch(self.queue_patch_url(&appointment_id)))
+                .header("Prefer", "return=minimal")
+                .json(&queue_payload)
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            Self::ensure_success(queue_response).await?;
+
+            let room_payload = json!({
+                "status": "Available",
+                "current_appointment_id": null,
+                "updated_at": now
+            });
+
+            let room_response = self
+                .request(self.client.patch(self.room_patch_url(&appointment_id)))
+                .header("Prefer", "return=minimal")
+                .json(&room_payload)
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            Self::ensure_success(room_response).await
         })
     }
 }
 
 #[derive(Deserialize)]
+struct DoctorIdRow {
+    id: String,
+}
+
+#[derive(Deserialize)]
 struct DatabaseAppointment {
     id: String,
+    patient_id: String,
     scheduled_at: DateTime<Utc>,
-    reason: String,
-    status: String,
-    patient: DatabasePatient,
-    doctor: DatabaseDoctor,
+    patients: DatabasePatient,
+    patient_queue: Option<Value>,
 }
 
 #[derive(Deserialize)]
 struct DatabasePatient {
-    id: String,
     first_name: String,
     last_name: String,
-    dob: String,
-    gender: String,
-    phone: String,
-    email: String,
 }
 
-#[derive(Deserialize)]
-struct DatabaseDoctor {
-    room: Option<String>,
-    staff: Option<DatabaseDoctorStaff>,
-}
-
-#[derive(Deserialize)]
-struct DatabaseDoctorStaff {
-    full_name: String,
-}
-
-impl From<DatabaseAppointment> for DashboardAppointment {
+impl From<DatabaseAppointment> for DoctorQueueAppointment {
     fn from(row: DatabaseAppointment) -> Self {
-        let doctor_name = row
-            .doctor
-            .staff
-            .map(|staff| staff.full_name)
-            .unwrap_or_else(|| "Unassigned doctor".to_string());
-        let reason = row.reason.trim().to_string();
+        let queue_status = queue_status_from_value(row.patient_queue.as_ref());
 
-        Self {
+        DoctorQueueAppointment {
             appointment_id: row.id,
-            priority: priority_from_reason(&reason),
-            doctor: doctor_name,
-            date: row.scheduled_at.format("%Y-%m-%d").to_string(),
-            time: format_time(row.scheduled_at),
-            room: row.doctor.room.unwrap_or_default(),
-            appointment_type: if reason.is_empty() { "Consultation".to_string() } else { reason.clone() },
-            referring_provider: String::new(),
-            special_requirements: Vec::new(),
-            status: dashboard_status(&row.status),
-            patient: DashboardPatient {
-                id: row.patient.id,
-                first_name: row.patient.first_name,
-                last_name: row.patient.last_name,
-                dob: row.patient.dob,
-                gender: row.patient.gender,
-                phone: row.patient.phone,
-                email: row.patient.email,
-            },
+            patient_id: row.patient_id,
+            patient_name: format!("{} {}", row.patients.first_name, row.patients.last_name)
+                .trim()
+                .to_string(),
+            appointment_time: format_time(row.scheduled_at),
+            queue_status,
         }
     }
 }
 
-fn priority_from_reason(reason: &str) -> String {
-    let normalized = reason.to_lowercase();
-    if normalized.contains("emergency") {
-        "Emergency".to_string()
-    } else if normalized.contains("urgent") {
-        "Urgent".to_string()
-    } else if normalized.contains("follow") {
-        "Follow-up".to_string()
-    } else {
-        "Normal".to_string()
-    }
-}
+fn queue_status_from_value(value: Option<&Value>) -> String {
+    match value {
+        Some(Value::Array(rows)) => rows
+            .first()
+            .and_then(|row| row.get("status"))
+            .and_then(Value::as_str)
+            .unwrap_or("Not Checked In")
+            .to_string(),
 
-fn dashboard_status(status: &str) -> String {
-    match status.trim() {
-        "Checked In" => "Checked-In".to_string(),
-        "In Consultation" => "In-Room".to_string(),
-        "No Show" => "No-Show".to_string(),
-        other => other.to_string(),
+        Some(Value::Object(row)) => row
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("Not Checked In")
+            .to_string(),
+
+        _ => "Not Checked In".to_string(),
     }
 }
 
@@ -187,26 +339,6 @@ fn format_time(value: DateTime<Utc>) -> String {
         0 => 12,
         other => other,
     };
+
     format!("{hour_12}:{minute:02} {suffix}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{dashboard_status, priority_from_reason};
-
-    #[test]
-    fn maps_supabase_status_for_dashboard_badges() {
-        assert_eq!(dashboard_status("Checked In"), "Checked-In");
-        assert_eq!(dashboard_status("In Consultation"), "In-Room");
-        assert_eq!(dashboard_status("No Show"), "No-Show");
-        assert_eq!(dashboard_status("Completed"), "Completed");
-    }
-
-    #[test]
-    fn derives_priority_from_reason() {
-        assert_eq!(priority_from_reason("Emergency review"), "Emergency");
-        assert_eq!(priority_from_reason("urgent referral"), "Urgent");
-        assert_eq!(priority_from_reason("Follow up"), "Follow-up");
-        assert_eq!(priority_from_reason("Routine checkup"), "Normal");
-    }
 }

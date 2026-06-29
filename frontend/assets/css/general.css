@@ -353,6 +353,20 @@ input.password+i {
     color: var(--danger);
 }
 
+.toast.loader.show {
+    animation: none;
+}
+
+.toast.loader .fa-spinner {
+    color: var(--primary);
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 @-webkit-keyframes fadein {
     from {
         top: 0;
