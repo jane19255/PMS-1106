@@ -22,16 +22,30 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
+        const name = document.getElementById('currentUserName');
         const role = document.getElementById('currentUserRole');
-        if (role) {
+
+        if (name || role) {
             fetch('/api/me')
                 .then(response => response.ok ? response.json() : null)
                 .then(user => {
-                    if (user?.role) {
+                    if (name && user?.name) {
+                        name.textContent = user.name;
+                    }
+
+                    if (role && user?.role) {
                         role.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
                     }
+
+                    document.querySelectorAll("[data-permission]").forEach(link => {
+                        const permission = link.dataset.permission;
+
+                        if (!user?.permissions?.[permission]) {
+                            link.style.display = "none";
+                        }
+                    });
                 })
-                .catch(() => {});
+                .catch(() => { });
         }
     };
 

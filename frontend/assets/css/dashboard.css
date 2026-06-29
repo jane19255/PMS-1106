@@ -37,7 +37,8 @@ main {
     border-radius: var(--radius);
 }
 
-.tag-vacant {
+.tag-vacant,
+.badge-inroom {
     background-color: rgb(from var(--primary) r g b / 10%);
     color: var(--primary);
 }

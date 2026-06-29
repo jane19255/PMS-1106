@@ -25,7 +25,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="/assets/js/FirebaseService.js"></script>
   <script src="/assets/js/general.js"></script>
-  <script src="/assets/js/dashbaord-admin.js?v=dashboard-api-1"></script>
+  <script src="/assets/js/dashbaord-admin.js"></script>
 </head>
 
 <body>
@@ -36,7 +36,7 @@
       <div class="card" id="todayAppointments">
         <div class="details">
           <div class="data">Today's Appointments</div>
-          <div class="number">32</div>
+          <div class="number">0</div>
         </div>
         <div class="icon"><i class="fas fa-calendar-check"></i></div>
       </div>
@@ -44,7 +44,7 @@
       <div class="card" id="patientArrived">
         <div class="details">
           <div class="data">Patient Arrived</div>
-          <div class="number">15</div>
+          <div class="number">0</div>
         </div>
         <div class="icon"><i class="fa-solid fa-user-check"></i></div>
       </div>
@@ -52,7 +52,7 @@
       <div class="card" id="pendingViral">
         <div class="details">
           <div class="data">Pending Viral Entry</div>
-          <div class="number">6</div>
+          <div class="number">0</div>
         </div>
         <div class="icon"><i class="fa-solid fa-circle-exclamation"></i></div>
       </div>
@@ -60,7 +60,7 @@
       <div class="card" id="noshow">
         <div class="details">
           <div class="data">Potential No-Show</div>
-          <div class="number">2</div>
+          <div class="number">0</div>
         </div>
         <div class="icon"><i class="fa-solid fa-phone"></i></div>
       </div>
@@ -76,7 +76,6 @@
               <th>Current Room Status</th>
               <th>Patient Inside Room</th>
               <th>Next Scheduled Appointment</th>
-              <th>Available Free Gap</th>
             </tr>
           </thead>
 
@@ -106,11 +105,11 @@
             <select id="statusFilter">
               <option value="all">All Status</option>
               <option value="Scheduled">Scheduled</option>
-              <option value="Checked-In">Checked-In</option>
-              <option value="Vitals-Done">Vitals-Done</option>
-              <option value="In-Room">In-Room</option>
+              <option value="Checked In">Checked In</option>
+              <option value="Vitals Recorded">Vitals Recorded</option>
+              <option value="In Consultation">In Consultation</option>
               <option value="Completed">Completed</option>
-              <option value="No-Show">No-Show</option>
+              <option value="No Show">No Show</option>
               <option value="Cancelled">Cancelled</option>
             </select>
           </div>
@@ -206,4 +205,3 @@
 </body>
 
 </html>
-

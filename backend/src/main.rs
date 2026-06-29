@@ -1,6 +1,7 @@
 mod billing;
 mod db;
 mod doctors;
+mod admindashboard;
 mod doctor_dashboard;
 mod handlers;
 mod models;

@@ -1,6 +1,7 @@
 use crate::appointments::handlers as appointment_handlers;
 use crate::billing::handlers as billing_handlers;
 use crate::doctors::handlers as doctor_handlers;
+use crate::admindashboard::handlers as admindashboard_handlers;
 use crate::doctor_dashboard::handlers as doctor_dashboard_handlers;
 use crate::handlers::{auth, patients};
 use crate::prescriptions::handlers as prescription_handlers;
@@ -18,6 +19,8 @@ pub fn configure(config: &mut web::ServiceConfig) {
     config.configure(doctor_dashboard_handlers::routes);
     config.configure(prescription_handlers::routes);
     config.configure(staff_handlers::routes);
+
+    config.configure(admindashboard_handlers::routes);
 
     // Billing routes
     config.service(

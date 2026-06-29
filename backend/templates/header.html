@@ -5,16 +5,12 @@
       <div class="title">CSCare Hospital System</div>
     </a>
     <div class="relative">
-      <div class="search-bar">
-        <input type="text" placeholder="Search patient, appointment, staff...">
-        <i class="fa-solid fa-magnifying-glass"></i>
-      </div>
       <div class="dropdown">
         <div class="profile">
           <span class="profile-avatar" aria-hidden="true"><i class="fa-solid fa-user"></i></span>
           <div class="identity">
-            <div class="name">Signed-in user</div>
-            <div class="roles" id="currentUserRole">Staff</div>
+            <div class="name" id="currentUserName">Loading...</div>
+            <div class="roles" id="currentUserRole">Loading...</div>
           </div>
         </div>
 
@@ -38,15 +34,14 @@
   </div>
 
   <nav class="mega-menu">
-    <a href="/dashboard"><i class="fa-solid fa-gauge"></i>Dashboard</a>
-    <a href="/patients"><i class="fa-solid fa-users"></i>Patients</a>
-    <a href="/appointments"><i class="fa-solid fa-calendar-days"></i>Appointments</a>
-    <a href="/doctor-dashboard"><i class="fa-solid fa-stethoscope"></i>Doctor Dashboard</a>
-    <a href="/doctors"><i class="fa-solid fa-user-doctor"></i>Doctor Management</a>
-    <a href="/records"><i class="fa-solid fa-file-medical"></i>Medical Records</a>
-    <a href="/prescriptions"><i class="fa-solid fa-prescription-bottle-medical"></i>Prescriptions</a>
-    <a href="/billing"><i class="fa-solid fa-money-bill-transfer"></i>Billing</a>
-    <a href="/staff"><i class="fa-solid fa-user-tie"></i>Staffs</a>
-    <!-- <a href="/settings"><i class="fa-solid fa-gear"></i>Settings</a> -->
+    <a href="/dashboard" data-permission="canManageAppointments"><i class="fa-solid fa-gauge"></i>Dashboard</a>
+    <a href="/doctor-dashboard" data-permission="canManageDoctorAppointments"><i class="fa-solid fa-stethoscope"></i>Dashboard</a>
+    <a href="/patients" data-permission="canViewPatients"><i class="fa-solid fa-users"></i>Patients</a>
+    <a href="/appointments" data-permission="canManageAppointments"><i class="fa-solid fa-calendar-days"></i>Appointments</a>
+    <a href="/doctors" data-permission="canManageUsers"><i class="fa-solid fa-user-doctor"></i>Doctor Management</a>
+    <a href="/records" data-permission="canViewMedicalRecords"><i class="fa-solid fa-file-medical"></i>Medical Records</a>
+    <a href="/prescriptions" data-permission="canViewPrescriptions"><i class="fa-solid fa-prescription-bottle-medical"></i>Prescriptions</a>
+    <a href="/billing" data-permission="canViewBilling"><i class="fa-solid fa-money-bill-transfer"></i>Billing</a>
+    <a href="/staff" data-permission="canManageUsers"><i class="fa-solid fa-user-tie"></i>Staffs</a>
   </nav>
 </header>

@@ -149,12 +149,12 @@ button#callEarlyBtn {
     font-weight: 600;
 }
 
-.badge-notarrive {
+.badge-completed {
     background-color: rgb(from var(--secondary) r g b / 10%);
     color: var(--secondary);
 }
 
-.badge-completed,
+.badge-inroom,
 .priority.Follow-up {
     background-color: rgb(from var(--primary-hover) r g b / 10%);
     color: var(--primary-hover);
@@ -172,7 +172,6 @@ button#callEarlyBtn {
     color: var(--warning);
 }
 
-.badge-noshow,
 .priority.Emergency {
     background-color: rgb(from var(--danger) r g b / 10%);
     color: var(--danger);
@@ -183,9 +182,17 @@ button#callEarlyBtn {
     font-weight: 700;
 }
 
-.table-list tr:hover {
+.table-list tr:not(td .empty-row):hover {
     cursor: pointer;
     background: var(--hover);
+}
+
+td.empty-row {
+    pointer-events: none
+}
+
+.page-title .description i {
+    margin-right: 8px;
 }
 
 @media only screen and (max-width: 1300px) {

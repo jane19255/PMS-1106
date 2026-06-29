@@ -163,7 +163,8 @@
 
         // 5. If Rust accepts the token and creates the cookie, redirect to Dashboard!
         if (response.ok) {
-          window.location.href = "/dashboard";
+          const data = await response.json();
+          window.location.href = data.redirect_to || "/dashboard";
         } else {
           errorBox.innerHTML =
             '<i class="fa-solid fa-circle-exclamation"></i> Server rejected login.';

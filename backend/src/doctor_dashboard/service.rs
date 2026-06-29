@@ -1,5 +1,6 @@
-use super::models::DashboardAppointment;
+use super::models::DoctorQueueAppointment;
 use super::repository::{DoctorDashboardRepository, RepositoryError};
+use chrono::NaiveDate;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -16,9 +17,33 @@ impl DoctorDashboardService {
         Self { repository }
     }
 
-    pub async fn list_appointments(&self) -> Result<Vec<DashboardAppointment>, DoctorDashboardError> {
+    pub async fn list_appointments(
+        &self,
+        firebase_uid: &str,
+        date: NaiveDate,
+    ) -> Result<Vec<DoctorQueueAppointment>, DoctorDashboardError> {
         self.repository
-            .list_appointments()
+            .list_appointments(firebase_uid, date)
+            .await
+            .map_err(Self::map_repository_error)
+    }
+
+    pub async fn start_consultation(
+        &self,
+        appointment_id: &str,
+    ) -> Result<(), DoctorDashboardError> {
+        self.repository
+            .start_consultation(appointment_id)
+            .await
+            .map_err(Self::map_repository_error)
+    }
+
+    pub async fn complete_consultation(
+        &self,
+        appointment_id: &str,
+    ) -> Result<(), DoctorDashboardError> {
+        self.repository
+            .complete_consultation(appointment_id)
             .await
             .map_err(Self::map_repository_error)
     }

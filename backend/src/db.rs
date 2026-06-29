@@ -95,18 +95,18 @@ impl SupabaseRestDb {
         }
     }
 
-    fn rest_url(&self, path: &str) -> String {
+    pub fn rest_url(&self, path: &str) -> String {
         format!("{}/rest/v1/{}", self.url, path.trim_start_matches('/'))
     }
 
-    fn authed(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    pub fn authed(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         builder
             .header("apikey", &self.key)
             .header("Authorization", format!("Bearer {}", &self.key))
             .header("Content-Type", "application/json")
     }
 
-    async fn read_response(response: reqwest::Response) -> Result<String, String> {
+    pub async fn read_response(response: reqwest::Response) -> Result<String, String> {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         if status.is_success() {
@@ -341,5 +341,44 @@ impl SupabaseRestDb {
             .map_err(|e| e.to_string())?;
 
         Self::read_response(response).await
+    }
+
+    
+    pub async fn fetch_table(
+        &self,
+        table_name: &str,
+        filter_params: &str
+    ) -> Result<String, String> {
+        let full_path = format!("{}?{}", table_name, filter_params);
+        let url = self.rest_url(&full_path);
+        let req = self.authed(self.http_client.get(url));
+        let res = req.send().await.map_err(|e| e.to_string())?;
+        let full_path = format!("{}?{}", table_name, filter_params);
+        let url = self.rest_url(&full_path);
+        Self::read_response(res).await
+    }
+    pub async fn insert_row(
+        &self,
+        table_name: &str,
+        payload: &serde_json::Value
+    ) -> Result<String, String> {
+        let url = self.rest_url(table_name);
+        let req = self.authed(self.http_client.post(url))
+            .header("Prefer", "return=representation")
+            .json(payload);
+        let res = req.send().await.map_err(|e| e.to_string())?;
+        Self::read_response(res).await
+    }
+    pub async fn patch_row(
+        &self,
+        filter: &str,
+        payload: &serde_json::Value
+    ) -> Result<String, String> {
+        let url = self.rest_url(&format!("{}?{}", "patient_queue", filter));
+        let req = self.authed(self.http_client.patch(url))
+            .header("Prefer", "return=representation")
+            .json(payload);
+        let res = req.send().await.map_err(|e| e.to_string())?;
+        Self::read_response(res).await
     }
 }
