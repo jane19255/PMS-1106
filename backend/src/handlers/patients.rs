@@ -3,10 +3,61 @@ use chrono::{NaiveDate, Utc};
 use firebase_auth::FirebaseAuth;
 use serde_json::{json, Value};
 use tera::{Context, Tera};
+use uuid::Uuid;
 
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use crate::models::{Patient, PatientView, SupabasePatientRow, UpdatePatient};
+
+#[derive(serde::Deserialize)]
+struct CreateMedicalRecordForm {
+    patient_id: String,
+    doctor_id: Option<String>,
+    reason_of_visit: Option<String>,
+    clinical_findings: Option<String>,
+    diagnosis: Option<String>,
+    doctor_notes: Option<String>,
+    blood_pressure: Option<String>,
+    temperature: Option<String>,
+    pulse_rate: Option<String>,
+    height_cm: Option<String>,
+    weight_kg: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct MedicalRecordRow {
+    id: String,
+    patient_id: String,
+    doctor_id: Option<String>,
+    diagnosis: Option<String>,
+    doctor_notes: Option<String>,
+    recorded_at: Option<String>,
+    reason_of_visit: Option<String>,
+    clinical_findings: Option<String>,
+    blood_pressure: Option<String>,
+    temperature: Option<String>,
+    pulse_rate: Option<String>,
+    height_cm: Option<String>,
+    weight_kg: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct HistoryEntry {
+    id: String,
+    patient_id: String,
+    doctor_id: Option<String>,
+    doctor_name: Option<String>,
+    diagnosis: Option<String>,
+    doctor_notes: Option<String>,
+    reason_of_visit: Option<String>,
+    clinical_findings: Option<String>,
+    blood_pressure: Option<String>,
+    temperature: Option<String>,
+    pulse_rate: Option<String>,
+    height_cm: Option<String>,
+    weight_kg: Option<String>,
+    recorded_at: Option<String>,
+}
 
 const VALID_GENDERS: [&str; 2] = ["Male", "Female"];
 const VALID_PATIENT_STATUSES: [&str; 2] = ["Active", "Inactive"];
@@ -37,6 +88,8 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/api/patients/{id}", web::get().to(get_patient_by_id));
     cfg.route("/api/patients/{id}", web::put().to(update_patient));
     cfg.route("/api/patients/{id}", web::delete().to(delete_patient));
+    cfg.route("/api/patients/{id}/history", web::get().to(get_patient_history));
+    cfg.route("/api/medical-records", web::post().to(create_medical_record));
 }
 
 pub async fn patients_page(
@@ -534,6 +587,149 @@ mod tests {
         let validated = validate_updated_patient(&update).expect("update should validate");
         assert_eq!(validated.status.as_deref(), Some("Inactive"));
     }
+}
+
+pub async fn get_patient_history(
+    req: HttpRequest,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
+    path: web::Path<String>,
+) -> impl Responder {
+    if let Err(rejection) = require_auth_and_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::ViewMedicalRecords,
+    )
+    .await
+    {
+        return rejection;
+    }
+    let patient_id = path.into_inner();
+    let encoded_id = urlencoding::encode(&patient_id);
+    let query = format!(
+        "patient_id=eq.{}&select=*&order=recorded_at.desc.nullslast",
+        encoded_id
+    );
+
+    match supabase_db.fetch_table("medical_records", &query).await {
+        Ok(body) => match serde_json::from_str::<Vec<MedicalRecordRow>>(&body) {
+            Ok(rows) => {
+                let mut entries: Vec<HistoryEntry> = Vec::new();
+                for row in rows {
+                    let doctor_name = if let Some(ref did) = row.doctor_id {
+                        fetch_doctor_name(&supabase_db, did).await.ok()
+                    } else {
+                        None
+                    };
+                    entries.push(HistoryEntry {
+                        doctor_name,
+                        id: row.id,
+                        patient_id: row.patient_id,
+                        doctor_id: row.doctor_id,
+                        diagnosis: row.diagnosis,
+                        doctor_notes: row.doctor_notes,
+                        reason_of_visit: row.reason_of_visit,
+                        clinical_findings: row.clinical_findings,
+                        blood_pressure: row.blood_pressure,
+                        temperature: row.temperature,
+                        pulse_rate: row.pulse_rate,
+                        height_cm: row.height_cm,
+                        weight_kg: row.weight_kg,
+                        recorded_at: row.recorded_at,
+                    });
+                }
+                HttpResponse::Ok().json(entries)
+            }
+            Err(e) => {
+                eprintln!("Failed to parse medical records: {e} | body: {body}");
+                HttpResponse::InternalServerError().body("Failed to parse medical records")
+            }
+        },
+        Err(e) => {
+            eprintln!("Failed to fetch history for {patient_id}: {e}");
+            HttpResponse::InternalServerError().body("Failed to load medical records")
+        }
+    }
+}
+
+pub async fn create_medical_record(
+    req: HttpRequest,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
+    form: web::Json<CreateMedicalRecordForm>,
+) -> impl Responder {
+    if let Err(rejection) = require_auth_and_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::EditMedicalRecords,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    if form.patient_id.trim().is_empty() {
+        return HttpResponse::BadRequest().body("patient_id is required");
+    }
+
+    let id = format!("MR-{}", Uuid::new_v4());
+    let payload = json!({
+        "id": id,
+        "patient_id": form.patient_id.trim(),
+        "doctor_id": form.doctor_id.as_deref().filter(|s| !s.trim().is_empty()),
+        "diagnosis": form.diagnosis.as_deref().filter(|s| !s.trim().is_empty()),
+        "doctor_notes": form.doctor_notes.as_deref().filter(|s| !s.trim().is_empty()),
+        "reason_of_visit": form.reason_of_visit.as_deref().filter(|s| !s.trim().is_empty()),
+        "clinical_findings": form.clinical_findings.as_deref().filter(|s| !s.trim().is_empty()),
+        "blood_pressure": form.blood_pressure.as_deref().filter(|s| !s.trim().is_empty()),
+        "temperature": form.temperature.as_deref().filter(|s| !s.trim().is_empty()),
+        "pulse_rate": form.pulse_rate.as_deref().filter(|s| !s.trim().is_empty()),
+        "height_cm": form.height_cm.as_deref().filter(|s| !s.trim().is_empty()),
+        "weight_kg": form.weight_kg.as_deref().filter(|s| !s.trim().is_empty()),
+    });
+
+    match supabase_db.insert_row("medical_records", &payload).await {
+        Ok(body) => {
+            if let Ok(rows) = serde_json::from_str::<Vec<serde_json::Value>>(&body) {
+                if let Some(row) = rows.into_iter().next() {
+                    return HttpResponse::Created().json(row);
+                }
+            }
+            HttpResponse::Created().json(json!({ "id": id }))
+        }
+        Err(e) => {
+            eprintln!("Failed to create medical record: {e}");
+            HttpResponse::InternalServerError().body(format!("Failed to save medical record: {e}"))
+        }
+    }
+}
+
+async fn fetch_doctor_name(supabase_db: &SupabaseRestDb, doctor_id: &str) -> Result<String, ()> {
+    #[derive(serde::Deserialize)]
+    struct StaffEmbed {
+        full_name: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct DoctorRow {
+        staff: StaffEmbed,
+    }
+
+    let encoded_id = urlencoding::encode(doctor_id);
+    let url = supabase_db.rest_url(&format!(
+        "doctors?id=eq.{}&select=staff:staff_id(full_name)",
+        encoded_id
+    ));
+    let response = supabase_db
+        .authed(supabase_db.http_client.get(&url))
+        .send()
+        .await
+        .map_err(|_| ())?;
+    let rows: Vec<DoctorRow> = response.json().await.map_err(|_| ())?;
+    rows.into_iter().next().map(|r| r.staff.full_name).ok_or(())
 }
 
 pub async fn delete_patient(
