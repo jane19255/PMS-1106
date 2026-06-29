@@ -37,6 +37,14 @@ function addNewPresRow() {
                 </select>
             </div>
         </div>
+        <div class="field">
+            <label class="required">Duration</label>
+            <input class="dur-input" type="text" placeholder="e.g. 5 days" value="5 days">
+        </div>
+        <div class="field">
+            <label class="required">Qty</label>
+            <input class="qty-input" type="number" placeholder="10" value="10" min="1">
+        </div>
     `;
     wrap.appendChild(newRow);
     showToast("New empty prescription row added", "success");
@@ -101,34 +109,61 @@ async function loadPatient(patientId) {
 }
 
 async function loadHistory(patientId) {
-    try {
-        const res = await fetch(`/api/patients/${encodeURIComponent(patientId)}/timeline`);
-        if (!res.ok) return;
-        const entries = await res.json();
+    const container = document.getElementById('prevRecord');
+    const title = container.querySelector('.title');
 
-        const container = document.getElementById('prevRecord');
-        const title = container.querySelector('.title');
+    try {
+        const [histRes, presRes] = await Promise.all([
+            fetch(`/api/patients/${encodeURIComponent(patientId)}/history`),
+            fetch(`/api/prescriptions?patient_id=${encodeURIComponent(patientId)}`)
+        ]);
+
         container.innerHTML = '';
         if (title) container.appendChild(title);
 
-        if (!entries.length) {
-            const msg = document.createElement('p');
-            msg.style.cssText = 'color:#888;padding:16px 0;font-size:14px';
-            msg.textContent = 'No previous visits recorded.';
-            container.appendChild(msg);
+        if (!histRes.ok) {
+            container.insertAdjacentHTML('beforeend', '<p style="color:#888;padding:16px 0;font-size:14px">Could not load visit history.</p>');
             return;
         }
 
-        entries.forEach(entry => container.appendChild(buildHistoryCard(entry)));
+        const entries = await histRes.json();
+        const prescriptions = presRes.ok ? await presRes.json() : [];
+
+        // Group prescriptions by medical_record_id
+        const presMap = {};
+        for (const p of prescriptions) {
+            if (p.medical_record_id) {
+                if (!presMap[p.medical_record_id]) presMap[p.medical_record_id] = [];
+                presMap[p.medical_record_id].push(p);
+            }
+        }
+
+        if (!entries.length) {
+            container.insertAdjacentHTML('beforeend', '<p style="color:#888;padding:16px 0;font-size:14px">No previous visits recorded.</p>');
+            return;
+        }
+
+        entries.forEach(entry => container.appendChild(buildHistoryCard(entry, presMap[entry.id] || [])));
     } catch (e) {
         console.error('Failed to load history:', e);
     }
 }
 
-function buildHistoryCard(entry) {
-    const r = entry.record;
-    const date = r.recorded_at ? new Date(r.recorded_at).toLocaleDateString('en-GB') : '—';
-    const doctor = entry.doctor_name || '';
+function buildHistoryCard(entry, prescriptions) {
+    const date = entry.recorded_at ? new Date(entry.recorded_at).toLocaleDateString('en-GB') : '—';
+    const doctor = entry.doctor_name || entry.doctor_id || '—';
+
+    const findingsDiag = [entry.clinical_findings, entry.diagnosis].filter(Boolean).join(' — ') || '—';
+
+    let presLines = '';
+    if (prescriptions && prescriptions.length > 0) {
+        presLines = prescriptions
+            .map(p => `<p>${p.medication_name} ${p.dosage} ${p.frequency}${p.duration ? ', ' + p.duration : ''}</p>`)
+            .join('');
+    } else {
+        presLines = '<p>—</p>';
+    }
+
     const card = document.createElement('div');
     card.className = 'history-card';
     card.innerHTML = `
@@ -141,21 +176,34 @@ function buildHistoryCard(entry) {
         </div>
         <div class="history-body">
             <div class="hist-data">
-                <div><p>BP</p><p>${r.blood_pressure || '—'}</p></div>
-                <div><p>Temp</p><p>${r.temperature ? r.temperature + '°C' : '—'}</p></div>
-                <div><p>Pulse</p><p>${r.pulse_rate ? r.pulse_rate + 'bpm' : '—'}</p></div>
-                <div><p>Height</p><p>${r.height_cm ? r.height_cm + 'cm' : '—'}</p></div>
-                <div><p>Weight</p><p>${r.weight_kg ? r.weight_kg + 'kg' : '—'}</p></div>
+                <div><p>BP</p><p>${entry.blood_pressure || '—'}</p></div>
+                <div><p>Temp</p><p>${entry.temperature ? entry.temperature + '°C' : '—'}</p></div>
+                <div><p>Pulse</p><p>${entry.pulse_rate ? entry.pulse_rate + 'bpm' : '—'}</p></div>
+                <div><p>Height</p><p>${entry.height_cm ? entry.height_cm + 'cm' : '—'}</p></div>
+                <div><p>Weight</p><p>${entry.weight_kg ? entry.weight_kg + 'kg' : '—'}</p></div>
             </div>
-            ${r.reason_of_visit ? `<div class="hist-block"><p>Reason: </p><p>${r.reason_of_visit}</p></div>` : ''}
-            ${r.diagnosis ? `<div class="hist-block"><p>Findings &amp; Diagnosis: </p><p>${r.diagnosis}</p></div>` : ''}
-            ${r.treatment_plan ? `<div class="hist-block"><p>Treatment: </p><p>${r.treatment_plan}</p></div>` : ''}
-            ${r.doctor_notes ? `<div class="hist-block"><p>Notes: </p><p>${r.doctor_notes}</p></div>` : ''}
+            <div class="hist-block">
+                <p>Reason: </p>
+                <p>${entry.reason_of_visit || '—'}</p>
+            </div>
+            <div class="hist-block">
+                <p>Findings &amp; Diagnosis: </p>
+                <p>${findingsDiag}</p>
+            </div>
+            <div class="hist-block">
+                <p>Notes: </p>
+                <p>${entry.doctor_notes || '—'}</p>
+            </div>
+            <div class="hist-block">
+                <p>Prescription:</p>
+                ${presLines}
+            </div>
         </div>`;
     return card;
 }
 
 async function saveRecord(patientId) {
+    const doctorId = document.getElementById('visitDoctorId').value.trim() || null;
     const body = {
         patient_id: patientId,
         blood_pressure: document.getElementById('inp-bp').value.trim() || null,
@@ -167,7 +215,7 @@ async function saveRecord(patientId) {
         clinical_findings: document.getElementById('findings').value.trim() || null,
         diagnosis: document.getElementById('diagnosis').value.trim() || null,
         doctor_notes: document.getElementById('treatNote').value.trim() || null,
-        doctor_id: document.getElementById('visitDoctorId').value.trim() || null,
+        doctor_id: doctorId,
     };
 
     try {
@@ -177,6 +225,19 @@ async function saveRecord(patientId) {
             body: JSON.stringify(body),
         });
         if (res.ok) {
+            const savedRecord = await res.json();
+
+            const addPrescriptCb = document.getElementById('addPrescript');
+            if (addPrescriptCb && addPrescriptCb.checked && savedRecord.id) {
+                const presOk = await savePrescriptions(patientId, doctorId, savedRecord.id);
+                if (!presOk) {
+                    // Rollback: delete the medical record so nothing is partially saved
+                    await fetch(`/api/medical-records/${encodeURIComponent(savedRecord.id)}`, { method: 'DELETE' });
+                    showToast('Prescription failed — visit record was not saved.', 'error');
+                    return;
+                }
+            }
+
             showToast('Record saved successfully!', 'success');
             ['visitReason', 'findings', 'diagnosis', 'treatNote'].forEach(id => {
                 const el = document.getElementById(id);
@@ -194,6 +255,48 @@ async function saveRecord(patientId) {
     } catch (e) {
         showToast('Network error: ' + e.message, 'error');
     }
+}
+
+async function savePrescriptions(patientId, doctorId, medicalRecordId) {
+    const rows = document.querySelectorAll('#presWrap .pres-row');
+    const instructions = document.getElementById('usageIns')?.value.trim() || null;
+    let saved = 0;
+    const errors = [];
+    for (const row of rows) {
+        const medicationName = row.querySelector('.med-select')?.value;
+        const dosage = row.querySelector('.dosage-select')?.value;
+        const frequency = row.querySelector('.freq-select')?.value;
+        const duration = row.querySelector('.dur-input')?.value.trim() || '5 days';
+        const quantity = row.querySelector('.qty-input')?.value.trim() || '10';
+        if (!medicationName || !dosage || !frequency) continue;
+        try {
+            const res = await fetch('/api/prescriptions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_id: patientId,
+                    doctor_id: doctorId || '',
+                    medical_record_id: medicalRecordId,
+                    medication_name: medicationName,
+                    dosage,
+                    frequency,
+                    duration,
+                    instructions: instructions || null,
+                    quantity,
+                    unit_cost: '0',
+                }),
+            });
+            if (res.ok) saved++;
+            else errors.push(`${medicationName}: ${await res.text()}`);
+        } catch (e) {
+            errors.push(`${medicationName}: network error`);
+        }
+    }
+    if (errors.length > 0) {
+        showToast('Prescription error: ' + errors[0], 'error');
+        return false;
+    }
+    return true;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
