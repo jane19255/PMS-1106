@@ -83,10 +83,10 @@
 
     <div class="detail-actions">
         <form action="/doctors/{{ doctor.id }}/delete" method="post"
-            onsubmit="return confirm('Delete this doctor?') && confirm('This will also remove the doctor schedules. Continue?');">
+            onsubmit="return confirm('Delete this doctor, their staff record, schedules, and login account?');">
             <button class="danger-button" type="submit">Delete Doctor</button>
         </form>
-        <a class="button-link" href="/doctors">Back to Doctors</a>
+        <a class="button-link" href="/staff#doctor-management">Back to Staff Management</a>
     </div>
 </section>
 
@@ -126,5 +126,5 @@
     {% endfor %}
 </section>
 
-<a class="button-link" href="/doctors">Back to Doctors</a>
+<a class="button-link" href="/staff#doctor-management">Back to Staff Management</a>
 {% endblock content %}

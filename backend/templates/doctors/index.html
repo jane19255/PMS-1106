@@ -204,7 +204,7 @@
                             <span class="tooltip-text">View Details</span>
                         </a>
                         <form action="/doctors/{{ doctor.id }}/delete" method="post"
-                            onsubmit="return confirm('Delete this doctor?') && confirm('This doctor cannot be deleted if appointments still reference them. Continue?');">
+                            onsubmit="return confirm('Delete this doctor, their staff record, schedules, and login account? Existing appointments may prevent deletion.');">
                             <button class="danger-icon-button has-tooltip" type="submit" aria-label="Delete doctor">
                                 <i class="fa-solid fa-trash"></i>
                                 <span class="tooltip-text">Delete Doctor</span>

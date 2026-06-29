@@ -2,7 +2,9 @@ use super::service::{
     CreateDoctorForm, CreateDoctorScheduleForm, DoctorError, DoctorService, UpdateDoctorForm,
 };
 use crate::db::FirebaseRestDb;
+use crate::firebase_admin::FirebaseAdmin;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::staff::service::StaffService;
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
@@ -118,7 +120,7 @@ pub async fn create_doctor_form(
     let submitted_form = form.into_inner();
 
     match doctor_service.create_doctor(submitted_form.clone()).await {
-        Ok(_) => redirect_to("/doctors"),
+        Ok(_) => redirect_to("/staff#doctor-management"),
         Err(error @ DoctorError::InvalidInput(_)) => match doctor_service.list_doctors().await {
             Ok(doctors) => render_doctors_page(
                 &templates,
@@ -159,6 +161,8 @@ pub async fn update_doctor_form(
 pub async fn delete_doctor_form(
     req: HttpRequest,
     doctor_service: web::Data<DoctorService>,
+    staff_service: web::Data<StaffService>,
+    firebase_admin: web::Data<FirebaseAdmin>,
     templates: web::Data<Tera>,
     path: web::Path<String>,
     firebase_auth: web::Data<FirebaseAuth>,
@@ -169,8 +173,9 @@ pub async fn delete_doctor_form(
     }
 
     let doctor_id = path.into_inner();
-    match doctor_service.delete_doctor(&doctor_id).await {
-        Ok(_) => redirect_to("/doctors?deleted=1"),
+    match delete_doctor_account(&doctor_service, &staff_service, &firebase_admin, &doctor_id).await
+    {
+        Ok(_) => redirect_to("/staff#doctor-management"),
         Err(error) => render_error(&templates, error),
     }
 }
@@ -227,7 +232,7 @@ pub async fn delete_schedule_form(
     }
 
     match doctor_service.delete_schedule(&path.into_inner()).await {
-        Ok(_) => redirect_to("/doctors"),
+        Ok(_) => redirect_to("/staff#doctor-management"),
         Err(error) => render_error(&templates, error),
     }
 }
@@ -306,6 +311,8 @@ pub async fn update_doctor_api(
 pub async fn delete_doctor_api(
     req: HttpRequest,
     doctor_service: web::Data<DoctorService>,
+    staff_service: web::Data<StaffService>,
+    firebase_admin: web::Data<FirebaseAdmin>,
     path: web::Path<String>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
@@ -314,10 +321,45 @@ pub async fn delete_doctor_api(
         return rejection;
     }
 
-    match doctor_service.delete_doctor(&path.into_inner()).await {
+    match delete_doctor_account(
+        &doctor_service,
+        &staff_service,
+        &firebase_admin,
+        &path.into_inner(),
+    )
+    .await
+    {
         Ok(_) => HttpResponse::Ok().json(json!({ "status": "success" })),
         Err(error) => doctor_error_response(error),
     }
+}
+
+async fn delete_doctor_account(
+    doctor_service: &DoctorService,
+    staff_service: &StaffService,
+    firebase_admin: &FirebaseAdmin,
+    doctor_id: &str,
+) -> Result<(), DoctorError> {
+    let doctor = doctor_service.find_doctor(doctor_id).await?;
+    let staff = staff_service
+        .list_staff()
+        .await
+        .map_err(|_| DoctorError::StorageUnavailable)?
+        .into_iter()
+        .find(|staff| staff.id == doctor.staff_id)
+        .ok_or(DoctorError::StorageUnavailable)?;
+
+    // Delete the doctor first because staff is the parent record in Supabase.
+    doctor_service.delete_doctor(doctor_id).await?;
+    staff_service
+        .delete_staff(&staff.id)
+        .await
+        .map_err(|_| DoctorError::StorageUnavailable)?;
+
+    if let Err(error) = firebase_admin.delete_user(&staff.firebase_uid).await {
+        eprintln!("Firebase user deletion failed: {error}");
+    }
+    Ok(())
 }
 
 pub async fn list_schedules_api(
@@ -488,8 +530,8 @@ fn render_template(templates: &Tera, template_name: &str, context: &Context) -> 
 fn render_error(templates: &Tera, error: DoctorError) -> HttpResponse {
     let mut context = Context::new();
     context.insert("message", &doctor_error_message(error));
-    context.insert("back_url", "/doctors");
-    context.insert("back_label", "Back to Doctor Management");
+    context.insert("back_url", "/staff#doctor-management");
+    context.insert("back_label", "Back to Staff Management");
     render_template(templates, "error.html", &context)
 }
 

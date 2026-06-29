@@ -484,8 +484,7 @@ function editPatient(index) {
   document.getElementById("edit-lastName").value = p.lastName;
   document.getElementById("edit-dob").value = p.dob;
 
-  // FIX: Removed .toLowerCase() so the capital letter is preserved!
-  document.getElementById("edit-gender").value = p.gender;
+  document.getElementById("edit-gender").value = p.gender.toLowerCase();
 
   document.getElementById("edit-nric").value = p.nric;
   document.getElementById("edit-nationality").value = p.nationality;

@@ -1,6 +1,7 @@
 mod billing;
 mod db;
 mod doctors;
+mod firebase_admin;
 mod admindashboard;
 mod doctor_dashboard;
 mod handlers;
@@ -48,6 +49,10 @@ async fn main() -> std::io::Result<()> {
         std::env::var("FIREBASE_PROJECT_ID").expect("FIREBASE_PROJECT_ID must be set in .env");
 
     let firebase_auth = FirebaseAuth::new(&firebase_project_id).await;
+    let firebase_admin = web::Data::new(
+        firebase_admin::FirebaseAdmin::from_env()
+            .expect("Firebase Admin configuration is invalid"),
+    );
     let firestore_db = db::FirebaseRestDb::new(firebase_project_id.clone());
     let supabase_db = db::SupabaseRestDb::from_env();
 
@@ -155,6 +160,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(staff_service.clone())
             .app_data(template_data.clone())
             .app_data(web::Data::new(firebase_auth.clone()))
+            .app_data(firebase_admin.clone())
             .app_data(web::Data::new(firestore_db.clone()))
             .app_data(web::Data::new(supabase_db.clone()))
             .app_data(web::Data::new(firebase_project_id.clone()))

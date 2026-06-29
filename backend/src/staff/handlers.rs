@@ -1,5 +1,7 @@
 use super::service::{StaffError, StaffForm, StaffService};
 use crate::db::FirebaseRestDb;
+use crate::doctors::service::{DoctorError, DoctorService};
+use crate::firebase_admin::FirebaseAdmin;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
@@ -8,7 +10,8 @@ pub fn routes(config: &mut web::ServiceConfig) {
     config
         .route("/api/staff", web::get().to(list_staff_api))
         .route("/api/staff", web::post().to(create_staff_api))
-        .route("/api/staff/{staff_id}", web::put().to(update_staff_api));
+        .route("/api/staff/{staff_id}", web::put().to(update_staff_api))
+        .route("/api/staff/{staff_id}", web::delete().to(delete_staff_api));
 }
 
 pub async fn list_staff_api(
@@ -30,6 +33,7 @@ pub async fn list_staff_api(
 pub async fn create_staff_api(
     req: HttpRequest,
     staff_service: web::Data<StaffService>,
+    firebase_admin: web::Data<FirebaseAdmin>,
     form: web::Json<StaffForm>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
@@ -38,9 +42,27 @@ pub async fn create_staff_api(
         return rejection;
     }
 
-    match staff_service.create_staff(form.into_inner()).await {
-        Ok(staff) => HttpResponse::Created().json(staff),
-        Err(error) => staff_error_response(error),
+    let mut form = form.into_inner();
+    let full_name = format!("{} {}", form.first_name.trim(), form.last_name.trim());
+    let uid = match firebase_admin.create_user(&form.email, &full_name).await {
+        Ok(uid) => uid,
+        Err(message) => return HttpResponse::BadRequest().body(message),
+    };
+    form.firebase_uid = uid.clone();
+
+    match staff_service.create_staff(form).await {
+        Ok(staff) => {
+            if let Err(error) = firebase_admin.send_password_setup(&staff.email).await {
+                eprintln!("Firebase password setup email failed: {error}");
+            }
+            HttpResponse::Created().json(staff)
+        }
+        Err(error) => {
+            if let Err(rollback_error) = firebase_admin.delete_user(&uid).await {
+                eprintln!("Firebase user rollback failed: {rollback_error}");
+            }
+            staff_error_response(error)
+        }
     }
 }
 
@@ -56,9 +78,70 @@ pub async fn update_staff_api(
         return rejection;
     }
 
-    match staff_service.update_staff(&path.into_inner(), form.into_inner()).await {
+    match staff_service
+        .update_staff(&path.into_inner(), form.into_inner())
+        .await
+    {
         Ok(staff) => HttpResponse::Ok().json(staff),
         Err(error) => staff_error_response(error),
+    }
+}
+
+pub async fn delete_staff_api(
+    req: HttpRequest,
+    staff_service: web::Data<StaffService>,
+    doctor_service: web::Data<DoctorService>,
+    firebase_admin: web::Data<FirebaseAdmin>,
+    path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_staff_admin(&req, &firebase_auth, &firestore_db).await {
+        return rejection;
+    }
+
+    let staff_id = path.into_inner();
+    let firebase_uid = staff_service
+        .list_staff()
+        .await
+        .ok()
+        .and_then(|staff| staff.into_iter().find(|item| item.id == staff_id))
+        .map(|staff| staff.firebase_uid);
+
+    let linked_doctor = match doctor_service.list_doctors().await {
+        Ok(doctors) => doctors
+            .into_iter()
+            .find(|doctor| doctor.staff_id == staff_id),
+        Err(error) => return doctor_delete_error(error),
+    };
+    if let Some(doctor) = linked_doctor {
+        if let Err(error) = doctor_service.delete_doctor(&doctor.id).await {
+            return doctor_delete_error(error);
+        }
+    }
+
+    match staff_service.delete_staff(&staff_id).await {
+        Ok(()) => {
+            if let Some(uid) = firebase_uid {
+                if let Err(error) = firebase_admin.delete_user(&uid).await {
+                    eprintln!("Firebase user deletion failed: {error}");
+                }
+            }
+            HttpResponse::NoContent().finish()
+        }
+        Err(error) => staff_error_response(error),
+    }
+}
+
+fn doctor_delete_error(error: DoctorError) -> HttpResponse {
+    match error {
+        DoctorError::DoctorHasAppointments => HttpResponse::BadRequest()
+            .body("This doctor cannot be deleted because appointments still reference them."),
+        DoctorError::DoctorNotFound => HttpResponse::NotFound().body("Doctor was not found."),
+        DoctorError::InvalidInput(message) => HttpResponse::BadRequest().body(message),
+        DoctorError::StorageUnavailable => {
+            HttpResponse::InternalServerError().body("Doctor storage is unavailable.")
+        }
     }
 }
 
@@ -74,6 +157,9 @@ fn staff_error_response(error: StaffError) -> HttpResponse {
     let message = match error {
         StaffError::InvalidInput(message) => message,
         StaffError::StaffNotFound => "Staff member was not found.".to_string(),
+        StaffError::StaffHasDoctorProfile => {
+            "The linked doctor profile could not be deleted.".to_string()
+        }
         StaffError::StorageUnavailable => "Staff storage is unavailable.".to_string(),
     };
 

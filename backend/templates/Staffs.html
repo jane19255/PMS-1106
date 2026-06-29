@@ -22,6 +22,7 @@
   <script src="/assets/js/FirebaseService.js"></script>
   <script src="/assets/js/general.js"></script>
   <script src="/assets/js/staffs.js?v=staff-api-1"></script>
+  <script src="/assets/js/staff-doctors.js?v=1" defer></script>
 </head>
 
 <body>
@@ -64,7 +65,7 @@
             <th>Roles</th>
             <th>Date of Birth</th>
             <th>Phone</th>
-            <th>Status</th>
+            <th>Employment Status</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -94,6 +95,63 @@
         </div>
       </div>
     </div>
+
+    <section class="doctor-management" id="doctor-management" aria-labelledby="doctorManagementTitle">
+      <div class="page-title section-title">
+        <div>
+          <div class="title" id="doctorManagementTitle">Doctor Management</div>
+          <div class="description">Manage doctor credentials, availability, and schedule access</div>
+        </div>
+      </div>
+
+      <div class="display doctor-metrics">
+        <div class="card">
+          <div class="details"><div class="data">Total Doctors</div><div class="number" id="totalDoctorCount">0</div></div>
+          <div class="icon"><i class="fa-solid fa-user-doctor"></i></div>
+        </div>
+        <div class="card">
+          <div class="details"><div class="data">Available</div><div class="number" id="availableDoctorCount">0</div></div>
+          <div class="icon"><i class="fa-solid fa-circle-check"></i></div>
+        </div>
+        <div class="card">
+          <div class="details"><div class="data">Unavailable</div><div class="number" id="unavailableDoctorCount">0</div></div>
+          <div class="icon"><i class="fa-solid fa-user-clock"></i></div>
+        </div>
+        <div class="card">
+          <div class="details"><div class="data">Specialties</div><div class="number" id="doctorSpecialtyCount">0</div></div>
+          <div class="icon"><i class="fa-solid fa-stethoscope"></i></div>
+        </div>
+      </div>
+
+      <div class="control card">
+        <div class="search">
+          <input type="text" placeholder="Search doctor ID / name / specialty" id="doctorSearchInput" oninput="refreshDoctorList()">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </div>
+        <div class="custom-select">
+          <select id="doctorStatusFilter" onchange="refreshDoctorList()">
+            <option value="all">All Statuses</option>
+            <option value="available">Available</option>
+            <option value="unavailable">Unavailable</option>
+            <option value="on leave">On Leave</option>
+          </select>
+        </div>
+        <div class="custom-select">
+          <select id="doctorSort" onchange="refreshDoctorList()">
+            <option value="name">Sort by Name</option>
+            <option value="specialization">Sort by Specialty</option>
+            <option value="status">Sort by Status</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-list">
+        <table>
+          <thead><tr><th>Doctor</th><th>Staff ID</th><th>License</th><th>Specialty</th><th>Contact</th><th>Availability</th><th>Actions</th></tr></thead>
+          <tbody id="doctorTableBody"><tr><td class="empty-row" colspan="7">Loading doctors...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
 
     <div id="filterModal" class="modal">
       <div class="modal-box card">
@@ -141,11 +199,6 @@
 
           <div class="error-box"></div>
 
-          <div class="field">
-            <label class="required">Firebase UID</label>
-            <input type="text" id="add-firebaseUid" placeholder="Firebase user UID" required>
-          </div>
-
           <div class="row-section">
             <div class="field">
               <label class="required">First Name</label>
@@ -180,7 +233,7 @@
             <div class="field">
               <label class="required">Roles</label>
               <div class="custom-select">
-                <select id="add-role" required>
+                <select id="add-role" required onchange="toggleAddDoctorFields()">
                   <option>Receptionist</option>
                   <option>Doctor</option>
                   <option>Pharmacist</option>
@@ -213,6 +266,26 @@
           <div class="field">
             <label>Home Address</label>
             <textarea id="add-address" rows="4" placeholder="Enter street, block, unit, and postal code"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Emergency Contact</label>
+            <input type="text" id="add-emergency" placeholder="Name and phone number">
+          </div>
+
+          <div id="addDoctorFields" class="doctor-profile-fields" hidden>
+            <div class="subsection-title">DOCTOR PROFILE</div>
+            <div class="row-section">
+              <div class="field">
+                <label class="required">License Number</label>
+                <input id="add-doctorLicense" placeholder="e.g. MCR-SG-100004">
+              </div>
+              <div class="field">
+                <label class="required">Specialization</label>
+                <input id="add-doctorSpecialization" placeholder="e.g. Cardiology">
+              </div>
+            </div>
+            <p class="doctor-form-note">The doctor name, phone and email will use the staff information entered above.</p>
           </div>
         </div>
 
@@ -301,10 +374,7 @@
           <div class="error-box"></div>
 
           <input type="hidden" id="edit-id">
-          <div class="field">
-            <label class="required">Firebase UID</label>
-            <input type="text" id="edit-firebaseUid" placeholder="Firebase user UID" required>
-          </div>
+          <input type="hidden" id="edit-firebaseUid">
 
           <div class="row-section">
             <div class="field">
@@ -340,7 +410,7 @@
             <div class="field">
               <label class="required">Role</label>
               <div class="custom-select">
-                <select id="edit-role" required>
+                <select id="edit-role" required onchange="toggleEditDoctorFields()">
                   <option>Receptionist</option>
                   <option>Doctor</option>
                   <option>Pharmacist</option>
@@ -374,6 +444,35 @@
           <div class="field">
             <label>Home Address</label>
             <textarea id="edit-address" rows="4" placeholder="Enter street, block, unit, and postal code"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Emergency Contact</label>
+            <input type="text" id="edit-emergency" placeholder="Name and phone number">
+          </div>
+
+          <div id="editDoctorFields" class="doctor-profile-fields" hidden>
+            <div class="subsection-title">DOCTOR PROFILE</div>
+            <div class="row-section">
+              <div class="field">
+                <label class="required">License Number</label>
+                <input id="edit-doctorLicense" placeholder="e.g. MCR-SG-100004">
+              </div>
+              <div class="field">
+                <label class="required">Specialization</label>
+                <input id="edit-doctorSpecialization" placeholder="e.g. Cardiology">
+              </div>
+              <div class="field">
+                <label class="required">Availability</label>
+                <div class="custom-select">
+                  <select id="edit-doctorAvailability">
+                    <option>Available</option>
+                    <option>Unavailable</option>
+                    <option>On Leave</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

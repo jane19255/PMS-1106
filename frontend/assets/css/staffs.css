@@ -26,6 +26,92 @@
     font-weight: 500;
 }
 
+.doctor-management {
+    margin-top: 36px;
+}
+
+.doctor-management .section-title {
+    margin-bottom: 18px;
+}
+
+.doctor-metrics {
+    margin-bottom: 20px;
+}
+
+.doctor-status {
+    display: inline-flex;
+    justify-content: center;
+    min-width: 92px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.doctor-status.available {
+    background: rgb(34 197 94 / 12%);
+    color: #15803d;
+}
+
+.doctor-status.unavailable,
+.doctor-status.on-leave {
+    background: rgb(249 115 22 / 12%);
+    color: #c2410c;
+}
+
+.doctor-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.doctor-actions a,
+.doctor-actions button {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.doctor-actions .delete-doctor {
+    color: var(--danger);
+    border-color: rgb(239 68 68 / 35%);
+}
+
+.doctor-form-note {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 18px;
+}
+
+.doctor-profile-fields {
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    padding-top: 18px;
+}
+
+.doctor-profile-fields[hidden] {
+    display: none;
+}
+
+.subsection-title {
+    color: var(--secondary);
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.empty-row {
+    text-align: center;
+    color: var(--muted);
+}
+
 @media only screen and (max-width: 1000px) {
     main {
         padding: 90px 24px 24px;

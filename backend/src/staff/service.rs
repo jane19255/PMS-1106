@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub enum StaffError {
     InvalidInput(String),
     StaffNotFound,
+    StaffHasDoctorProfile,
     StorageUnavailable,
 }
 
@@ -17,10 +18,20 @@ pub struct StaffForm {
     pub firebase_uid: String,
     pub first_name: String,
     pub last_name: String,
+    #[serde(default)]
+    pub dob: String,
+    #[serde(default)]
+    pub gender: String,
+    #[serde(default)]
+    pub nric: String,
     pub role: String,
     pub phone: String,
     pub email: String,
     pub status: Option<String>,
+    #[serde(default)]
+    pub address: String,
+    #[serde(default)]
+    pub emergency: String,
 }
 
 pub struct StaffService {
@@ -33,12 +44,16 @@ impl StaffService {
     }
 
     pub async fn create_staff(&self, form: StaffForm) -> Result<StaffMember, StaffError> {
-        self.validate_staff_form(&form)?;
+        self.validate_staff_form(&form, true)?;
+        let generated_id = Uuid::new_v4();
         let staff = StaffMember {
-            id: format!("STF-{}", Uuid::new_v4()),
+            id: format!("STF-{generated_id}"),
             firebase_uid: form.firebase_uid.trim().to_string(),
             first_name: form.first_name.trim().to_string(),
             last_name: form.last_name.trim().to_string(),
+            dob: form.dob.trim().to_string(),
+            gender: normalize_gender(&form.gender),
+            nric: form.nric.trim().to_uppercase(),
             role: normalize_role(&form.role),
             phone: form.phone.trim().to_string(),
             email: form.email.trim().to_string(),
@@ -47,6 +62,8 @@ impl StaffService {
                 .as_deref()
                 .map(normalize_status)
                 .unwrap_or_else(|| "Active".to_string()),
+            address: form.address.trim().to_string(),
+            emergency: form.emergency.trim().to_string(),
         };
 
         self.staff_repository
@@ -70,12 +87,15 @@ impl StaffService {
         if staff_id.trim().is_empty() {
             return Err(StaffError::InvalidInput("Staff ID is required".to_string()));
         }
-        self.validate_staff_form(&form)?;
+        self.validate_staff_form(&form, true)?;
         let staff = StaffMember {
             id: staff_id.trim().to_string(),
             firebase_uid: form.firebase_uid.trim().to_string(),
             first_name: form.first_name.trim().to_string(),
             last_name: form.last_name.trim().to_string(),
+            dob: form.dob.trim().to_string(),
+            gender: normalize_gender(&form.gender),
+            nric: form.nric.trim().to_uppercase(),
             role: normalize_role(&form.role),
             phone: form.phone.trim().to_string(),
             email: form.email.trim().to_string(),
@@ -84,6 +104,8 @@ impl StaffService {
                 .as_deref()
                 .map(normalize_status)
                 .unwrap_or_else(|| "Active".to_string()),
+            address: form.address.trim().to_string(),
+            emergency: form.emergency.trim().to_string(),
         };
 
         self.staff_repository
@@ -92,9 +114,22 @@ impl StaffService {
             .map_err(Self::map_repository_error)
     }
 
-    fn validate_staff_form(&self, form: &StaffForm) -> Result<(), StaffError> {
+    pub async fn delete_staff(&self, staff_id: &str) -> Result<(), StaffError> {
+        if staff_id.trim().is_empty() {
+            return Err(StaffError::InvalidInput("Staff ID is required".to_string()));
+        }
+        self.staff_repository
+            .delete(staff_id.trim())
+            .await
+            .map_err(Self::map_repository_error)
+    }
+
+    fn validate_staff_form(
+        &self,
+        form: &StaffForm,
+        require_firebase_uid: bool,
+    ) -> Result<(), StaffError> {
         for (field_name, value) in [
-            ("Firebase UID", form.firebase_uid.as_str()),
             ("First name", form.first_name.as_str()),
             ("Last name", form.last_name.as_str()),
             ("Role", form.role.as_str()),
@@ -105,6 +140,12 @@ impl StaffService {
                     "{field_name} is required"
                 )));
             }
+        }
+
+        if require_firebase_uid && form.firebase_uid.trim().is_empty() {
+            return Err(StaffError::InvalidInput(
+                "Firebase UID is required".to_string(),
+            ));
         }
 
         if !matches!(
@@ -119,6 +160,27 @@ impl StaffService {
             if !matches!(status.trim().to_lowercase().as_str(), "active" | "inactive") {
                 return Err(StaffError::InvalidInput(
                     "Status must be Active or Inactive".to_string(),
+                ));
+            }
+        }
+
+        if !form.gender.trim().is_empty()
+            && !matches!(
+                form.gender.trim().to_lowercase().as_str(),
+                "male" | "female"
+            )
+        {
+            return Err(StaffError::InvalidInput(
+                "Gender must be Male or Female".to_string(),
+            ));
+        }
+
+        if !form.dob.trim().is_empty() {
+            let dob = chrono::NaiveDate::parse_from_str(form.dob.trim(), "%Y-%m-%d")
+                .map_err(|_| StaffError::InvalidInput("Date of birth is invalid".to_string()))?;
+            if dob > chrono::Utc::now().date_naive() {
+                return Err(StaffError::InvalidInput(
+                    "Date of birth cannot be in the future".to_string(),
                 ));
             }
         }
@@ -153,6 +215,7 @@ impl StaffService {
             RepositoryError::DuplicateFirebaseUid => StaffError::InvalidInput(
                 "Firebase UID is already used by another staff member".to_string(),
             ),
+            RepositoryError::ReferencedByDoctor => StaffError::StaffHasDoctorProfile,
             RepositoryError::NotFound => StaffError::StaffNotFound,
             RepositoryError::StorageUnavailable => StaffError::StorageUnavailable,
         }
@@ -173,6 +236,14 @@ fn normalize_status(status: &str) -> String {
         "Inactive".to_string()
     } else {
         "Active".to_string()
+    }
+}
+
+fn normalize_gender(gender: &str) -> String {
+    match gender.trim().to_lowercase().as_str() {
+        "male" => "Male".to_string(),
+        "female" => "Female".to_string(),
+        _ => String::new(),
     }
 }
 
@@ -206,10 +277,15 @@ mod tests {
             firebase_uid: "firebase-user-1".to_string(),
             first_name: "Ada".to_string(),
             last_name: "Lovelace".to_string(),
+            dob: "1990-01-01".to_string(),
+            gender: "Female".to_string(),
+            nric: "S1234567A".to_string(),
             role: "Doctor".to_string(),
             phone: "91234567".to_string(),
             email: "ada@example.com".to_string(),
             status: Some("Active".to_string()),
+            address: "1 Test Road".to_string(),
+            emergency: "Bob 91234567".to_string(),
         }
     }
 
@@ -247,5 +323,15 @@ mod tests {
 
         assert_eq!(updated.role, "Pharmacist");
         assert_eq!(updated.status, "Inactive");
+    }
+
+    #[actix_web::test]
+    async fn deletes_existing_staff_member() {
+        let service = service();
+        let staff = service.create_staff(staff_form()).await.unwrap();
+
+        service.delete_staff(&staff.id).await.unwrap();
+
+        assert!(service.list_staff().await.unwrap().is_empty());
     }
 }

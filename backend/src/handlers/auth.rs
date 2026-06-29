@@ -390,6 +390,7 @@ pub async fn require_auth_and_permission(
     firestore_db: &FirebaseRestDb,
     action: AppAction,
 ) -> Result<(String, String), HttpResponse> {
+    // Check both login and role here so protected routes follow the same rule.
     let uid = require_auth(req, firebase_auth).await?;
     let role = get_staff_role(firestore_db, &uid).await.ok_or_else(|| {
         HttpResponse::Forbidden().body("Access Denied: No active staff profile found.")
@@ -408,6 +409,7 @@ pub async fn require_auth_and_permission(
 }
 
 pub fn has_permission(role: &str, action: AppAction) -> bool {
+    // Keep the role rules in one place so the frontend and API do not disagree.
     let normalized_role = role.trim().to_lowercase();
 
     if normalized_role == "admin" {
@@ -529,7 +531,10 @@ mod tests {
         assert!(has_permission("receptionist", AppAction::CreateInvoice));
         assert!(has_permission("receptionist", AppAction::RecordPayment));
         assert!(has_permission("receptionist", AppAction::CancelInvoice));
-        assert!(has_permission("receptionist", AppAction::GenerateBillingReport));
+        assert!(has_permission(
+            "receptionist",
+            AppAction::GenerateBillingReport
+        ));
     }
 
     #[test]
@@ -540,7 +545,10 @@ mod tests {
 
     #[test]
     fn receptionist_manages_appointments_but_not_doctor_dashboard_or_doctors() {
-        assert!(has_permission("receptionist", AppAction::ManageAppointments));
+        assert!(has_permission(
+            "receptionist",
+            AppAction::ManageAppointments
+        ));
         assert!(!has_permission("receptionist", AppAction::ManageDoctorAppt));
         assert!(!has_permission("receptionist", AppAction::ManageUsers));
     }
@@ -564,8 +572,14 @@ mod tests {
         assert!(has_permission("pharmacist", AppAction::DispenseMedicine));
         assert!(!has_permission("pharmacist", AppAction::CreatePrescription));
 
-        assert!(!has_permission("receptionist", AppAction::ViewPrescriptions));
-        assert!(!has_permission("receptionist", AppAction::CreatePrescription));
+        assert!(!has_permission(
+            "receptionist",
+            AppAction::ViewPrescriptions
+        ));
+        assert!(!has_permission(
+            "receptionist",
+            AppAction::CreatePrescription
+        ));
         assert!(!has_permission("receptionist", AppAction::DispenseMedicine));
     }
 

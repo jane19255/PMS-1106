@@ -16,6 +16,7 @@ pub enum RepositoryError {
     InvalidPhone,
     DuplicateEmail,
     DuplicateFirebaseUid,
+    ReferencedByDoctor,
     NotFound,
     StorageUnavailable,
 }
@@ -24,6 +25,7 @@ pub trait StaffRepository: Send + Sync {
     fn create(&self, staff: StaffMember) -> RepositoryFuture<'_, StaffMember>;
     fn list(&self) -> RepositoryFuture<'_, Vec<StaffMember>>;
     fn update(&self, staff: StaffMember) -> RepositoryFuture<'_, StaffMember>;
+    fn delete(&self, staff_id: &str) -> RepositoryFuture<'_, ()>;
 }
 
 #[derive(Default)]
@@ -66,6 +68,18 @@ impl StaffRepository for InMemoryStaffRepository {
             }
             staff_members.insert(staff.id.clone(), staff.clone());
             Ok(staff)
+        })
+    }
+
+    fn delete(&self, staff_id: &str) -> RepositoryFuture<'_, ()> {
+        let staff_id = staff_id.to_string();
+        Box::pin(async move {
+            let removed = self
+                .staff
+                .lock()
+                .map_err(|_| RepositoryError::StorageUnavailable)?
+                .remove(&staff_id);
+            removed.map(|_| ()).ok_or(RepositoryError::NotFound)
         })
     }
 }
@@ -123,6 +137,8 @@ impl SupabaseStaffRepository {
             RepositoryError::DuplicateEmail
         } else if body.contains("staff_firebase_uid_key") {
             RepositoryError::DuplicateFirebaseUid
+        } else if body.contains("doctors_staff_id_fkey") {
+            RepositoryError::ReferencedByDoctor
         } else {
             RepositoryError::StorageUnavailable
         }
@@ -180,6 +196,33 @@ impl StaffRepository for SupabaseStaffRepository {
                 .ok_or(RepositoryError::NotFound)
         })
     }
+
+    fn delete(&self, staff_id: &str) -> RepositoryFuture<'_, ()> {
+        let encoded_id = urlencoding::encode(staff_id).into_owned();
+        Box::pin(async move {
+            let response = self
+                .request(
+                    self.client
+                        .delete(self.staff_url(&format!("id=eq.{encoded_id}&select=id"))),
+                )
+                .header("Prefer", "return=representation")
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+            if !response.status().is_success() {
+                return Err(Self::response_error(response).await);
+            }
+            let rows = response
+                .json::<Vec<serde_json::Value>>()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+            if rows.is_empty() {
+                Err(RepositoryError::NotFound)
+            } else {
+                Ok(())
+            }
+        })
+    }
 }
 
 #[derive(Deserialize)]
@@ -187,10 +230,15 @@ struct DatabaseStaff {
     id: String,
     firebase_uid: String,
     full_name: String,
+    dob: Option<String>,
+    gender: Option<String>,
+    nric: Option<String>,
     email: String,
     phone: Option<String>,
     role: String,
     status: String,
+    address: Option<String>,
+    emergency_contact: Option<String>,
 }
 
 impl From<DatabaseStaff> for StaffMember {
@@ -201,10 +249,15 @@ impl From<DatabaseStaff> for StaffMember {
             firebase_uid: row.firebase_uid,
             first_name,
             last_name,
+            dob: row.dob.unwrap_or_default(),
+            gender: row.gender.unwrap_or_default(),
+            nric: row.nric.unwrap_or_default(),
             role: display_role(&row.role),
             phone: row.phone.unwrap_or_default(),
             email: row.email,
             status: display_status(&row.status),
+            address: row.address.unwrap_or_default(),
+            emergency: row.emergency_contact.unwrap_or_default(),
         }
     }
 }
@@ -214,11 +267,25 @@ fn database_payload(staff: &StaffMember) -> serde_json::Value {
         "id": staff.id,
         "firebase_uid": staff.firebase_uid,
         "full_name": staff.full_name(),
+        "dob": optional_text(&staff.dob),
+        "gender": optional_text(&staff.gender),
+        "nric": optional_text(&staff.nric),
         "email": staff.email,
         "phone": if staff.phone.trim().is_empty() { None } else { Some(staff.phone.trim()) },
         "role": database_role(&staff.role),
         "status": database_status(&staff.status),
+        "address": optional_text(&staff.address),
+        "emergency_contact": optional_text(&staff.emergency),
     })
+}
+
+fn optional_text(value: &str) -> Option<&str> {
+    let value = value.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
 }
 
 fn split_full_name(full_name: &str) -> (String, String) {
@@ -262,4 +329,3 @@ fn display_status(status: &str) -> String {
         "Active".to_string()
     }
 }
-
