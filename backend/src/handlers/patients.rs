@@ -34,6 +34,7 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/patients", web::get().to(patients_page));
     cfg.route("/api/patients", web::get().to(list_patients));
     cfg.route("/api/patients/new", web::post().to(create_patient));
+    cfg.route("/api/patients/{id}", web::get().to(get_patient_by_id));
     cfg.route("/api/patients/{id}", web::put().to(update_patient));
     cfg.route("/api/patients/{id}", web::delete().to(delete_patient));
 }
@@ -99,6 +100,39 @@ pub async fn list_patients(
         Err(e) => {
             eprintln!("Failed to list patients from Supabase: {e}");
             HttpResponse::InternalServerError().body("Failed to load patients from database.")
+        }
+    }
+}
+
+pub async fn get_patient_by_id(
+    req: HttpRequest,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
+    path: web::Path<String>,
+) -> impl Responder {
+    if let Err(rejection) =
+        require_auth_and_permission(&req, &firebase_auth, &firestore_db, AppAction::ViewPatient)
+            .await
+    {
+        return rejection;
+    }
+
+    let patient_id = path.into_inner();
+    match supabase_db.get_patient(&patient_id).await {
+        Ok(body) => match serde_json::from_str::<Vec<SupabasePatientRow>>(&body) {
+            Ok(rows) => match rows.into_iter().next().map(PatientView::from) {
+                Some(patient) => HttpResponse::Ok().json(patient),
+                None => HttpResponse::NotFound().body("Patient not found"),
+            },
+            Err(e) => {
+                eprintln!("Failed to parse patient {patient_id}: {e}");
+                HttpResponse::InternalServerError().body("Failed to parse patient")
+            }
+        },
+        Err(e) => {
+            eprintln!("Failed to fetch patient {patient_id}: {e}");
+            HttpResponse::InternalServerError().body("Failed to load patient")
         }
     }
 }

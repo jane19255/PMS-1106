@@ -39,37 +39,45 @@
             </div>
         </div>
 
+        <div id="patientSearch" class="card" style="display:flex;gap:10px;align-items:flex-end;margin-bottom:12px">
+            <div class="field" style="flex:1;margin:0">
+                <label>Patient ID</label>
+                <input type="text" id="patientIdInput" placeholder="Enter Patient ID (e.g. S1234567A)">
+            </div>
+            <button onclick="searchPatient()">Load Patient</button>
+        </div>
+
         <div id="patientInfo" class="card">
             <img src="https://i.pinimg.com/736x/48/49/ab/4849ab9b4c07e86b9fc62757cb11c37d.jpg">
             <div class="info-grid">
                 <div class="info-item">
                     <p>Full Name</p>
-                    <p>Michael Tan</p>
+                    <p id="pat-name">—</p>
                 </div>
                 <div class="info-item">
                     <p>IC Number</p>
-                    <p>S1234567A</p>
+                    <p id="pat-ic">—</p>
                 </div>
                 <div class="info-item">
                     <p>Date of Birth</p>
-                    <p>15/03/1992</p>
+                    <p id="pat-dob">—</p>
                 </div>
                 <div class="info-item">
                     <p>Contact Phone</p>
-                    <p>+65 98765432</p>
+                    <p id="pat-phone">—</p>
                 </div>
 
                 <div class="info-item">
                     <p>Known Allergies</p>
-                    <p>Penicillin</p>
+                    <p id="pat-allergies">—</p>
                 </div>
                 <div class="info-item">
                     <p>Current Medications</p>
-                    <p>Loratadine</p>
+                    <p id="pat-medications">—</p>
                 </div>
                 <div class="info-item">
                     <p>Existing Medical Conditions</p>
-                    <p>Asthma</p>
+                    <p id="pat-conditions">—</p>
                 </div>
             </div>
         </div>
@@ -80,23 +88,23 @@
             <div id="vital-row">
                 <div class="field">
                     <label>Blood Pressure</label>
-                    <input value="125/82" readonly="">
+                    <input id="inp-bp" placeholder="e.g. 120/80">
                 </div>
                 <div class="field">
                     <label>Temperature (°C)</label>
-                    <input value="37.2" readonly="">
+                    <input id="inp-temp" placeholder="e.g. 37.2">
                 </div>
                 <div class="field">
                     <label>Pulse Rate (bpm)</label>
-                    <input value="88" readonly="">
+                    <input id="inp-pulse" placeholder="e.g. 80">
                 </div>
                 <div class="field">
                     <label>Height (cm)</label>
-                    <input value="172" readonly="">
+                    <input id="inp-height" placeholder="e.g. 170">
                 </div>
                 <div class="field">
                     <label>Weight (kg)</label>
-                    <input value="68.5" readonly="">
+                    <input id="inp-weight" placeholder="e.g. 65">
                 </div>
             </div>
 
@@ -172,109 +180,14 @@
                         </div>
                     </div>
                 </div>
-
-                <button id="saveRecBtn"><i class="fa-solid fa-floppy-disk"></i>Save record</button>
             </div>
+
+            <button id="saveVisitBtn"><i class="fa-solid fa-floppy-disk"></i>Save Visit Record</button>
         </div>
 
         <div class="card" id="prevRecord">
             <p class="title"><i class="fa-solid fa-clock-rotate-left"></i>Previous Historical Visits Record</p>
-
-            <div class="history-card">
-                <div class="history-head" onclick="toggleHistory(this)">
-                    <span>Visit Date: 12/05/2025<span>Dr. Jimmy</span></span>
-                    <div>
-                        <button onclick="event.stopPropagation();printSingleHist()">Print This Visit</button>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                </div>
-                <div class="history-body">
-                    <div class="hist-data">
-                        <div>
-                            <p>BP</p>
-                            <p>120/78</p>
-                        </div>
-                        <div>
-                            <p>Temp</p>
-                            <p>36.7°C</p>
-                        </div>
-                        <div>
-                            <p>Pulse</p>
-                            <p>76bpm</p>
-                        </div>
-                        <div>
-                            <p>Height</p>
-                            <p>172cm</p>
-                        </div>
-                        <div>
-                            <p>Weight</p>
-                            <p>67kg</p>
-                        </div>
-                    </div>
-                    <div class="hist-block">
-                        <p>Reason: </p>
-                        <p>Headache &amp; mild fever for 2 days</p>
-                    </div>
-                    <div class="hist-block">
-                        <p>Findings & Diagnosis: </p>
-                        <p>Viral upper respiratory tract infection</p>
-                    </div>
-                    <div class="hist-block">
-                        <p>Prescription:</p>
-                        <p>Paracetamol 500mg 2x/Day, after meal</p>
-                        <p>Omeprazole 20mg 1x/Day before breakfast</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="history-card">
-                <div class="history-head" onclick="toggleHistory(this)">
-                    <div>
-                        <span>Visit Date: 28/04/2025</span>
-                        <span>Dr. Lee</span>
-                    </div>
-                    <div>
-                        <button onclick="event.stopPropagation();printSingleHist(this)">Print This Visit</button>
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                </div>
-                <div class="history-body">
-                    <div class="hist-data">
-                        <div>
-                            <p>BP</p>
-                            <p>122/80</p>
-                        </div>
-                        <div>
-                            <p>Temp</p>
-                            <p>36.5°C</p>
-                        </div>
-                        <div>
-                            <p>Pulse</p>
-                            <p>72bpm</p>
-                        </div>
-                        <div>
-                            <p>Height</p>
-                            <p>172cm</p>
-                        </div>
-                        <div>
-                            <p>Weight</p>
-                            <p>66.8kg</p>
-                        </div>
-                    </div>
-                    <div class="hist-block">
-                        <p>Reason: </p>
-                        <p>Mild stomach discomfort</p>
-                    </div>
-                    <div class="hist-block">
-                        <p>Findings &amp; Diagnosis: </p>
-                        <p>Indigestion due to irregular diet</p>
-                    </div>
-                    <div class="hist-block">
-                        <p>Prescription:</p>
-                        <p>Omeprazole 20mg 1x/Day before breakfast</p>
-                    </div>
-                </div>
-            </div>
+            <p style="color:#888;font-size:14px;padding:8px 0">Load a patient to view their visit history.</p>
         </div>
 
 
