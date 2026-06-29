@@ -432,7 +432,6 @@ pub async fn patient_timeline_api(
     service: web::Data<MedicalRecordService>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
-    supabase_db: web::Data<SupabaseRestDb>,
     path: web::Path<String>,
 ) -> impl Responder {
     if let Err(rejection) = require_records_permission(
@@ -447,16 +446,7 @@ pub async fn patient_timeline_api(
     }
 
     match service.patient_timeline(&path.into_inner()).await {
-        Ok(mut entries) => {
-            for entry in entries.iter_mut() {
-                if let Some(ref doctor_id) = entry.record.doctor_id {
-                    if let Ok(name) = fetch_doctor_name(&supabase_db, doctor_id).await {
-                        entry.doctor_name = Some(name);
-                    }
-                }
-            }
-            HttpResponse::Ok().json(entries)
-        }
+        Ok(entries) => HttpResponse::Ok().json(entries),
         Err(error) => record_error_response(error),
     }
 }
@@ -483,34 +473,6 @@ async fn fetch_patient(
     let body = supabase_db.get_patient(patient_id).await.map_err(|_| ())?;
     let rows: Vec<SupabasePatientRow> = serde_json::from_str(&body).map_err(|_| ())?;
     rows.into_iter().next().map(PatientView::from).ok_or(())
-}
-
-async fn fetch_doctor_name(supabase_db: &SupabaseRestDb, doctor_id: &str) -> Result<String, ()> {
-    #[derive(serde::Deserialize)]
-    struct StaffEmbed {
-        full_name: String,
-    }
-    #[derive(serde::Deserialize)]
-    struct DoctorRow {
-        staff: StaffEmbed,
-    }
-
-    let encoded_id = urlencoding::encode(doctor_id);
-    let url = format!(
-        "{}/rest/v1/doctors?id=eq.{}&select=staff:staff_id(full_name)",
-        supabase_db.url, encoded_id
-    );
-    let response = supabase_db
-        .http_client
-        .get(&url)
-        .header("apikey", &supabase_db.key)
-        .header("Authorization", format!("Bearer {}", supabase_db.key))
-        .send()
-        .await
-        .map_err(|_| ())?;
-
-    let rows: Vec<DoctorRow> = response.json().await.map_err(|_| ())?;
-    rows.into_iter().next().map(|r| r.staff.full_name).ok_or(())
 }
 
 async fn require_records_permission(
