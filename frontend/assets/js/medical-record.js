@@ -73,6 +73,148 @@ function toggleHistory(el) {
     else icon.style.transform = "rotate(0deg)";
 }
 
+function searchPatient() {
+    const id = document.getElementById('patientIdInput').value.trim();
+    if (!id) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('patient_id', id);
+    window.history.replaceState({}, '', url.toString());
+    loadPatient(id);
+    loadHistory(id);
+}
+
+async function loadPatient(patientId) {
+    try {
+        const res = await fetch(`/api/patients/${patientId}`);
+        if (!res.ok) { showToast('Patient not found', 'error'); return; }
+        const p = await res.json();
+        document.getElementById('pat-name').textContent = `${p.firstName} ${p.lastName}`;
+        document.getElementById('pat-ic').textContent = p.nric || '—';
+        document.getElementById('pat-dob').textContent = p.dob || '—';
+        document.getElementById('pat-phone').textContent = p.phone || '—';
+        document.getElementById('pat-allergies').textContent = p.allergies || 'None';
+        document.getElementById('pat-medications').textContent = p.medications || 'None';
+        document.getElementById('pat-conditions').textContent = p.conditions || 'None';
+    } catch (e) {
+        console.error('Failed to load patient:', e);
+    }
+}
+
+async function loadHistory(patientId) {
+    try {
+        const res = await fetch(`/api/patients/${encodeURIComponent(patientId)}/timeline`);
+        if (!res.ok) return;
+        const entries = await res.json();
+
+        const container = document.getElementById('prevRecord');
+        const title = container.querySelector('.title');
+        container.innerHTML = '';
+        if (title) container.appendChild(title);
+
+        if (!entries.length) {
+            const msg = document.createElement('p');
+            msg.style.cssText = 'color:#888;padding:16px 0;font-size:14px';
+            msg.textContent = 'No previous visits recorded.';
+            container.appendChild(msg);
+            return;
+        }
+
+        entries.forEach(entry => container.appendChild(buildHistoryCard(entry)));
+    } catch (e) {
+        console.error('Failed to load history:', e);
+    }
+}
+
+function buildHistoryCard(entry) {
+    const r = entry.record;
+    const date = r.recorded_at ? new Date(r.recorded_at).toLocaleDateString('en-GB') : '—';
+    const doctor = entry.doctor_name || '';
+    const card = document.createElement('div');
+    card.className = 'history-card';
+    card.innerHTML = `
+        <div class="history-head" onclick="toggleHistory(this)">
+            <span>Visit Date: ${date}<span>${doctor}</span></span>
+            <div>
+                <button onclick="event.stopPropagation();printSingleHist(this)">Print This Visit</button>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+        </div>
+        <div class="history-body">
+            <div class="hist-data">
+                <div><p>BP</p><p>${r.blood_pressure || '—'}</p></div>
+                <div><p>Temp</p><p>${r.temperature ? r.temperature + '°C' : '—'}</p></div>
+                <div><p>Pulse</p><p>${r.pulse_rate ? r.pulse_rate + 'bpm' : '—'}</p></div>
+                <div><p>Height</p><p>${r.height_cm ? r.height_cm + 'cm' : '—'}</p></div>
+                <div><p>Weight</p><p>${r.weight_kg ? r.weight_kg + 'kg' : '—'}</p></div>
+            </div>
+            ${r.reason_of_visit ? `<div class="hist-block"><p>Reason: </p><p>${r.reason_of_visit}</p></div>` : ''}
+            ${r.diagnosis ? `<div class="hist-block"><p>Findings &amp; Diagnosis: </p><p>${r.diagnosis}</p></div>` : ''}
+            ${r.treatment_plan ? `<div class="hist-block"><p>Treatment: </p><p>${r.treatment_plan}</p></div>` : ''}
+            ${r.doctor_notes ? `<div class="hist-block"><p>Notes: </p><p>${r.doctor_notes}</p></div>` : ''}
+        </div>`;
+    return card;
+}
+
+async function saveRecord(patientId) {
+    const body = {
+        patient_id: patientId,
+        blood_pressure: document.getElementById('inp-bp').value.trim() || null,
+        temperature: document.getElementById('inp-temp').value.trim() || null,
+        pulse_rate: document.getElementById('inp-pulse').value.trim() || null,
+        height_cm: document.getElementById('inp-height').value.trim() || null,
+        weight_kg: document.getElementById('inp-weight').value.trim() || null,
+        reason_of_visit: document.getElementById('visitReason').value.trim() || null,
+        clinical_findings: document.getElementById('findings').value.trim() || null,
+        diagnosis: document.getElementById('diagnosis').value.trim() || null,
+        doctor_notes: document.getElementById('treatNote').value.trim() || null,
+        doctor_id: document.getElementById('visitDoctorId').value.trim() || null,
+    };
+
+    try {
+        const res = await fetch('/api/medical-records', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (res.ok) {
+            showToast('Record saved successfully!', 'success');
+            ['visitReason', 'findings', 'diagnosis', 'treatNote'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            ['inp-bp', 'inp-temp', 'inp-pulse', 'inp-height', 'inp-weight'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            await loadHistory(patientId);
+        } else {
+            const text = await res.text();
+            showToast('Save failed: ' + text, 'error');
+        }
+    } catch (e) {
+        showToast('Network error: ' + e.message, 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const patientId = params.get('patient_id');
+    if (patientId) {
+        document.getElementById('patientIdInput').value = patientId;
+        loadPatient(patientId);
+        loadHistory(patientId);
+    }
+
+    const saveBtn = document.getElementById('saveVisitBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const id = new URLSearchParams(window.location.search).get('patient_id');
+            if (!id) { showToast('Please load a patient first', 'error'); return; }
+            saveRecord(id);
+        });
+    }
+});
+
 function printSingleHist(el) {
     // Fallback safety check
     let recordCard;
