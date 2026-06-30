@@ -17,20 +17,40 @@
 
     <section class="display" aria-label="Billing summary">
         <article class="card summary-card pending">
-            <div class="data">Pending bills</div>
-            <div class="number">{{ pending_count }}</div>
+            <div class="details">
+                <div class="data">Pending bills</div>
+                <div class="number">{{ pending_count }}</div>
+            </div>
+            <div class="icon">
+                <i class="fa-solid fa-file-invoice-dollar"></i>
+            </div>
         </article>
         <article class="card summary-card paid">
-            <div class="data">Paid bills</div>
-            <div class="number">{{ paid_count }}</div>
+            <div class="details">
+                <div class="data">Paid bills</div>
+                <div class="number">{{ paid_count }}</div>
+            </div>
+            <div class="icon">
+                <i class="fa-solid fa-file-circle-check"></i>
+            </div>
         </article>
         <article class="card summary-card cancelled">
-            <div class="data">Cancelled bills</div>
-            <div class="number">{{ cancelled_count }}</div>
+            <div class="details">
+                <div class="data">Cancelled bills</div>
+                <div class="number">{{ cancelled_count }}</div>
+            </div>
+            <div class="icon">
+                <i class="fa-solid fa-file-circle-xmark"></i>
+            </div>
         </article>
         <article class="card summary-card revenue">
-            <div class="data">Paid revenue</div>
-            <div class="number">${{ paid_revenue | round(precision=2) }}</div>
+            <div class="details">
+                <div class="data">Paid revenue</div>
+                <div class="number">${{ paid_revenue | round(precision=2) }}</div>
+            </div>
+            <div class="icon">
+                <i class="fa-solid fa-dollar-sign"></i>
+            </div>
         </article>
     </section>
 
@@ -73,8 +93,8 @@
                                 maxlength="200" placeholder="Medicine name">
                         </label>
                         <label class="custom-prescription-cost" hidden>Custom cost
-                            <input class="custom-medicine-cost" type="number" name="custom_prescription_costs"
-                                min="0" step="0.01" placeholder="0.00">
+                            <input class="custom-medicine-cost" type="number" name="custom_prescription_costs" min="0"
+                                step="0.01" placeholder="0.00">
                         </label>
                         <label>Cost
                             <input class="prescription-cost" type="number" min="0" step="0.01" readonly>
@@ -92,21 +112,27 @@
     </details>
 
     <section class="control card" aria-label="Invoice controls">
-        <div class="search">
+        <div class="field search">
             <input type="search" id="billingSearch" placeholder="Search invoice, patient, or appointment ID">
+            <i class="fa-solid fa-magnifying-glass"></i>
         </div>
-        <select id="billingStatus" aria-label="Filter by status">
-            <option value="">All statuses</option>
-            <option value="Pending">Pending</option>
-            <option value="Paid">Paid</option>
-            <option value="Cancelled">Cancelled</option>
-        </select>
-        <select id="billingSort" aria-label="Sort invoices">
-            <option value="newest">Date (newest)</option>
-            <option value="oldest">Date (oldest)</option>
-            <option value="amount-high">Amount (highest)</option>
-            <option value="amount-low">Amount (lowest)</option>
-        </select>
+        <div class="custom-select">
+            <select id="billingStatus" aria-label="Filter by status">
+                <option value="">All statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Paid">Paid</option>
+                <option value="Cancelled">Cancelled</option>
+            </select>
+        </div>
+        <div class="custom-select">
+            <select id="billingSort" aria-label="Sort invoices">
+                <option value="newest">Date (newest)</option>
+                <option value="oldest">Date (oldest)</option>
+                <option value="amount-high">Amount (highest)</option>
+                <option value="amount-low">Amount (lowest)</option>
+            </select>
+        </div>
+
     </section>
 
     <section class="table-list card">
@@ -126,8 +152,7 @@
                 <tbody>
                     {% for invoice in invoices %}
                     <tr data-search="{{ invoice.id }} {{ invoice.patient_id }} {{ invoice.appointment_id | default(value='') }}"
-                        data-status="{{ invoice.status }}"
-                        data-date="{{ invoice.created_at }}"
+                        data-status="{{ invoice.status }}" data-date="{{ invoice.created_at }}"
                         data-amount="{{ invoice.total }}">
                         <td>{{ invoice.id }}</td>
                         <td>{{ invoice.patient_id }}</td>
@@ -136,15 +161,21 @@
                         <td>${{ invoice.total | round(precision=2) }}</td>
                         <td><span class="status {{ invoice.status | lower }}">{{ invoice.status }}</span></td>
                         <td class="action">
-                            <a href="/billing/invoices/{{ invoice.id }}">View</a>
-                            <a href="/billing/invoices/{{ invoice.id }}/report">Report</a>
+                            <div class="has-tooltip">
+                                <a href="/billing/invoices/{{ invoice.id }}"><i class="view fa-solid fa-circle-info"></i></a>
+                                <span class="tooltip-text">View Details</span>
+                            </div>
+                            <div class="has-tooltip">
+                                <a href="/billing/invoices/{{ invoice.id }}/report"><i class="fa-solid fa-file"></i></a>
+                                <span class="tooltip-text">View Report</span>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        <p id="billingEmpty" class="empty-state" {% if invoices | length > 0 %}hidden{% endif %}>No invoices found.</p>
+        <p id="billingEmpty" class="empty-state" {% if invoices | length> 0 %}hidden{% endif %}>No invoices found.</p>
         <div class="pagination">
             <p id="billingPageInfo"></p>
             <div>
@@ -154,8 +185,8 @@
                     <option value="10">10</option>
                     <option value="20">20</option>
                 </select>
-                <button class="secondary" id="billingPrevious" type="button">Previous</button>
-                <button class="secondary" id="billingNext" type="button">Next</button>
+                <button class="secondary" id="billingPrevious" type="button"><i class="fa fa-chevron-left"></i></button>
+                <button class="secondary" id="billingNext" type="button"><i class="fa fa-chevron-right"></i></button>
             </div>
         </div>
     </section>

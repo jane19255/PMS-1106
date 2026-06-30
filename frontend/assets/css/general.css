@@ -212,7 +212,7 @@ input.password {
 
 input.password+i {
     position: absolute;
-    top: 37px;
+    top: 41px;
     left: 400px;
     color: var(--secondary);
     cursor: pointer;
@@ -488,6 +488,7 @@ input.password+i {
 .control .search {
     position: relative;
     width: 100%;
+    margin: 0;
 }
 
 .control .search input {
@@ -498,7 +499,7 @@ input.password+i {
 .control .search .fa-solid {
     position: absolute;
     color: var(--secondary);
-    top: 12px;
+    top: 15px;
     left: 12px;
 }
 
@@ -556,8 +557,8 @@ input.password+i {
     align-items: center;
 }
 
-.table-list .pagination #pageInfo {
-    padding: 0 12px;
+.table-list .pagination #pageInfo,
+#billingPageInfo {
     font-size: 12px;
     color: var(--secondary);
 }

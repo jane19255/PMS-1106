@@ -3,7 +3,10 @@
 {% block title %}Prescription{% endblock title %}
 
 {% block content %}
-<h1>{{ prescription.medication_name }}</h1>
+<div class="page-title">
+    <a class="description" href="/prescriptions"><i class="fa-solid fa-arrow-left"></i> Back to Prescriptions</a>
+    
+</div>
 
 <section class="card">
     <p>ID: {{ prescription.id }}</p>
@@ -42,5 +45,5 @@
     </form>
 </section>
 
-<p><a href="/prescriptions">Back to Prescriptions</a></p>
+<p><a href="/prescriptions"><i class="fa-solid fa-arrow-left"></i> Back to Prescriptions</a></p>
 {% endblock content %}

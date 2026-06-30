@@ -36,6 +36,7 @@ function getQueueStatus(status) {
 
 function renderAppointmentRow(app) {
     const status = getQueueStatus(app.queueStatus);
+    console.log(app)
 
     let actionHtml = `<span class="muted">-</span>`;
 
@@ -54,7 +55,7 @@ function renderAppointmentRow(app) {
     }
 
     return `
-        <tr onclick="window.location.href='/records'">
+        <tr onclick="window.location.href='/records?patient_id=${app.patientId}'">
             <td>${app.patientName}</td>
             <td>${app.appointmentTime}</td>
             <td><span class="${status.class}">${status.text}</span></td>
