@@ -274,7 +274,8 @@ impl SupabaseRestDb {
     }
     
     pub async fn list_appointments_by_doctor(&self, doctor_id: &str,) -> Result<String, String> {
-        let url = self.rest_url(&format!("appointments?doctor_id=eq.{}&select=*&order=scheduled_at", doctor_id));
+        let encoded_id = urlencoding::encode(doctor_id);
+        let url = self.rest_url(&format!("appointments?doctor_id=eq.{}&select=*&order=scheduled_at", encoded_id));
         let response = self
             .authed(self.http_client.get(url))
             .send()

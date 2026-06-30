@@ -1,0 +1,168 @@
+{% extends "layout.html" %}
+
+{% block title %}Appointments{% endblock title %}
+
+{% block styles %}
+<style>
+    .page-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 24px 0;
+        flex-wrap: wrap;
+    }
+
+    .page-heading h1 { margin: 0; }
+    .page-heading p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+
+    .filter-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .filter-bar .field { min-width: 180px; }
+    .filter-bar label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; }
+
+    .records-table { width: 100%; border-collapse: collapse; }
+
+    .records-table th,
+    .records-table td {
+        padding: 12px 14px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+    }
+
+    .records-table th {
+        background: var(--surface);
+        font-weight: 600;
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .records-table tr:hover td { background: var(--surface); }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: var(--radius); font-size: 14px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface); }
+    .btn-danger { background: transparent; color: #b91c1c; border: 1px solid #fca5a5; }
+    .btn-danger:hover { background: #fee2e2; }
+
+    .row-actions { display: flex; gap: 8px; }
+
+    .empty-state { text-align: center; padding: 64px 24px; color: var(--muted); }
+    .empty-state i { font-size: 40px; margin-bottom: 12px; display: block; }
+
+    .tag {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--surface);
+        color: var(--muted);
+    }
+    .tag-scheduled { background: #e0e7ff; color: #3730a3; }
+    .tag-checked-in { background: #fef3c7; color: #92400e; }
+    .tag-in-consultation { background: #fef3c7; color: #92400e; }
+    .tag-completed { background: #dcfce7; color: #166534; }
+    .tag-cancelled { background: #fee2e2; color: #991b1b; }
+    .tag-no-show { background: #fee2e2; color: #991b1b; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Appointments</h1>
+        <p class="description">View and manage scheduled appointments.</p>
+    </div>
+    <a href="/appointments/new" class="btn btn-primary">
+        <i class="fa-solid fa-plus"></i> New Appointment
+    </a>
+</div>
+
+<form class="filter-bar" method="get" action="/appointments">
+    <div class="field">
+        <label>Date</label>
+        <input type="date" name="date" value="{{ filter_date }}">
+    </div>
+    <div class="field">
+        <label>Doctor ID</label>
+        <input type="text" name="doctor_id" value="{{ filter_doctor_id }}" placeholder="e.g. DOC-001">
+    </div>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    {% if filter_date or filter_doctor_id %}
+        <a href="/appointments" class="btn btn-ghost">Clear</a>
+    {% endif %}
+</form>
+
+{% if appointments | length == 0 %}
+<div class="card empty-state">
+    <i class="fa-solid fa-calendar-days"></i>
+    <p>No appointments found.</p>
+    <a href="/appointments/new" class="btn btn-primary" style="margin-top:12px">Schedule an Appointment</a>
+</div>
+{% else %}
+<section class="card" style="padding:0;overflow:hidden">
+    <table class="records-table">
+        <thead>
+            <tr>
+                <th>Patient</th>
+                <th>Doctor</th>
+                <th>Date / Time</th>
+                <th>Duration</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for appointment in appointments %}
+            <tr>
+                <td>
+                    {% if appointment.patients %}
+                        {{ appointment.patients.first_name }} {{ appointment.patients.last_name }}
+                        <div style="font-size:12px;color:var(--muted)">{{ appointment.patient_id }}</div>
+                    {% else %}
+                        {{ appointment.patient_id }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if appointment.doctors and appointment.doctors.staff %}
+                        Dr. {{ appointment.doctors.staff.full_name }}
+                        <div style="font-size:12px;color:var(--muted)">{{ appointment.doctors.specialty }}</div>
+                    {% else %}
+                        {{ appointment.doctor_id }}
+                    {% endif %}
+                </td>
+                <td>{{ appointment.scheduled_at | date(format="%d %b %Y, %H:%M") }}</td>
+                <td>{{ appointment.duration_minutes }} min</td>
+                <td>{{ appointment.reason | default(value="—") }}</td>
+                <td>
+                    <span class="tag tag-{{ appointment.status | lower | replace(from=" ", to="-") }}">{{ appointment.status }}</span>
+                </td>
+                <td>
+                    <div class="row-actions">
+                        <a href="/appointments/{{ appointment.id }}/edit" class="btn btn-ghost btn-sm">Edit</a>
+                        <form method="post" action="/appointments/{{ appointment.id }}/delete" onsubmit="return confirm('Delete this appointment?')">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+{% endblock content %}
