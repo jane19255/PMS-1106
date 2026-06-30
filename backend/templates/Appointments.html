@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointments</title>
+    <link rel="stylesheet" href="/assets/css/appointments.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://kit.fontawesome.com/4897704fad.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "{{ firebase_api_key }}",
+            authDomain: "{{ firebase_project_id }}.firebaseapp.com",
+            projectId: "{{ firebase_project_id }}",
+            storageBucket: "{{ firebase_project_id }}.appspot.com",
+        };
+        firebase.initializeApp(firebaseConfig);
+    </script>
+    <script src="/assets/js/FirebaseService.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="/assets/js/general.js"></script>
+    <script src="/assets/js/appointments.js?v=live-1"></script>
+
+</head>
+
+<body>
+
+    {% include "header.html" %}
+
+    <main>
+        <div class="page-title">
+            <div>
+                <div class="title">Appointment Management</div>
+                <div class="description">Manage all scheduled & past appointments</div>
+            </div>
+            <button onclick="openModal('addAppointmentModal')"><i class="fa-solid fa-plus"></i>New Appointment</button>
+        </div>
+
+        <div class="display">
+            <div class="card" id="todayAppointments">
+                <div class="details">
+                    <div class="data">Today's Appointments</div>
+                    <div class="number">0</div>
+                </div>
+                <div class="icon"><i class="fas fa-calendar-check"></i></div>
+            </div>
+
+            <div class="card" id="upcomingAppointments">
+                <div class="details">
+                    <div class="data">Upcoming Appointments</div>
+                    <div class="number">0</div>
+                </div>
+                <div class="icon"><i class="fas fa-clock"></i></div>
+            </div>
+
+            <div class="card" id="completedAppointments">
+                <div class="details">
+                    <div class="data">Completed This Month</div>
+                    <div class="number">0</div>
+                </div>
+                <div class="icon"><i class="fa-solid fa-check"></i></div>
+            </div>
+
+            <div class="card" id="cancelledAppointments">
+                <div class="details">
+                    <div class="data">Cancelled Appointments</div>
+                    <div class="number">0</div>
+                </div>
+                <div class="icon"><i class="fas fa-calendar-times"></i></div>
+            </div>
+        </div>
+
+        <div class="control card">
+            <div class="search">
+                <input type="text" placeholder="Search appointment ID / patient name" id="searchInput"
+                    oninput="refreshAppointmentList()">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </div>
+            <button class="secondary filter" onclick="openModal('filterModal')"><i
+                    class="fa-solid fa-filter"></i>Filter</button>
+            <div class="custom-select">
+                <select id="sortBy" onchange="refreshAppointmentList()">
+                    <option value="dateNewest">Date (Newest)</option>
+                    <option value="dateOldest">Date (Oldest)</option>
+                    <option value="time">Time</option>
+                    <option value="doctor">Doctor</option>
+                    <option value="status">Status</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-list">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Appointment ID</th>
+                        <th>Patient Name</th>
+                        <th>Doctor</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="appointmentTableBody"></tbody>
+            </table>
+
+            <div class="pagination">
+                <p id="pageInfo"></p>
+                <div>
+                    <div class="rowsPage">
+                        <span>Rows per page:</span>
+                        <select id="rowsPerPageSelect" onchange="pagination.changeRowsPerPage(this.value)">
+                            <option value="3">3</option>
+                            <option value="5" selected>5</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+
+                    <div class="controls">
+                        <button class="secondary" id="prevBtn" onclick="pagination.prev()"><i
+                                class="fa fa-chevron-left"></i></button>
+                        <span>Page:</span>
+                        <select id="pageSelect" onchange="pagination.goToPage(this.value)"></select>
+                        <button class="secondary" id="nextBtn" onclick="pagination.next()"><i
+                                class="fa fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="filterModal" class="modal">
+            <div class="modal-box card">
+                <div class="top-title">Filter Appointments</div>
+                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+                <div class="modal-content">
+
+                    <label>Appointment Type</label>
+                    <div class="field">
+                        <div><input type="checkbox" class="filter-type" id="checkup" name="checkup" value="Routine Checkup">
+                            <label for="checkup">Routine Checkup</label>
+                        </div>
+                        <div><input type="checkbox" class="filter-type" id="followup" name="followup" value="Follow-up">
+                            <label for="followup">Follow-up</label>
+                        </div>
+                        <div><input type="checkbox" class="filter-type" id="consultation" name="consultation"
+                                value="New Consultation">
+                            <label for="consultation">New Consultation</label>
+                        </div>
+                        <div><input type="checkbox" class="filter-type" id="emergency" name="emergency"
+                                value="Emergency">
+                            <label for="emergency">Emergency</label>
+                        </div>
+                    </div>
+
+                    <label>Doctor</label>
+                    <div class="field" id="doctorCheckbox"></div>
+
+                    <div class="field">
+                        <label>Date Range</label>
+                        <div class="custom-select">
+                            <i class="fa-solid fa-calendar-days"></i>
+                            <select id="filter-date">
+                                <option value="">All Date</option>
+                                <option value="today">Today</option>
+                                <option value="thisweek">This Week</option>
+                                <option value="thismonth">This Month</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Status</label>
+                        <div class="custom-select">
+                            <i class="fa-solid fa-list-check"></i>
+                            <select id="filter-status">
+                                <option value="">All Status</option>
+                                <option value="Scheduled">Scheduled</option>
+                                <option value="Checked In">Checked In</option>
+                                <option value="In Consultation">In Consultation</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                                <option value="No Show">No Show</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-section">
+                    <button class="secondary" onclick="clearInput(this)">Reset</button>
+                    <button
+                        onclick="refreshAppointmentList(); closeModal(this); showToast('Filter applied!', 'success')">Apply
+                        Filter</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="addAppointmentModal" class="modal">
+            <div class="modal-box card">
+                <div class="top-title">New Appointment</div>
+                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+                <div class="modal-content">
+
+                    <div class="stepper">
+                        <div class="step-item active" data-step="1">
+                            <div class="step-circle">1</div>
+                            <div class="step-title">Doctor</div>
+                        </div>
+                        <div class="step-item" data-step="2">
+                            <div class="step-circle">2</div>
+                            <div class="step-title">Patient</div>
+                        </div>
+                        <div class="step-item" data-step="3">
+                            <div class="step-circle">3</div>
+                            <div class="step-title">Confirmation</div>
+                        </div>
+                    </div>
+
+                    <div class="step-content card active" data-step="1">
+                        <div class="error-box"></div>
+
+                        <div class="field">
+                            <label class="required">Priority</label>
+                            <div class="level">
+                                <div class="emergency"><span></span>Emergency</div>
+                                <div class="urgent"><span></span>Urgent</div>
+                                <div class="normal selected"><span></span>Normal</div>
+                                <div class="follow-up"><span></span>Follow-up</div>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="required">Doctor</label>
+                            <div class="custom-select">
+                                <i class="fa-solid fa-user-doctor"></i>
+                                <select id="doctorList" required></select>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="required">Date</label>
+                            <input type="text" id="appointment_date" placeholder="Choose date" required>
+                        </div>
+
+                        <div class="field">
+                            <label class="required">Time Slot</label>
+                            <div class="timeslot">
+                                <div class="tab-section">
+                                    <div class="tab selected" onclick="openTab(this, 'addMorningTab')">Morning</div>
+                                    <div class="tab" onclick="openTab(this, 'addAfternoonTab')">Afternoon</div>
+                                    <div class="tab" onclick="openTab(this, 'addEveningTab')">Evening</div>
+                                </div>
+
+                                <div class="tab-content show" id="addMorningTab">
+                                    <div class="slot" data-time="08:00">08:00</div>
+                                    <div class="slot" data-time="08:30">08:30</div>
+                                    <div class="slot" data-time="09:00">09:00</div>
+                                    <div class="slot" data-time="09:30">09:30</div>
+                                    <div class="slot" data-time="10:00">10:00</div>
+                                    <div class="slot" data-time="10:30">10:30</div>
+                                    <div class="slot" data-time="11:00">11:00</div>
+                                    <div class="slot" data-time="11:30">11:30</div>
+                                </div>
+
+                                <div class="tab-content" id="addAfternoonTab">
+                                    <div class="slot" data-time="13:00">13:00</div>
+                                    <div class="slot" data-time="13:30">13:30</div>
+                                    <div class="slot" data-time="14:00">14:00</div>
+                                    <div class="slot" data-time="14:30">14:30</div>
+                                    <div class="slot" data-time="15:00">15:00</div>
+                                    <div class="slot" data-time="15:30">15:30</div>
+                                    <div class="slot" data-time="16:00">16:00</div>
+                                    <div class="slot" data-time="16:30">16:30</div>
+                                </div>
+
+                                <div class="tab-content" id="addEveningTab">
+                                    <div class="slot" data-time="17:00">17:00</div>
+                                    <div class="slot" data-time="17:30">17:30</div>
+                                    <div class="slot" data-time="18:00">18:00</div>
+                                    <div class="slot" data-time="18:30">18:30</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-content card" data-step="2">
+                        <div class="error-box"></div>
+
+                        <div class="field">
+                            <label class="required">Patient</label>
+                            <div class="custom-select">
+                                <i class="fa-solid fa-hospital-user"></i>
+                                <select id="patientsList" required></select>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <input type="checkbox" id="addNewPatient" name="addNewPatient" value="addNewPatient"
+                                onchange="showAddPatientTab(this)">
+                            <label for="addNewPatient">New Patient (Enable to register)</label>
+                        </div>
+
+                        <div class="card row-section" id="addNewPatientTab">
+                            <div class="field">
+                                <label class="required">First Name</label>
+                                <input type="text" id="newPatientFirstName" placeholder="First Name">
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Last Name</label>
+                                <input type="text" id="newPatientLastName" placeholder="Last Name">
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Date of Birth</label>
+                                <input type="date" id="newPatientDob">
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Phone Number</label>
+                                <input type="tel" id="newPatientPhone" maxlength="8" placeholder="e.g. 9123 4567"
+                                    oninput="this.value = this.value.replace(/[^\d]/g, '')">
+                            </div>
+
+                            <div class="field">
+                                <label class="required">NRIC / FIN</label>
+                                <input type="text" id="newPatientNric" placeholder="e.g. S1234567A" style="text-transform:uppercase">
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Gender</label>
+                                <div class="custom-select">
+                                    <select id="newPatientGender">
+                                        <option value="">Select gender</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Nationality</label>
+                                <input type="text" id="newPatientNationality" placeholder="e.g. Singaporean">
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Email</label>
+                                <input type="email" id="newPatientEmail" placeholder="e.g. patient@email.com">
+                            </div>
+                        </div>
+
+                        <div class="row-section">
+                            <div class="field">
+                                <label class="required">Room</label>
+                                <div class="custom-select">
+                                    <i class="fa-solid fa-door-closed"></i>
+                                    <select id="appointmentRoom" required>
+                                        <option>Room 1</option>
+                                        <option>Room 2</option>
+                                        <option>Room 3</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Appointment Type</label>
+                                <div class="custom-select">
+                                    <i class="fa-solid fa-stethoscope"></i>
+                                    <select id="appointmentType" required>
+                                        <option>Routine Checkup</option>
+                                        <option>Follow-up</option>
+                                        <option>New Consultation</option>
+                                        <option>Emergency</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label>Referring Provider (Optional)</label>
+                            <textarea id="referringProvider" rows="1" placeholder="Name of external doctor"></textarea>
+                        </div>
+
+                        <label>Special Requirements</label>
+                        <div class="field">
+                            <input type="checkbox" id="wheelchair" name="wheelchair" value="wheelchair">
+                            <label for="wheelchair">Wheelchair</label>
+
+                            <input type="checkbox" id="equipment" name="equipment" value="medical equipment">
+                            <label for="equipment">Medical Equipment</label>
+
+                            <input type="checkbox" id="translator" name="translator" value="translator">
+                            <label for="translator">Translator</label>
+                        </div>
+                    </div>
+
+                    <div class="step-content card" data-step="3">
+                        <div class="card" id="aptSummary">
+                            <div>APPOINTMENT SUMMARY</div>
+                            <div class="row">
+                                <span>Doctor:</span>
+                                <span id="summary-doc"></span>
+                            </div>
+                            <div class="row">
+                                <span>Date:</span>
+                                <span id="summary-date"></span>
+                            </div>
+                            <div class="row">
+                                <span>Time:</span>
+                                <span id="summary-time"></span>
+                            </div>
+                            <div class="row">
+                                <span>Patient:</span>
+                                <span id="summary-patient"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="button-section">
+                    <button class="secondary" onclick="clearInput(this)">Reset</button>
+                    <button class="secondary btn-back" onclick="prevStep(this)">Back</button>
+                    <button class="btn-next"
+                        onclick="verifyInput(`#addAppointmentModal .step-content[data-step='1']`)&&nextStep(this)">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="detailsModal" class="modal">
+            <div class="modal-box card">
+                <div class="top-title">Appointments Details</div>
+                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+                <div class="modal-content">
+                    <div class="info card">
+                        <div>APPOINTMENT INFORMATION</div>
+                        <div class="row">
+                            <span>Doctor:</span>
+                            <span id="view-doc"></span>
+                        </div>
+                        <div class="row">
+                            <span>Date:</span>
+                            <span id="view-date"></span>
+                        </div>
+                        <div class="row">
+                            <span>Time:</span>
+                            <span id="view-time"></span>
+                        </div>
+                        <div class="row">
+                            <span>Room:</span>
+                            <span id="view-room"></span>
+                        </div>
+                        <div class="row">
+                            <span>Appointment Type:</span>
+                            <span id="view-type"></span>
+                        </div>
+                        <div class="row">
+                            <span>Special Requirements:</span>
+                            <span id="view-sr"></span>
+                        </div>
+                        <div class="row">
+                            <span>Referring Provider:</span>
+                            <span id="view-rp"></span>
+                        </div>
+                        <div class="row">
+                            <span>Patient:</span>
+                            <span id="view-patient"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-section">
+                    <button onclick="closeModal(this)">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="editModal" class="modal">
+            <div class="modal-box card">
+                <div class="top-title">Edit Appointment</div>
+                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+                <div class="modal-content">
+
+                    <div class="stepper">
+                        <div class="step-item active" data-step="1">
+                            <div class="step-circle">1</div>
+                            <div class="step-title">Doctor</div>
+                        </div>
+                        <div class="step-item" data-step="2">
+                            <div class="step-circle">2</div>
+                            <div class="step-title">Patient</div>
+                        </div>
+                        <div class="step-item" data-step="3">
+                            <div class="step-circle">3</div>
+                            <div class="step-title">Confirmation</div>
+                        </div>
+                    </div>
+
+                    <div class="step-content active card" data-step="1">
+                        <div class="error-box"></div>
+
+                        <div class="field">
+                            <label class="required">Priority</label>
+                            <div class="level">
+                                <div class="emergency"><span></span>Emergency</div>
+                                <div class="urgent"><span></span>Urgent</div>
+                                <div class="normal selected"><span></span>Normal</div>
+                                <div class="follow-up"><span></span>Follow-up</div>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="required">Doctor</label>
+                            <div class="custom-select">
+                                <i class="fa-solid fa-user-doctor"></i>
+                                <select id="editDoctorList" required></select>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="required">Date</label>
+                            <input type="text" id="edit_appointment_date" placeholder="Choose date" required>
+                        </div>
+
+                        <div class="field">
+                            <label class="required">Time Slot</label>
+                            <div class="timeslot">
+                                <div class="tab-section">
+                                    <div class="tab selected" onclick="openTab(this, 'editMorningTab')">Morning</div>
+                                    <div class="tab" onclick="openTab(this, 'editAfternoonTab')">Afternoon</div>
+                                    <div class="tab" onclick="openTab(this, 'editEveningTab')">Evening</div>
+                                </div>
+
+                                <div class="tab-content show" id="editMorningTab">
+                                    <div class="slot" data-time="08:00">08:00</div>
+                                    <div class="slot" data-time="08:30">08:30</div>
+                                    <div class="slot" data-time="09:00">09:00</div>
+                                    <div class="slot" data-time="09:30">09:30</div>
+                                    <div class="slot" data-time="10:00">10:00</div>
+                                    <div class="slot" data-time="10:30">10:30</div>
+                                    <div class="slot" data-time="11:00">11:00</div>
+                                    <div class="slot" data-time="11:30">11:30</div>
+                                </div>
+
+                                <div class="tab-content" id="editAfternoonTab">
+                                    <div class="slot" data-time="13:00">13:00</div>
+                                    <div class="slot" data-time="13:30">13:30</div>
+                                    <div class="slot" data-time="14:00">14:00</div>
+                                    <div class="slot" data-time="14:30">14:30</div>
+                                    <div class="slot" data-time="15:00">15:00</div>
+                                    <div class="slot" data-time="15:30">15:30</div>
+                                    <div class="slot" data-time="16:00">16:00</div>
+                                    <div class="slot" data-time="16:30">16:30</div>
+                                </div>
+
+                                <div class="tab-content" id="editEveningTab">
+                                    <div class="slot" data-time="17:00">17:00</div>
+                                    <div class="slot" data-time="17:30">17:30</div>
+                                    <div class="slot" data-time="18:00">18:00</div>
+                                    <div class="slot" data-time="18:30">18:30</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-content card" data-step="2">
+                        <div class="error-box"></div>
+
+                        <div class="field">
+                            <label class="required">Patient</label>
+                            <div class="custom-select">
+                                <i class="fa-solid fa-hospital-user"></i>
+                                <select id="editPatientsList" required></select>
+                            </div>
+                        </div>
+
+                        <div class="row-section">
+                            <div class="field">
+                                <label class="required">Room</label>
+                                <div class="custom-select">
+                                    <i class="fa-solid fa-door-closed"></i>
+                                    <select id="editAppointmentRoom" required>
+                                        <option>Room 1</option>
+                                        <option>Room 2</option>
+                                        <option>Room 3</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Appointment Type</label>
+                                <div class="custom-select">
+                                    <i class="fa-solid fa-stethoscope"></i>
+                                    <select id="editAppointmentType" required>
+                                        <option>Routine Checkup</option>
+                                        <option>Follow-up</option>
+                                        <option>New Consultation</option>
+                                        <option>Emergency</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label>Referring Provider (Optional)</label>
+                            <textarea id="editReferringProvider" rows="1" placeholder="Name of external doctor"></textarea>
+                        </div>
+
+                        <label>Special Requirements</label>
+                        <div class="field">
+                            <input type="checkbox" id="editWheelchair" name="wheelchair" value="wheelchair">
+                            <label for="editWheelchair">Wheelchair</label>
+
+                            <input type="checkbox" id="editEquipment" name="equipment" value="medical equipment">
+                            <label for="editEquipment">Medical Equipment</label>
+
+                            <input type="checkbox" id="editTranslator" name="translator" value="translator">
+                            <label for="editTranslator">Translator</label>
+                        </div>
+                    </div>
+
+                    <div class="step-content card" data-step="3">
+                        <div class="card" id="editAptSummary">
+                            <div>EDITED APPOINTMENT SUMMARY</div>
+                            <div class="row">
+                                <span>Doctor:</span>
+                                <span id="editSummary-doc"></span>
+                            </div>
+                            <div class="row">
+                                <span>Date:</span>
+                                <span id="editSummary-date"></span>
+                            </div>
+                            <div class="row">
+                                <span>Time:</span>
+                                <span id="editSummary-time"></span>
+                            </div>
+                            <div class="row">
+                                <span>Patient:</span>
+                                <span id="editSummary-patient"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="button-section">
+                    <button class="secondary" onclick="clearInput(this)">Reset</button>
+                    <button class="secondary btn-back" onclick="prevStep(this)">Back</button>
+                    <button class="btn-next"
+                        onclick="verifyInput(`#editModal .step-content[data-step='1']`)&&nextStep(this)">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="toast card" id="toast"></div>
+    </main>
+
+    {% include "footer.html" %}
+
+</body>
+
+</html>
