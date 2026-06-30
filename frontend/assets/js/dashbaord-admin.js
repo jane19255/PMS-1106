@@ -36,8 +36,8 @@ function getTodayDate() {
 
 function formatIsoTime(isoStr) {
     const dt = new Date(isoStr);
-    let hours = dt.getHours();
-    const minutes = String(dt.getMinutes()).padStart(2, "0");
+    let hours = dt.getUTCHours();
+    const minutes = String(dt.getUTCMinutes()).padStart(2, "0");
     const ampm = hours >= 12 ? "PM" : "AM";
     hours = hours % 12 || 12;
     return `${hours}:${minutes} ${ampm}`;
