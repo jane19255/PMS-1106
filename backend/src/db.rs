@@ -273,6 +273,16 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
     
+    pub async fn list_appointments_by_doctor(&self, doctor_id: &str,) -> Result<String, String> {
+        let url = self.rest_url(&format!("appointments?doctor_id=eq.{}&select=*&order=scheduled_at", doctor_id));
+        let response = self
+            .authed(self.http_client.get(url))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        Self::read_response(response).await
+    }
+
     // Queue Management methods
     pub async fn list_queue_by_doctor(&self, doctor_id: &str) -> Result<String, String> {
         let encoded_id = urlencoding::encode(doctor_id);
