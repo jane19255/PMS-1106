@@ -53,7 +53,6 @@ function splitScheduledAt(iso) {
 function renderAppointmentRow(item) {
     const { date, timeDisplay } = splitScheduledAt(item.scheduled_at);
     const statusClass = (item.status || "").toLowerCase().replace(/\s+/g, '');
-    const priorityClass = (item.priority || "Normal").toLowerCase().replace(/-/g, '');
     return `
     <tr>
         <td>${item.id}</td>
@@ -61,9 +60,8 @@ function renderAppointmentRow(item) {
         <td>${doctorLabel(item.doctor_id)}</td>
         <td>${date}</td>
         <td>${timeDisplay}</td>
-        <td>${item.appointment_type || '—'}</td>
+        <td>${item.reason || '—'}</td>
         <td><span class="status ${statusClass}">${item.status}</span></td>
-        <td><span class="priority ${priorityClass}">${item.priority || 'Normal'}</span></td>
         <td class="action">
             <div class="has-tooltip">
                 <i class="view fa-solid fa-circle-info" onclick="viewAppointment('${item.id}')"></i>
@@ -72,6 +70,10 @@ function renderAppointmentRow(item) {
             <div class="has-tooltip">
                 <i class="edit fa-solid fa-pen-to-square" onclick="editAppointment('${item.id}')"></i>
                 <span class="tooltip-text">Edit Details</span>
+            </div>
+            <div class="has-tooltip">
+                <i class="delete fa-solid fa-trash" onclick="deleteAppointment('${item.id}')"></i>
+                <span class="tooltip-text">Delete Appointment</span>
             </div>
         </td>
     </tr>
@@ -117,15 +119,12 @@ function refreshAppointmentList() {
             a.id.toLowerCase().includes(keyword) ||
             patientLabel(a.patient_id).toLowerCase().includes(keyword) ||
             doctorLabel(a.doctor_id).toLowerCase().includes(keyword) ||
-            (a.appointment_type || "").toLowerCase().includes(keyword)
+            (a.reason || "").toLowerCase().includes(keyword)
         );
     }
 
     const status = document.getElementById("filter-status")?.value;
     if (status) list = list.filter(a => a.status === status);
-
-    const types = Array.from(document.querySelectorAll(".filter-type:checked")).map(c => c.value);
-    if (types.length > 0) list = list.filter(a => types.includes(a.appointment_type));
 
     const doctors = Array.from(document.querySelectorAll(".filter-doctor:checked")).map(c => c.value);
     if (doctors.length > 0) list = list.filter(a => doctors.includes(a.doctor_id));
@@ -250,18 +249,6 @@ async function loadDoctors() {
     }
 }
 
-function getSelectedPriority(modal) {
-    const selected = modal.querySelector(".level > div.selected");
-    if (!selected) return "Normal";
-    return selected.textContent.trim();
-}
-
-function setSelectedPriority(modal, priority) {
-    modal.querySelectorAll(".level > div").forEach(level => {
-        level.classList.toggle("selected", level.textContent.trim().toLowerCase() === (priority || "Normal").toLowerCase());
-    });
-}
-
 function getSelectedSlot(modal) {
     const selected = modal.querySelector(".timeslot .slot.selected");
     return selected ? selected.dataset.time : null;
@@ -318,12 +305,9 @@ function fillViewData(item) {
     document.getElementById("view-doc").innerText = doctorLabel(item.doctor_id);
     document.getElementById("view-date").innerText = date;
     document.getElementById("view-time").innerText = timeDisplay;
-    document.getElementById("view-type").innerText = item.appointment_type || "—";
-    document.getElementById("view-room").innerText = item.room || "—";
     document.getElementById("view-patient").innerText = patientLabel(item.patient_id);
-    const sr = item.special_requirements || [];
-    document.getElementById("view-sr").innerText = sr.length > 0 ? sr.join(", ") : "None";
-    document.getElementById("view-rp").innerText = item.referring_provider || "None";
+    document.getElementById("view-reason").innerText = item.reason || "—";
+    document.getElementById("view-notes").innerText = item.notes || "None";
 }
 
 function editAppointment(id) {
@@ -334,6 +318,37 @@ function editAppointment(id) {
     fillEditData(item);
 }
 
+let pendingDeleteId = null;
+
+function deleteAppointment(id) {
+    pendingDeleteId = id;
+    openModal('confirmDeleteModal');
+}
+
+async function confirmDeleteAppointment(button) {
+    const id = pendingDeleteId;
+    if (!id) return;
+
+    try {
+        const res = await fetch(`/api/appointments/${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+        });
+
+        if (res.ok) {
+            showToast('Appointment deleted', 'success');
+            closeModal(button);
+            await loadAppointments();
+        } else {
+            const text = await res.text();
+            showToast(text || 'Failed to delete appointment', 'error');
+        }
+    } catch (error) {
+        showToast('Network error: ' + error.message, 'error');
+    } finally {
+        pendingDeleteId = null;
+    }
+}
+
 function fillEditData(item) {
     const modal = document.getElementById("editModal");
     const { date, time24 } = splitScheduledAt(item.scheduled_at);
@@ -341,17 +356,10 @@ function fillEditData(item) {
     document.getElementById("editDoctorList").value = item.doctor_id;
     document.getElementById("edit_appointment_date").value = date;
     if (window.editDatePicker) window.editDatePicker.setDate(date, false);
-    document.getElementById("editAppointmentRoom").value = item.room || "Room 1";
-    document.getElementById("editAppointmentType").value = item.appointment_type || "Routine Checkup";
     document.getElementById("editPatientsList").value = item.patient_id;
-    document.getElementById("editReferringProvider").value = item.referring_provider || "";
+    document.getElementById("editAppointmentReason").value = item.reason || "";
+    document.getElementById("editAppointmentNotes").value = item.notes || "";
 
-    const sr = item.special_requirements || [];
-    document.getElementById("editWheelchair").checked = sr.includes("wheelchair");
-    document.getElementById("editEquipment").checked = sr.includes("medical equipment");
-    document.getElementById("editTranslator").checked = sr.includes("translator");
-
-    setSelectedPriority(modal, item.priority);
     refreshSlotAvailability(modal, "edit_appointment_date", "editDoctorList", item.id);
     setSelectedSlot(modal, time24);
 }
@@ -490,7 +498,6 @@ function resetStepper(modal) {
     goToStep(modal, 1);
     modal.querySelectorAll(".step-item").forEach(step => step.classList.remove("completed"));
     modal.querySelectorAll(".timeslot .slot").forEach(slot => slot.classList.remove("selected", "disable"));
-    setSelectedPriority(modal, "Normal");
 }
 
 async function createNewPatientIfNeeded() {
@@ -539,23 +546,14 @@ async function submitNewAppointment(button) {
     const doctorId = document.getElementById('doctorList').value;
     const dateValue = document.getElementById('appointment_date').value;
     const time = getSelectedSlot(modal);
-    const appointmentType = document.getElementById('appointmentType').value;
-    const specialRequirements = ['wheelchair', 'equipment', 'translator']
-        .map(id => document.getElementById(id))
-        .filter(el => el.checked)
-        .map(el => el.value);
 
     const payload = {
         patient_id: patientId,
         doctor_id: doctorId,
         scheduled_at: `${dateValue}T${time}:00Z`,
         duration_minutes: 30,
-        reason: appointmentType,
-        priority: getSelectedPriority(modal),
-        room: document.getElementById('appointmentRoom').value,
-        appointment_type: appointmentType,
-        referring_provider: document.getElementById('referringProvider').value.trim() || null,
-        special_requirements: specialRequirements,
+        reason: document.getElementById('appointmentReason').value.trim(),
+        notes: document.getElementById('appointmentNotes').value.trim() || null,
     };
 
     try {
@@ -596,23 +594,14 @@ async function submitEditAppointment(button) {
     const doctorId = document.getElementById('editDoctorList').value;
     const dateValue = document.getElementById('edit_appointment_date').value;
     const time = getSelectedSlot(modal);
-    const appointmentType = document.getElementById('editAppointmentType').value;
-    const specialRequirements = ['editWheelchair', 'editEquipment', 'editTranslator']
-        .map(id => document.getElementById(id))
-        .filter(el => el.checked)
-        .map(el => el.value);
 
     const payload = {
         patient_id: document.getElementById('editPatientsList').value,
         doctor_id: doctorId,
         scheduled_at: `${dateValue}T${time}:00Z`,
         duration_minutes: 30,
-        reason: appointmentType,
-        priority: getSelectedPriority(modal),
-        room: document.getElementById('editAppointmentRoom').value,
-        appointment_type: appointmentType,
-        referring_provider: document.getElementById('editReferringProvider').value.trim() || null,
-        special_requirements: specialRequirements,
+        reason: document.getElementById('editAppointmentReason').value.trim(),
+        notes: document.getElementById('editAppointmentNotes').value.trim() || null,
     };
 
     try {
@@ -679,14 +668,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 modal.querySelectorAll('.timeslot .slot').forEach(s => s.classList.remove('selected'));
                 slot.classList.add('selected');
             }
-        });
-    });
-
-    document.querySelectorAll(".level > div").forEach(level => {
-        level.addEventListener('click', () => {
-            const levels = level.closest('.level').querySelectorAll('div');
-            levels.forEach(el => el.classList.remove("selected"));
-            level.classList.add("selected");
         });
     });
 

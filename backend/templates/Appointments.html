@@ -104,9 +104,8 @@
                         <th>Doctor</th>
                         <th>Date</th>
                         <th>Time</th>
-                        <th>Type</th>
+                        <th>Reason</th>
                         <th>Status</th>
-                        <th>Priority</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -143,24 +142,6 @@
                 <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
 
                 <div class="modal-content">
-
-                    <label>Appointment Type</label>
-                    <div class="field">
-                        <div><input type="checkbox" class="filter-type" id="checkup" name="checkup" value="Routine Checkup">
-                            <label for="checkup">Routine Checkup</label>
-                        </div>
-                        <div><input type="checkbox" class="filter-type" id="followup" name="followup" value="Follow-up">
-                            <label for="followup">Follow-up</label>
-                        </div>
-                        <div><input type="checkbox" class="filter-type" id="consultation" name="consultation"
-                                value="New Consultation">
-                            <label for="consultation">New Consultation</label>
-                        </div>
-                        <div><input type="checkbox" class="filter-type" id="emergency" name="emergency"
-                                value="Emergency">
-                            <label for="emergency">Emergency</label>
-                        </div>
-                    </div>
 
                     <label>Doctor</label>
                     <div class="field" id="doctorCheckbox"></div>
@@ -228,16 +209,6 @@
 
                     <div class="step-content card active" data-step="1">
                         <div class="error-box"></div>
-
-                        <div class="field">
-                            <label class="required">Priority</label>
-                            <div class="level">
-                                <div class="emergency"><span></span>Emergency</div>
-                                <div class="urgent"><span></span>Urgent</div>
-                                <div class="normal selected"><span></span>Normal</div>
-                                <div class="follow-up"><span></span>Follow-up</div>
-                            </div>
-                        </div>
 
                         <div class="field">
                             <label class="required">Doctor</label>
@@ -359,48 +330,14 @@
                             </div>
                         </div>
 
-                        <div class="row-section">
-                            <div class="field">
-                                <label class="required">Room</label>
-                                <div class="custom-select">
-                                    <i class="fa-solid fa-door-closed"></i>
-                                    <select id="appointmentRoom" required>
-                                        <option>Room 1</option>
-                                        <option>Room 2</option>
-                                        <option>Room 3</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="field">
-                                <label class="required">Appointment Type</label>
-                                <div class="custom-select">
-                                    <i class="fa-solid fa-stethoscope"></i>
-                                    <select id="appointmentType" required>
-                                        <option>Routine Checkup</option>
-                                        <option>Follow-up</option>
-                                        <option>New Consultation</option>
-                                        <option>Emergency</option>
-                                    </select>
-                                </div>
-                            </div>
+                        <div class="field">
+                            <label class="required">Reason</label>
+                            <textarea id="appointmentReason" rows="1" placeholder="E.g. Running nose, Sore throat" required></textarea>
                         </div>
 
                         <div class="field">
-                            <label>Referring Provider (Optional)</label>
-                            <textarea id="referringProvider" rows="1" placeholder="Name of external doctor"></textarea>
-                        </div>
-
-                        <label>Special Requirements</label>
-                        <div class="field">
-                            <input type="checkbox" id="wheelchair" name="wheelchair" value="wheelchair">
-                            <label for="wheelchair">Wheelchair</label>
-
-                            <input type="checkbox" id="equipment" name="equipment" value="medical equipment">
-                            <label for="equipment">Medical Equipment</label>
-
-                            <input type="checkbox" id="translator" name="translator" value="translator">
-                            <label for="translator">Translator</label>
+                            <label>Notes</label>
+                            <textarea id="appointmentNotes" rows="1" placeholder="E.g. Need wheelchair"></textarea>
                         </div>
                     </div>
 
@@ -458,24 +395,16 @@
                             <span id="view-time"></span>
                         </div>
                         <div class="row">
-                            <span>Room:</span>
-                            <span id="view-room"></span>
-                        </div>
-                        <div class="row">
-                            <span>Appointment Type:</span>
-                            <span id="view-type"></span>
-                        </div>
-                        <div class="row">
-                            <span>Special Requirements:</span>
-                            <span id="view-sr"></span>
-                        </div>
-                        <div class="row">
-                            <span>Referring Provider:</span>
-                            <span id="view-rp"></span>
-                        </div>
-                        <div class="row">
                             <span>Patient:</span>
                             <span id="view-patient"></span>
+                        </div>
+                        <div class="row">
+                            <span>Reason:</span>
+                            <span id="view-reason"></span>
+                        </div>
+                        <div class="row">
+                            <span>Notes:</span>
+                            <span id="view-notes"></span>
                         </div>
                     </div>
                 </div>
@@ -510,16 +439,6 @@
 
                     <div class="step-content active card" data-step="1">
                         <div class="error-box"></div>
-
-                        <div class="field">
-                            <label class="required">Priority</label>
-                            <div class="level">
-                                <div class="emergency"><span></span>Emergency</div>
-                                <div class="urgent"><span></span>Urgent</div>
-                                <div class="normal selected"><span></span>Normal</div>
-                                <div class="follow-up"><span></span>Follow-up</div>
-                            </div>
-                        </div>
 
                         <div class="field">
                             <label class="required">Doctor</label>
@@ -586,48 +505,14 @@
                             </div>
                         </div>
 
-                        <div class="row-section">
-                            <div class="field">
-                                <label class="required">Room</label>
-                                <div class="custom-select">
-                                    <i class="fa-solid fa-door-closed"></i>
-                                    <select id="editAppointmentRoom" required>
-                                        <option>Room 1</option>
-                                        <option>Room 2</option>
-                                        <option>Room 3</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="field">
-                                <label class="required">Appointment Type</label>
-                                <div class="custom-select">
-                                    <i class="fa-solid fa-stethoscope"></i>
-                                    <select id="editAppointmentType" required>
-                                        <option>Routine Checkup</option>
-                                        <option>Follow-up</option>
-                                        <option>New Consultation</option>
-                                        <option>Emergency</option>
-                                    </select>
-                                </div>
-                            </div>
+                        <div class="field">
+                            <label class="required">Reason</label>
+                            <textarea id="editAppointmentReason" rows="1" placeholder="E.g. Running nose, Sore throat" required></textarea>
                         </div>
 
                         <div class="field">
-                            <label>Referring Provider (Optional)</label>
-                            <textarea id="editReferringProvider" rows="1" placeholder="Name of external doctor"></textarea>
-                        </div>
-
-                        <label>Special Requirements</label>
-                        <div class="field">
-                            <input type="checkbox" id="editWheelchair" name="wheelchair" value="wheelchair">
-                            <label for="editWheelchair">Wheelchair</label>
-
-                            <input type="checkbox" id="editEquipment" name="equipment" value="medical equipment">
-                            <label for="editEquipment">Medical Equipment</label>
-
-                            <input type="checkbox" id="editTranslator" name="translator" value="translator">
-                            <label for="editTranslator">Translator</label>
+                            <label>Notes</label>
+                            <textarea id="editAppointmentNotes" rows="1" placeholder="E.g. Need wheelchair"></textarea>
                         </div>
                     </div>
 
@@ -660,6 +545,22 @@
                     <button class="secondary btn-back" onclick="prevStep(this)">Back</button>
                     <button class="btn-next"
                         onclick="verifyInput(`#editModal .step-content[data-step='1']`)&&nextStep(this)">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="confirmDeleteModal" class="modal">
+            <div class="modal-box card">
+                <div class="top-title">Delete Appointment</div>
+                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+                <div class="modal-content">
+                    <p>Are you sure you want to delete this appointment? This cannot be undone.</p>
+                </div>
+
+                <div class="button-section">
+                    <button class="secondary" onclick="closeModal(this)">Cancel</button>
+                    <button class="danger" onclick="confirmDeleteAppointment(this)">Delete</button>
                 </div>
             </div>
         </div>

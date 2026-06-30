@@ -11,10 +11,6 @@ use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::doctors::service::DoctorService;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 
-const VALID_PRIORITIES: [&str; 4] = ["Emergency", "Urgent", "Normal", "Follow-up"];
-const VALID_APPOINTMENT_TYPES: [&str; 4] =
-    ["Routine Checkup", "Follow-up", "New Consultation", "Emergency"];
-
 pub fn routes(cfg: &mut web::ServiceConfig) {
     // SSR page shell — the appointment list/table, stat cards, and modals are
     // populated client-side from the JSON API below (see assets/js/appointments.js).
@@ -142,28 +138,6 @@ async fn validate_and_check_conflict(
         return Err(AppointmentError::BadRequest("reason is required".to_string()));
     }
 
-    let priority = appointment
-        .get("priority")
-        .and_then(Value::as_str)
-        .unwrap_or("Normal");
-    if !VALID_PRIORITIES.contains(&priority) {
-        return Err(AppointmentError::BadRequest(format!(
-            "priority must be one of: {}",
-            VALID_PRIORITIES.join(", ")
-        )));
-    }
-
-    let appointment_type = appointment
-        .get("appointment_type")
-        .and_then(Value::as_str)
-        .unwrap_or("Routine Checkup");
-    if !VALID_APPOINTMENT_TYPES.contains(&appointment_type) {
-        return Err(AppointmentError::BadRequest(format!(
-            "appointment_type must be one of: {}",
-            VALID_APPOINTMENT_TYPES.join(", ")
-        )));
-    }
-
     let appointments_json = db
         .list_appointments_by_doctor(&doctor_id)
         .await
@@ -225,9 +199,6 @@ fn normalize_appointment_payload(appointment: &mut Value, doctor_id: &str) {
     }
 
     object.entry("reason").or_insert_with(|| json!("Appointment"));
-    object.entry("priority").or_insert_with(|| json!("Normal"));
-    object.entry("appointment_type").or_insert_with(|| json!("Routine Checkup"));
-    object.entry("special_requirements").or_insert_with(|| json!([]));
 }
 
 fn conflict_json(suggestions: Vec<(DateTime<Utc>, DateTime<Utc>)>) -> Value {
@@ -296,13 +267,45 @@ pub async fn update_appointment(
     }
 }
 
+const NON_DELETABLE_STATUSES: [&str; 3] = ["Checked In", "In Consultation", "Completed"];
+
 pub async fn delete_appointment(
     db: web::Data<SupabaseRestDb>,
     path: web::Path<String>,
 ) -> impl Responder {
     let appointment_id = path.into_inner();
+
+    let status = match db.get_appointment(&appointment_id).await {
+        Ok(body) => {
+            let rows: Vec<Value> = serde_json::from_str(&body).unwrap_or_default();
+            rows.into_iter()
+                .next()
+                .and_then(|row| row.get("status").and_then(Value::as_str).map(str::to_string))
+        }
+        Err(err) => return HttpResponse::InternalServerError().body(err),
+    };
+
+    if let Some(status) = status.as_deref() {
+        if NON_DELETABLE_STATUSES.contains(&status) {
+            return HttpResponse::BadRequest().body(format!(
+                "Cannot delete an appointment that is already \"{status}\". Cancel it instead, or contact an administrator."
+            ));
+        }
+    } else {
+        return HttpResponse::NotFound().body("Appointment was not found.");
+    }
+
     match db.delete_appointment(&appointment_id).await {
         Ok(result) => HttpResponse::Ok().content_type("application/json").body(result),
-        Err(err) => HttpResponse::InternalServerError().body(err),
+        Err(err) => {
+            if err.contains("violates foreign key constraint") || err.contains("23503") {
+                HttpResponse::Conflict().body(
+                    "This appointment can't be deleted because it has linked records (e.g. a queue entry or room assignment). Cancel it instead.",
+                )
+            } else {
+                eprintln!("Failed to delete appointment {appointment_id}: {err}");
+                HttpResponse::InternalServerError().body("Failed to delete appointment.")
+            }
+        }
     }
 }
