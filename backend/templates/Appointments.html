@@ -25,7 +25,7 @@
     <script src="/assets/js/FirebaseService.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="/assets/js/general.js"></script>
-    <script src="/assets/js/appointments.js?v=doctor-availability-1"></script>
+    <script src="/assets/js/appointments.js?v=live-1"></script>
 
 </head>
 
@@ -46,7 +46,7 @@
             <div class="card" id="todayAppointments">
                 <div class="details">
                     <div class="data">Today's Appointments</div>
-                    <div class="number">8</div>
+                    <div class="number">0</div>
                 </div>
                 <div class="icon"><i class="fas fa-calendar-check"></i></div>
             </div>
@@ -54,7 +54,7 @@
             <div class="card" id="upcomingAppointments">
                 <div class="details">
                     <div class="data">Upcoming Appointments</div>
-                    <div class="number">15</div>
+                    <div class="number">0</div>
                 </div>
                 <div class="icon"><i class="fas fa-clock"></i></div>
             </div>
@@ -62,7 +62,7 @@
             <div class="card" id="completedAppointments">
                 <div class="details">
                     <div class="data">Completed This Month</div>
-                    <div class="number">32</div>
+                    <div class="number">0</div>
                 </div>
                 <div class="icon"><i class="fa-solid fa-check"></i></div>
             </div>
@@ -70,7 +70,7 @@
             <div class="card" id="cancelledAppointments">
                 <div class="details">
                     <div class="data">Cancelled Appointments</div>
-                    <div class="number">6</div>
+                    <div class="number">0</div>
                 </div>
                 <div class="icon"><i class="fas fa-calendar-times"></i></div>
             </div>
@@ -104,9 +104,8 @@
                         <th>Doctor</th>
                         <th>Date</th>
                         <th>Time</th>
-                        <th>Type</th>
+                        <th>Reason</th>
                         <th>Status</th>
-                        <th>Priority</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -120,7 +119,7 @@
                         <span>Rows per page:</span>
                         <select id="rowsPerPageSelect" onchange="pagination.changeRowsPerPage(this.value)">
                             <option value="3">3</option>
-                            <option value="5">5</option>
+                            <option value="5" selected>5</option>
                             <option value="10">10</option>
                         </select>
                     </div>
@@ -143,24 +142,6 @@
                 <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
 
                 <div class="modal-content">
-
-                    <label>Appointment Type</label>
-                    <div class="field">
-                        <div><input type="checkbox" class="filter-type" id="checkup" name="checkup" value="checkup">
-                            <label for="checkup">Routine Checkup</label>
-                        </div>
-                        <div><input type="checkbox" class="filter-type" id="followup" name="followup" value="followup">
-                            <label for="followup">Follow-up</label>
-                        </div>
-                        <div><input type="checkbox" class="filter-type" id="consultation" name="consultation"
-                                value="consultation">
-                            <label for="consultation">New Consultation</label>
-                        </div>
-                        <div><input type="checkbox" class="filter-type" id="emergency" name="emergency"
-                                value="emergency">
-                            <label for="emergency">Emergency</label>
-                        </div>
-                    </div>
 
                     <label>Doctor</label>
                     <div class="field" id="doctorCheckbox"></div>
@@ -185,11 +166,11 @@
                             <select id="filter-status">
                                 <option value="">All Status</option>
                                 <option value="Scheduled">Scheduled</option>
-                                <option value="Checked-In">Checked-In</option>
-                                <option value="In-Progress">In-Progress</option>
+                                <option value="Checked In">Checked In</option>
+                                <option value="In Consultation">In Consultation</option>
                                 <option value="Completed">Completed</option>
                                 <option value="Cancelled">Cancelled</option>
-                                <option value="No-Show">No-Show</option>
+                                <option value="No Show">No Show</option>
                             </select>
                         </div>
                     </div>
@@ -230,16 +211,6 @@
                         <div class="error-box"></div>
 
                         <div class="field">
-                            <label class="required">Priority</label>
-                            <div class="level">
-                                <div class="emergency"><span></span>Emergency</div>
-                                <div class="urgent"><span></span>Urgent</div>
-                                <div class="normal selected"><span></span>Normal</div>
-                                <div class="follow-up"><span></span>Follow-up</div>
-                            </div>
-                        </div>
-
-                        <div class="field">
                             <label class="required">Doctor</label>
                             <div class="custom-select">
                                 <i class="fa-solid fa-user-doctor"></i>
@@ -262,32 +233,32 @@
                                 </div>
 
                                 <div class="tab-content show" id="addMorningTab">
-                                    <div class="slot selected">08:00</div>
-                                    <div class="slot">08:30</div>
-                                    <div class="slot">09:00</div>
-                                    <div class="slot">09:30</div>
-                                    <div class="slot disable">10:00</div>
-                                    <div class="slot disable">10:30</div>
-                                    <div class="slot">11:00</div>
-                                    <div class="slot">11:30</div>
+                                    <div class="slot" data-time="08:00">08:00</div>
+                                    <div class="slot" data-time="08:30">08:30</div>
+                                    <div class="slot" data-time="09:00">09:00</div>
+                                    <div class="slot" data-time="09:30">09:30</div>
+                                    <div class="slot" data-time="10:00">10:00</div>
+                                    <div class="slot" data-time="10:30">10:30</div>
+                                    <div class="slot" data-time="11:00">11:00</div>
+                                    <div class="slot" data-time="11:30">11:30</div>
                                 </div>
 
                                 <div class="tab-content" id="addAfternoonTab">
-                                    <div class="slot">13:00</div>
-                                    <div class="slot">13:30</div>
-                                    <div class="slot disable">14:00</div>
-                                    <div class="slot">14:30</div>
-                                    <div class="slot">15:00</div>
-                                    <div class="slot">15:30</div>
-                                    <div class="slot disable">16:00</div>
-                                    <div class="slot">16:30</div>
+                                    <div class="slot" data-time="13:00">13:00</div>
+                                    <div class="slot" data-time="13:30">13:30</div>
+                                    <div class="slot" data-time="14:00">14:00</div>
+                                    <div class="slot" data-time="14:30">14:30</div>
+                                    <div class="slot" data-time="15:00">15:00</div>
+                                    <div class="slot" data-time="15:30">15:30</div>
+                                    <div class="slot" data-time="16:00">16:00</div>
+                                    <div class="slot" data-time="16:30">16:30</div>
                                 </div>
 
                                 <div class="tab-content" id="addEveningTab">
-                                    <div class="slot">17:00</div>
-                                    <div class="slot">17:30</div>
-                                    <div class="slot disable">18:00</div>
-                                    <div class="slot">18:30</div>
+                                    <div class="slot" data-time="17:00">17:00</div>
+                                    <div class="slot" data-time="17:30">17:30</div>
+                                    <div class="slot" data-time="18:00">18:00</div>
+                                    <div class="slot" data-time="18:30">18:30</div>
                                 </div>
                             </div>
                         </div>
@@ -313,68 +284,60 @@
                         <div class="card row-section" id="addNewPatientTab">
                             <div class="field">
                                 <label class="required">First Name</label>
-                                <input type="text" placeholder="First Name">
+                                <input type="text" id="newPatientFirstName" placeholder="First Name">
                             </div>
 
                             <div class="field">
                                 <label class="required">Last Name</label>
-                                <input type="text" placeholder="Last Name">
+                                <input type="text" id="newPatientLastName" placeholder="Last Name">
                             </div>
 
                             <div class="field">
                                 <label class="required">Date of Birth</label>
-                                <input type="date">
+                                <input type="date" id="newPatientDob">
                             </div>
 
                             <div class="field">
                                 <label class="required">Phone Number</label>
-                                <input type="tel" maxlength="8" placeholder="e.g. 9123 4567"
+                                <input type="tel" id="newPatientPhone" maxlength="8" placeholder="e.g. 9123 4567"
                                     oninput="this.value = this.value.replace(/[^\d]/g, '')">
                             </div>
-                        </div>
 
-                        <div class="row-section">
                             <div class="field">
-                                <label class="required">Room</label>
+                                <label class="required">NRIC / FIN</label>
+                                <input type="text" id="newPatientNric" placeholder="e.g. S1234567A" style="text-transform:uppercase">
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Gender</label>
                                 <div class="custom-select">
-                                    <i class="fa-solid fa-door-closed"></i>
-                                    <select id="appointmentType" required>
-                                        <option>Room 1</option>
-                                        <option>Room 2</option>
-                                        <option>Room 3</option>
+                                    <select id="newPatientGender">
+                                        <option value="">Select gender</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div class="field">
-                                <label class="required">Appointment Type</label>
-                                <div class="custom-select">
-                                    <i class="fa-solid fa-stethoscope"></i>
-                                    <select id="appointmentType" required>
-                                        <option>Routine Checkup</option>
-                                        <option>Follow-up</option>
-                                        <option>New Consultation</option>
-                                        <option>Emergency</option>
-                                    </select>
-                                </div>
+                                <label class="required">Nationality</label>
+                                <input type="text" id="newPatientNationality" placeholder="e.g. Singaporean">
+                            </div>
+
+                            <div class="field">
+                                <label class="required">Email</label>
+                                <input type="email" id="newPatientEmail" placeholder="e.g. patient@email.com">
                             </div>
                         </div>
 
                         <div class="field">
-                            <label>Referring Provider (Optional)</label>
-                            <textarea type="textarea" rows="1" placeholder="Name of external doctor"></textarea>
+                            <label class="required">Reason</label>
+                            <textarea id="appointmentReason" rows="1" placeholder="E.g. Running nose, Sore throat" required></textarea>
                         </div>
 
-                        <label>Special Requirements</label>
                         <div class="field">
-                            <input type="checkbox" id="wheelchair" name="wheelchair" value="wheelchair">
-                            <label for="wheelchair">Wheelchair</label>
-
-                            <input type="checkbox" id="equipment" name="equipment" value="equipment">
-                            <label for="equipment">Medical Equipment</label>
-
-                            <input type="checkbox" id="translator" name="translator" value="translator">
-                            <label for="translator">Translator</label>
+                            <label>Notes</label>
+                            <textarea id="appointmentNotes" rows="1" placeholder="E.g. Need wheelchair"></textarea>
                         </div>
                     </div>
 
@@ -383,19 +346,19 @@
                             <div>APPOINTMENT SUMMARY</div>
                             <div class="row">
                                 <span>Doctor:</span>
-                                <span>Dr. Jimmy Jitaraphol</span>
+                                <span id="summary-doc"></span>
                             </div>
                             <div class="row">
                                 <span>Date:</span>
-                                <span>20 June 2026</span>
+                                <span id="summary-date"></span>
                             </div>
                             <div class="row">
                                 <span>Time:</span>
-                                <span>14:00</span>
+                                <span id="summary-time"></span>
                             </div>
                             <div class="row">
                                 <span>Patient:</span>
-                                <span>William JKP</span>
+                                <span id="summary-patient"></span>
                             </div>
                         </div>
                     </div>
@@ -432,24 +395,16 @@
                             <span id="view-time"></span>
                         </div>
                         <div class="row">
-                            <span>Room:</span>
-                            <span id="view-room"></span>
-                        </div>
-                        <div class="row">
-                            <span>Appointment Type:</span>
-                            <span id="view-type"></span>
-                        </div>
-                        <div class="row">
-                            <span>Special Requirements:</span>
-                            <span id="view-sr"></span>
-                        </div>
-                        <div class="row">
-                            <span>Referring Provider:</span>
-                            <span id="view-rp"></span>
-                        </div>
-                        <div class="row">
                             <span>Patient:</span>
                             <span id="view-patient"></span>
+                        </div>
+                        <div class="row">
+                            <span>Reason:</span>
+                            <span id="view-reason"></span>
+                        </div>
+                        <div class="row">
+                            <span>Notes:</span>
+                            <span id="view-notes"></span>
                         </div>
                     </div>
                 </div>
@@ -486,16 +441,6 @@
                         <div class="error-box"></div>
 
                         <div class="field">
-                            <label class="required">Priority</label>
-                            <div class="level">
-                                <div class="emergency"><span></span>Emergency</div>
-                                <div class="urgent"><span></span>Urgent</div>
-                                <div class="normal selected"><span></span>Normal</div>
-                                <div class="follow-up"><span></span>Follow-up</div>
-                            </div>
-                        </div>
-
-                        <div class="field">
                             <label class="required">Doctor</label>
                             <div class="custom-select">
                                 <i class="fa-solid fa-user-doctor"></i>
@@ -505,8 +450,7 @@
 
                         <div class="field">
                             <label class="required">Date</label>
-                            <input type="text" id="edit_appointment_date" placeholder="Choose date" value="2026-06-30"
-                                required>
+                            <input type="text" id="edit_appointment_date" placeholder="Choose date" required>
                         </div>
 
                         <div class="field">
@@ -519,32 +463,32 @@
                                 </div>
 
                                 <div class="tab-content show" id="editMorningTab">
-                                    <div class="slot selected">08:00</div>
-                                    <div class="slot">08:30</div>
-                                    <div class="slot">09:00</div>
-                                    <div class="slot">09:30</div>
-                                    <div class="slot disable">10:00</div>
-                                    <div class="slot disable">10:30</div>
-                                    <div class="slot">11:00</div>
-                                    <div class="slot">11:30</div>
+                                    <div class="slot" data-time="08:00">08:00</div>
+                                    <div class="slot" data-time="08:30">08:30</div>
+                                    <div class="slot" data-time="09:00">09:00</div>
+                                    <div class="slot" data-time="09:30">09:30</div>
+                                    <div class="slot" data-time="10:00">10:00</div>
+                                    <div class="slot" data-time="10:30">10:30</div>
+                                    <div class="slot" data-time="11:00">11:00</div>
+                                    <div class="slot" data-time="11:30">11:30</div>
                                 </div>
 
                                 <div class="tab-content" id="editAfternoonTab">
-                                    <div class="slot">13:00</div>
-                                    <div class="slot">13:30</div>
-                                    <div class="slot disable">14:00</div>
-                                    <div class="slot">14:30</div>
-                                    <div class="slot">15:00</div>
-                                    <div class="slot">15:30</div>
-                                    <div class="slot disable">16:00</div>
-                                    <div class="slot">16:30</div>
+                                    <div class="slot" data-time="13:00">13:00</div>
+                                    <div class="slot" data-time="13:30">13:30</div>
+                                    <div class="slot" data-time="14:00">14:00</div>
+                                    <div class="slot" data-time="14:30">14:30</div>
+                                    <div class="slot" data-time="15:00">15:00</div>
+                                    <div class="slot" data-time="15:30">15:30</div>
+                                    <div class="slot" data-time="16:00">16:00</div>
+                                    <div class="slot" data-time="16:30">16:30</div>
                                 </div>
 
                                 <div class="tab-content" id="editEveningTab">
-                                    <div class="slot">17:00</div>
-                                    <div class="slot">17:30</div>
-                                    <div class="slot disable">18:00</div>
-                                    <div class="slot">18:30</div>
+                                    <div class="slot" data-time="17:00">17:00</div>
+                                    <div class="slot" data-time="17:30">17:30</div>
+                                    <div class="slot" data-time="18:00">18:00</div>
+                                    <div class="slot" data-time="18:30">18:30</div>
                                 </div>
                             </div>
                         </div>
@@ -561,48 +505,14 @@
                             </div>
                         </div>
 
-                        <div class="row-section">
-                            <div class="field">
-                                <label class="required">Room</label>
-                                <div class="custom-select">
-                                    <i class="fa-solid fa-door-closed"></i>
-                                    <select id="editAppointmentRoom" required>
-                                        <option>Room 1</option>
-                                        <option>Room 2</option>
-                                        <option>Room 3</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="field">
-                                <label class="required">Appointment Type</label>
-                                <div class="custom-select">
-                                    <i class="fa-solid fa-stethoscope"></i>
-                                    <select id="appointmentType" required>
-                                        <option>Routine Checkup</option>
-                                        <option>Follow-up</option>
-                                        <option>New Consultation</option>
-                                        <option>Emergency</option>
-                                    </select>
-                                </div>
-                            </div>
+                        <div class="field">
+                            <label class="required">Reason</label>
+                            <textarea id="editAppointmentReason" rows="1" placeholder="E.g. Running nose, Sore throat" required></textarea>
                         </div>
 
                         <div class="field">
-                            <label>Referring Provider (Optional)</label>
-                            <textarea type="textarea" rows="1" placeholder="Name of external doctor"></textarea>
-                        </div>
-
-                        <label>Special Requirements</label>
-                        <div class="field">
-                            <input type="checkbox" id="editWheelchair" name="wheelchair" value="wheelchair">
-                            <label for="wheelchair">Wheelchair</label>
-
-                            <input type="checkbox" id="editEquipment" name="equipment" value="equipment">
-                            <label for="equipment">Medical Equipment</label>
-
-                            <input type="checkbox" id="editTranslator" name="translator" value="translator">
-                            <label for="translator">Translator</label>
+                            <label>Notes</label>
+                            <textarea id="editAppointmentNotes" rows="1" placeholder="E.g. Need wheelchair"></textarea>
                         </div>
                     </div>
 
@@ -611,19 +521,19 @@
                             <div>EDITED APPOINTMENT SUMMARY</div>
                             <div class="row">
                                 <span>Doctor:</span>
-                                <span>Dr. Jimmy Jitaraphol</span>
+                                <span id="editSummary-doc"></span>
                             </div>
                             <div class="row">
                                 <span>Date:</span>
-                                <span>20 June 2026</span>
+                                <span id="editSummary-date"></span>
                             </div>
                             <div class="row">
                                 <span>Time:</span>
-                                <span>14:00</span>
+                                <span id="editSummary-time"></span>
                             </div>
                             <div class="row">
                                 <span>Patient:</span>
-                                <span>William JKP</span>
+                                <span id="editSummary-patient"></span>
                             </div>
                         </div>
                     </div>
@@ -635,6 +545,22 @@
                     <button class="secondary btn-back" onclick="prevStep(this)">Back</button>
                     <button class="btn-next"
                         onclick="verifyInput(`#editModal .step-content[data-step='1']`)&&nextStep(this)">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="confirmDeleteModal" class="modal">
+            <div class="modal-box card">
+                <div class="top-title">Delete Appointment</div>
+                <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+                <div class="modal-content">
+                    <p>Are you sure you want to delete this appointment? This cannot be undone.</p>
+                </div>
+
+                <div class="button-section">
+                    <button class="secondary" onclick="closeModal(this)">Cancel</button>
+                    <button class="danger" onclick="confirmDeleteAppointment(this)">Delete</button>
                 </div>
             </div>
         </div>

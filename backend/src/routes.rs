@@ -23,6 +23,8 @@ pub fn configure(config: &mut web::ServiceConfig) {
     config.configure(staff_handlers::routes);
 
     config.configure(admindashboard_handlers::routes);
+    config.configure(appointment_handlers::routes);
+    config.configure(queue_handlers::routes);
 
     // Billing routes
     config.service(
@@ -54,23 +56,6 @@ pub fn configure(config: &mut web::ServiceConfig) {
             ),
     );
 
-    // Appointment scheduling routes
-    config.service(
-        web::scope("/appointments")
-            .route("", web::get().to(appointment_handlers::list_appointments)) // List all appointments
-            .route("", web::post().to(appointment_handlers::create_appointment)) // Create new appointment
-            .route("/{appointment_id}", web::get().to(appointment_handlers::get_appointment)) // Get appointment by ID
-            .route("/{appointment_id}", web::put().to(appointment_handlers::update_appointment)) // Update appointment by ID
-            .route("/{appointment_id}", web::delete().to(appointment_handlers::delete_appointment)), // Delete appointment by ID
-    );
-
-    // Queue management routes
-    config.service(
-        web::scope("/queue")
-            .route("/doctor/{doctor_id}", web::get().to(queue_handlers::list_queue_for_doctor)) // List queue for doctor
-            .route("", web::post().to(queue_handlers::create_queue_entry)) // Create queue entry
-            .route("/{queue_id}/status", web::put().to(queue_handlers::update_queue_status)), // Update queue status
-    );
     // Doctor availability is exposed through the existing doctor schedule API:
     // GET/POST /api/doctors/{doctor_id}/schedules.
 }

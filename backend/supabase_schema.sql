@@ -74,6 +74,15 @@ create table if not exists public.appointments (
   updated_at timestamptz not null default now()
 );
 
+alter table public.appointments
+  add column if not exists priority text not null default 'Normal'
+    check (priority in ('Emergency', 'Urgent', 'Normal', 'Follow-up')),
+  add column if not exists room text,
+  add column if not exists appointment_type text not null default 'Routine Checkup'
+    check (appointment_type in ('Routine Checkup', 'Follow-up', 'New Consultation', 'Emergency')),
+  add column if not exists referring_provider text,
+  add column if not exists special_requirements text[] not null default '{}';
+
 create index if not exists appointments_patient_id_idx on public.appointments(patient_id);
 create index if not exists appointments_doctor_id_idx on public.appointments(doctor_id);
 create index if not exists appointments_scheduled_at_idx on public.appointments(scheduled_at);

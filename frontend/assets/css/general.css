@@ -96,6 +96,16 @@ button.secondary:active {
     background: var(--hover);
 }
 
+button.danger {
+    background: var(--danger);
+    color: white;
+}
+
+button.danger:hover,
+button.danger:active {
+    opacity: 0.9;
+}
+
 button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
@@ -546,6 +556,11 @@ input.password+i {
 
 .table-list .action .edit {
     color: var(--warning);
+    cursor: pointer;
+}
+
+.table-list .action .delete {
+    color: var(--danger);
     cursor: pointer;
 }
 
