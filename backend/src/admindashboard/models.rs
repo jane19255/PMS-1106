@@ -25,6 +25,8 @@ pub struct SaveVitalPayload {
     pub pulse: i32,
     pub height: f32,
     pub weight: f32,
+    pub priority: String,
+    pub priority_reason: Option<String>,
 }
 
 #[derive(serde::Deserialize)]

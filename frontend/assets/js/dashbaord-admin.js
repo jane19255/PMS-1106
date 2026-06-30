@@ -173,19 +173,47 @@ function getPatientStatus(app) {
     }
 }
 
+function getPriorityRank(priority) {
+    if (priority === "Emergency") return 1;
+    if (priority === "Urgent") return 2;
+    return 3;
+}
+
+function sortByPriorityThenTime(list) {
+    return list.sort((a, b) => {
+        const priorityDiff = getPriorityRank(a.priority) - getPriorityRank(b.priority);
+        if (priorityDiff !== 0) return priorityDiff;
+
+        return new Date(a.raw.scheduled_at) - new Date(b.raw.scheduled_at);
+    });
+}
+
+function getPriorityBadge(priority) {
+    switch (priority) {
+        case "Emergency":
+            return { class: "badge badge-emergency", text: "Emergency" };
+        case "Urgent":
+            return { class: "badge badge-urgent", text: "Urgent" };
+        default:
+            return { class: "badge badge-normal", text: "Normal" };
+    }
+}
+
 async function fetchAppointmentsByDate(dateStr) {
     try {
         const res = await fetch(`/api/dashboard/appointments?date=${dateStr}`);
         if (!res.ok) throw new Error("Failed to load appointments");
         const rawList = await res.json();
         globalAppointments = rawList.map(row => {
+            const queue = Array.isArray(row.patient_queue) ? row.patient_queue[0] : row.patient_queue;
             return {
                 appointmentId: row.id,
                 doctorId: row.doctor_id,
                 date: extractIsoDate(row.scheduled_at),
                 time: formatIsoTime(row.scheduled_at),
                 status: row.status,
-                priority: row.reason || "Normal",
+                priority: queue?.priority || "Normal",
+                priorityReason: queue?.priority_reason || "",
                 room: row.doctors?.room || "Unassigned",
                 roomStatus: row.doctors?.room_status?.[0]?.status || "Available",
                 currentAppointmentId: row.doctors?.room_status?.[0]?.current_appointment_id || null,
@@ -198,6 +226,7 @@ async function fetchAppointmentsByDate(dateStr) {
                 raw: row
             };
         });
+        globalAppointments = sortByPriorityThenTime(globalAppointments);
         return globalAppointments;
     } catch (err) {
         console.error(err);
@@ -214,6 +243,7 @@ function renderAppointmentRow(app, index) {
     const isArrived = ["Checked In", "Vitals Recorded", "In Consultation", "Completed"].includes(app.status);
     const canEnterVitals = app.status === "Checked In";
     const canSendRoom = app.status === "Vitals Recorded" && app.roomStatus === "Available";
+    const priority = getPriorityBadge(app.priority);
 
     let html = `
         <tr data-doctor="${app.doctor}" data-status="${app.status}" data-app-id="${app.appointmentId}">
@@ -224,6 +254,7 @@ function renderAppointmentRow(app, index) {
     if (isToday) {
         html += `
         <td><span class="${status.class}">${status.text}</span></td>
+        <td><span class="${priority.class}">${priority.text}</span></td>
         <td class="action">
             <div class="has-tooltip">
                 <button class="btn btn-arrive ${isArrived ? 'disabled' : ''}" ${isArrived ? 'disabled' : ''} onclick="handleMarkArrive('${app.appointmentId}', '${fullName}')"><i class="fa-solid fa-user-check"></i></button>
@@ -239,7 +270,11 @@ function renderAppointmentRow(app, index) {
             </div>
         </td>`;
     } else {
-        html += `<td><span class="${status.class}">${status.text}</td><td class="action"></td>`;
+        html += `
+            <td><span class="${status.class}">${status.text}</span></td>
+            <td><span class="${priority.class}">${priority.text}</span></td>
+            <td class="action">-</td>
+        `;
     }
 
     html += `</tr>`;
@@ -280,7 +315,9 @@ async function apiSaveVitals(appointmentId, vitalsPayload) {
                 temp: Number(vitalsPayload.temp),
                 pulse: Number(vitalsPayload.pulse),
                 height: Number(vitalsPayload.height),
-                weight: Number(vitalsPayload.weight)
+                weight: Number(vitalsPayload.weight),
+                priority: vitalsPayload.priority,
+                priority_reason: vitalsPayload.priorityReason || null
             })
         });
         const data = await readApiResponse(res);
@@ -298,16 +335,26 @@ async function apiSaveVitals(appointmentId, vitalsPayload) {
 }
 
 async function refreshAppointmentTable(selectedDateStr) {
-    currentSelectedDate = selectedDateStr;
-    await fetchAppointmentsByDate(selectedDateStr);
+    const loadingToast = showToast("Loading appointments...", "loading", {
+        persist: true
+    });
 
-    pagination.data = globalAppointments;
-    pagination.currentPage = 1;
-    pagination.renderTable();
+    try {
+        currentSelectedDate = selectedDateStr;
+        await fetchAppointmentsByDate(selectedDateStr);
 
-    if (globalAppointments.length === 0) {
-        document.getElementById("appBody").innerHTML =
-            `<tr><td colspan="5" class="empty-row">No appointments found for this date.</td></tr>`;
+        pagination.data = globalAppointments;
+        pagination.currentPage = 1;
+        pagination.renderTable();
+
+        if (globalAppointments.length === 0) {
+            document.getElementById("appBody").innerHTML =
+                `<tr><td colspan="6" class="empty-row">No appointments found for this date.</td></tr>`;
+        }
+    } catch (err) {
+        showToast("Appointments could not be loaded!", "error");
+    } finally {
+        showToast("Appointments loaded!", "success");
     }
 }
 
@@ -329,14 +376,16 @@ function openVital(patientName, appId) {
 }
 
 async function saveVital() {
-    const patientName = document.getElementById("currentPatientName").textContent;
     const payload = {
         bp: document.getElementById("bp").value,
         temp: document.getElementById("temp").value,
         pulse: document.getElementById("pulse").value,
         height: document.getElementById("height").value,
-        weight: document.getElementById("weight").value
+        weight: document.getElementById("weight").value,
+        priority: document.getElementById("queuePriority").value,
+        priorityReason: document.getElementById("priorityReason").value.trim()
     };
+
     await apiSaveVitals(activeVitalAppId, payload);
 }
 
@@ -346,11 +395,7 @@ function applyAllFiltersAndRefresh() {
     const selectedStatus = document.getElementById("statusFilter").value;
 
     let filtered = globalAppointments.filter(p => p.date === currentSelectedDate);
-
-    if (filtered.length === 0) {
-        document.getElementById("appBody").innerHTML =
-            `<tr><td colspan="5" class="empty-row">No appointments found for this date.</td></tr>`;
-    }
+    filtered = sortByPriorityThenTime(filtered);
 
     if (searchKeyword) {
         filtered = filtered.filter(item => {
@@ -371,6 +416,11 @@ function applyAllFiltersAndRefresh() {
     pagination.data = filtered;
     pagination.currentPage = 1;
     pagination.renderTable();
+
+    if (filtered.length === 0) {
+        document.getElementById("appBody").innerHTML =
+            `<tr><td colspan="6" class="empty-row">No appointments found.</td></tr>`;
+    }
 }
 
 function initFilters() {
@@ -412,6 +462,40 @@ async function sendToRoom(appointmentId, patientName, doctorId) {
     }
 }
 
+function initPrioritySelector() {
+    const group = document.getElementById("queuePriorityGroup");
+    const hiddenInput = document.getElementById("queuePriority");
+    const reasonField = document.getElementById("priorityReasonField");
+    const reasonInput = document.getElementById("priorityReason");
+
+    if (!group || !hiddenInput || !reasonField || !reasonInput) return;
+
+    group.querySelectorAll(".priority-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            const selectedPriority = tab.dataset.priority;
+
+            group.querySelectorAll(".priority-tab").forEach(item => {
+                item.classList.remove("selected");
+            });
+
+            tab.classList.add("selected");
+            hiddenInput.value = selectedPriority;
+
+            const needsReason =
+                selectedPriority === "Urgent" ||
+                selectedPriority === "Emergency";
+
+            reasonField.style.display = needsReason ? "flex" : "none";
+            reasonInput.required = needsReason;
+
+            if (!needsReason) {
+                reasonInput.value = "";
+            }
+        });
+    });
+}
+
+
 document.addEventListener("DOMContentLoaded", async () => {
     const todayStr = getTodayDate();
     currentSelectedDate = todayStr;
@@ -420,6 +504,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderRoomTable();
     initFilters();
     updateStatsCards();
+    initPrioritySelector();
     flatpickr("#fullCalendar", {
         inline: true,
         dateFormat: "Y-m-d",

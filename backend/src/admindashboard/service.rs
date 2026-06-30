@@ -68,6 +68,22 @@ pub async fn save_patient_vitals(
         return Err("Weight value invalid".to_string());
     }
 
+        let priority = payload.priority.trim().to_string();
+
+    if !matches!(priority.as_str(), "Normal" | "Urgent" | "Emergency") {
+        return Err("Queue priority must be Normal, Urgent, or Emergency".to_string());
+    }
+
+    let priority_reason = payload
+        .priority_reason
+        .as_ref()
+        .map(|reason| reason.trim().to_string())
+        .filter(|reason| !reason.is_empty());
+
+    if matches!(priority.as_str(), "Urgent" | "Emergency") && priority_reason.is_none() {
+        return Err("Reason is required for urgent or emergency priority".to_string());
+    }
+
     repository::record_vitals(
         db,
         &payload.appointment_id,
@@ -76,6 +92,14 @@ pub async fn save_patient_vitals(
         payload.pulse,
         payload.height,
         payload.weight,
+    )
+    .await?;
+
+    repository::update_queue_priority(
+        db,
+        &payload.appointment_id,
+        &priority,
+        priority_reason.as_deref(),
     )
     .await?;
 

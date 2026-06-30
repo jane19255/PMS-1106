@@ -123,6 +123,7 @@
                 <th>Attending Doctor</th>
                 <th>Appointment Time</th>
                 <th>Status</th>
+                <th>Queue Priority</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -187,6 +188,21 @@
               <label class="required">Weight (kg)</label>
               <input type="number" , step="0.1" , min="1" , max="300" id="weight" placeholder="kg" required>
             </div>
+          </div>
+
+          <div class="field">
+            <label class="required">Queue Priority</label>
+            <div class="priority-level" id="queuePriorityGroup">
+              <div class="priority-tab selected" data-priority="Normal">Normal</div>
+              <div class="priority-tab urgent" data-priority="Urgent">Urgent</div>
+              <div class="priority-tab emergency" data-priority="Emergency">Emergency</div>
+            </div>
+            <input type="hidden" id="queuePriority" value="Normal">
+          </div>
+
+          <div class="field" id="priorityReasonField" style="display: none;">
+            <label class="required">Reason</label>
+            <input type="text" id="priorityReason" placeholder="e.g. High fever, fast pulse">
           </div>
         </div>
 

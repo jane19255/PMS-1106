@@ -3,7 +3,7 @@
 {% block title %}Prescriptions{% endblock title %}
 
 {% block styles %}
-<link rel="stylesheet" href="/assets/css/rescriptions.css?v=7">
+<link rel="stylesheet" href="/assets/css/prescriptions.css?v=7">
 {% endblock styles %}
 
 {% block content %}
@@ -127,7 +127,7 @@
                 <td>{{ prescription.doctor_id }}</td>
                 <td>{{ prescription.dosage }}</td>
                 <td>
-                    <span class="badge">
+                    <span class="status {{ prescription.status }}">
                         {{ prescription.status }}
                     </span>
                 </td>
