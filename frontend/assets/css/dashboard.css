@@ -12,19 +12,22 @@ main {
 }
 
 #patientArrived .icon,
-.badge-ready {
+.badge-ready,
+.badge-normal {
     background-color: rgb(from var(--success) r g b / 10%);
     color: var(--success);
 }
 
 #pendingViral .icon,
-.badge-pendingvital {
+.badge-pendingvital,
+.badge-urgent {
     background-color: rgb(from var(--warning) r g b / 10%);
     color: var(--warning);
 }
 
 #noshow .icon,
-.badge-noshow {
+.badge-noshow,
+.badge-emrgency {
     background-color: rgb(from var(--danger) r g b / 10%);
     color: var(--danger);
 }
@@ -253,4 +256,39 @@ span.flatpickr-weekday {
         grid-template-columns: none;
         grid-template-rows: 1fr;
     }
+}
+
+.priority-level {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.priority-tab {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+    cursor: pointer;
+    flex: 1;
+    background-color: rgb(from var(--success) r g b / 10%);
+    color: var(--success);
+    border: 0px solid var(--success);
+}
+
+.priority-tab.emergency {
+    background-color: rgb(from var(--danger) r g b / 10%);
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+.priority-tab.urgent {
+    background-color: rgb(from var(--warning) r g b / 10%);
+    color: var(--warning);
+    border-color: var(--warning);
+}
+
+.priority-tab.selected {
+    font-weight: 500;
+    border-width: 1px;
 }

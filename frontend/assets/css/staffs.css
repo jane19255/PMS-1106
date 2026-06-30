@@ -66,22 +66,19 @@
 
 .doctor-actions a,
 .doctor-actions button {
-    width: 34px;
-    height: 34px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
     background: var(--card-bg);
     color: var(--primary);
     text-decoration: none;
 }
 
-.doctor-actions .delete-doctor {
+.doctor-actions button.delete-doctor {
     color: var(--danger);
     border-color: rgb(239 68 68 / 35%);
+    background: none;
 }
 
 .doctor-form-note {
@@ -116,4 +113,28 @@
     main {
         padding: 90px 24px 24px;
     }
+}
+
+i.delete {
+    color: var(--danger);
+}
+
+.card:has(#totalDoctorCount) .icon {
+    background-color: rgb(from var(--primary) r g b / 10%);
+    color: var(--primary);
+}
+
+.card:has(#availableDoctorCount) .icon {
+    background-color: rgb(from var(--success) r g b / 10%);
+    color: var(--success);
+}
+
+.card:has(#unavailableDoctorCount) .icon {
+    background-color: rgb(from var(--secondary) r g b / 10%);
+    color: var(--secondary);
+}
+
+.card:has(#doctorSpecialtyCount) .icon {
+    background-color: rgb(from var(--primary) r g b / 10%);
+    color: var(--primary);
 }

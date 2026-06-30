@@ -10,7 +10,7 @@ pub async fn get_appointments_by_date(
     let next_day = target_date.succ_opt().unwrap();
 
     let filter = format!(
-        "select=*,patients(*),doctors(*,staff(*),room_status(*))&scheduled_at=gte.{}T00:00:00Z&scheduled_at=lt.{}T00:00:00Z&order=scheduled_at.asc",
+        "select=*,patients(*),doctors(*,staff(*),room_status(*)),patient_queue(*)&scheduled_at=gte.{}T00:00:00Z&scheduled_at=lt.{}T00:00:00Z&order=scheduled_at.asc",
         target_date,
         next_day
     );
@@ -109,6 +109,33 @@ pub async fn record_vitals(
     let url = db.rest_url("patient_vitals");
 
     let res = db.authed(db.http_client.post(url))
+        .header("Prefer", "return=representation")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    SupabaseRestDb::read_response(res).await
+}
+
+pub async fn update_queue_priority(
+    db: &SupabaseRestDb,
+    appointment_id: &str,
+    priority: &str,
+    priority_reason: Option<&str>,
+) -> Result<String, String> {
+    let payload = json!({
+        "priority": priority,
+        "priority_reason": priority_reason,
+        "updated_at": Utc::now().to_rfc3339()
+    });
+
+    let url = db.rest_url(&format!(
+        "patient_queue?appointment_id=eq.{}",
+        urlencoding::encode(appointment_id)
+    ));
+
+    let res = db.authed(db.http_client.patch(url))
         .header("Prefer", "return=representation")
         .json(&payload)
         .send()

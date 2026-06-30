@@ -95,19 +95,29 @@ function closeModal(button) {
     return true;
 }
 
-function showToast(msg, status) {
+function showToast(msg, condition) {
     const toast = document.getElementById('toast');
-    if (status === "success") {
-        toast.innerHTML = "<i class='fa-solid fa-check-circle'></i>"
-    } else if (status === "warning") {
-        toast.innerHTML = "<i class='fa-solid fa-triangle-exclamation'></i>"
-    } else {
-        toast.innerHTML = "<i class='fa-solid fa-circle-exclamation'></i>"
-    }
-    toast.innerHTML += msg;
+    if (!toast) return false;
+    console.log(condition)
 
-    toast.classList.add("show");
-    setTimeout(() => { toast.classList.remove("show"); }, 3000);
+    toast.className = "toast card show"; 
+
+    const icons = {
+        success: "fa-check-circle",
+        warning: "fa-triangle-exclamation",
+        loading: "fa-spinner",
+        error: "fa-circle-exclamation"
+    };
+
+    const iconClass = icons[condition] ? `fa-solid ${icons[condition]}` : '';
+    toast.innerHTML = iconClass ? `<i class="${iconClass}"></i> ${msg}` : msg;
+
+    if (condition === "loading") {
+        toast.classList.add("loader");
+    } else {
+        setTimeout(() => toast.classList.remove("show"), 3000);
+    }
+
     return true;
 }
 

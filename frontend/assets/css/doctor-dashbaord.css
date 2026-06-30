@@ -142,7 +142,7 @@ span.flatpickr-weekday {
 
 .badge,
 .priority,
-button#callEarlyBtn {
+.action button {
     padding: 5px 10px;
     border-radius: var(--radius);
     font-size: 12px;
