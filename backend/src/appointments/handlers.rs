@@ -1,5 +1,5 @@
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveTime, Utc, Weekday};
 use firebase_auth::FirebaseAuth;
 use serde_json::{json, Value};
 use tera::{Context, Tera};
@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::appointments::interval::AppointmentInterval;
 use crate::appointments::scheduler::AppointmentScheduler;
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
+use crate::doctors::models::{DayOfWeek, DoctorSchedule};
 use crate::doctors::service::DoctorService;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 
@@ -19,9 +20,18 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     // JSON API
     cfg.route("/api/appointments", web::get().to(list_appointments));
     cfg.route("/api/appointments", web::post().to(create_appointment));
-    cfg.route("/api/appointments/{appointment_id}", web::get().to(get_appointment));
-    cfg.route("/api/appointments/{appointment_id}", web::put().to(update_appointment));
-    cfg.route("/api/appointments/{appointment_id}", web::delete().to(delete_appointment));
+    cfg.route(
+        "/api/appointments/{appointment_id}",
+        web::get().to(get_appointment),
+    );
+    cfg.route(
+        "/api/appointments/{appointment_id}",
+        web::put().to(update_appointment),
+    );
+    cfg.route(
+        "/api/appointments/{appointment_id}",
+        web::delete().to(delete_appointment),
+    );
 }
 
 // ── SSR page shell ───────────────────────────────────────────────────────────
@@ -54,7 +64,9 @@ pub async fn appointments_page(
     );
 
     match tera.render("Appointments.html", &ctx) {
-        Ok(html) => HttpResponse::Ok().content_type("text/html; charset=utf-8").body(html),
+        Ok(html) => HttpResponse::Ok()
+            .content_type("text/html; charset=utf-8")
+            .body(html),
         Err(e) => {
             eprintln!("Template error: {e}");
             HttpResponse::InternalServerError().body("Template rendering failed")
@@ -83,11 +95,15 @@ async fn validate_and_check_conflict(
         .filter(|value| !value.is_empty())
         .map(str::to_string)
     else {
-        return Err(AppointmentError::BadRequest("doctor_id is required".to_string()));
+        return Err(AppointmentError::BadRequest(
+            "doctor_id is required".to_string(),
+        ));
     };
 
     if doctor_service.find_doctor(&doctor_id).await.is_err() {
-        return Err(AppointmentError::BadRequest("Selected doctor does not exist".to_string()));
+        return Err(AppointmentError::BadRequest(
+            "Selected doctor does not exist".to_string(),
+        ));
     }
 
     let Some(patient_id) = appointment
@@ -97,14 +113,18 @@ async fn validate_and_check_conflict(
         .filter(|value| !value.is_empty())
         .map(str::to_string)
     else {
-        return Err(AppointmentError::BadRequest("patient_id is required".to_string()));
+        return Err(AppointmentError::BadRequest(
+            "patient_id is required".to_string(),
+        ));
     };
 
     match db.get_patient(&patient_id).await {
         Ok(body) => {
             let rows: Vec<Value> = serde_json::from_str(&body).unwrap_or_default();
             if rows.is_empty() {
-                return Err(AppointmentError::BadRequest("Selected patient does not exist".to_string()));
+                return Err(AppointmentError::BadRequest(
+                    "Selected patient does not exist".to_string(),
+                ));
             }
         }
         Err(e) => return Err(AppointmentError::ServerError(e)),
@@ -114,28 +134,57 @@ async fn validate_and_check_conflict(
 
     let scheduled_at = match appointment.get("scheduled_at").and_then(Value::as_str) {
         Some(s) if !s.trim().is_empty() => s.to_string(),
-        _ => return Err(AppointmentError::BadRequest("scheduled_at is required".to_string())),
+        _ => {
+            return Err(AppointmentError::BadRequest(
+                "scheduled_at is required".to_string(),
+            ))
+        }
     };
 
     let requested_start = match DateTime::parse_from_rfc3339(&scheduled_at) {
         Ok(dt) => dt.with_timezone(&Utc),
-        Err(_) => return Err(AppointmentError::BadRequest("Invalid scheduled_at format".to_string())),
+        Err(_) => {
+            return Err(AppointmentError::BadRequest(
+                "Invalid scheduled_at format".to_string(),
+            ))
+        }
     };
 
-    let duration = appointment.get("duration_minutes").and_then(Value::as_i64).unwrap_or(30);
+    let duration = appointment
+        .get("duration_minutes")
+        .and_then(Value::as_i64)
+        .unwrap_or(30);
     if !(5..=480).contains(&duration) {
         return Err(AppointmentError::BadRequest(
             "duration_minutes must be between 5 and 480".to_string(),
         ));
     }
 
+    let schedules = doctor_service
+        .list_schedules(&doctor_id)
+        .await
+        .map_err(|_| AppointmentError::ServerError("Unable to load doctor schedule".to_string()))?;
+
+    if schedules.is_empty() {
+        return Err(AppointmentError::BadRequest(
+            "Doctor has no schedule configured".to_string(),
+        ));
+    }
+
+    if !appointment_fits_doctor_schedule(&schedules, requested_start, duration) {
+        return Err(AppointmentError::BadRequest(
+            "Selected time is outside the doctor's schedule".to_string(),
+        ));
+    }
     let reason_ok = appointment
         .get("reason")
         .and_then(Value::as_str)
         .map(|s| !s.trim().is_empty())
         .unwrap_or(false);
     if !reason_ok {
-        return Err(AppointmentError::BadRequest("reason is required".to_string()));
+        return Err(AppointmentError::BadRequest(
+            "reason is required".to_string(),
+        ));
     }
 
     let appointments_json = db
@@ -158,7 +207,10 @@ async fn validate_and_check_conflict(
             continue;
         };
 
-        let apt_duration = apt.get("duration_minutes").and_then(Value::as_i64).unwrap_or(30);
+        let apt_duration = apt
+            .get("duration_minutes")
+            .and_then(Value::as_i64)
+            .unwrap_or(30);
 
         if let Ok(start) = DateTime::parse_from_rfc3339(scheduled) {
             intervals.push(AppointmentInterval::new(
@@ -177,19 +229,69 @@ async fn validate_and_check_conflict(
     );
 
     if scheduler.has_conflict(&requested) {
-        return Err(AppointmentError::Conflict(scheduler.suggest_slots(duration)));
+        return Err(AppointmentError::Conflict(
+            scheduler.suggest_slots(duration),
+        ));
     }
 
     Ok(appointment)
 }
 
+fn appointment_fits_doctor_schedule(
+    schedules: &[DoctorSchedule],
+    requested_start: DateTime<Utc>,
+    duration_minutes: i64,
+) -> bool {
+    let requested_end = requested_start + Duration::minutes(duration_minutes);
+    if requested_end.date_naive() != requested_start.date_naive() {
+        return false;
+    }
+
+    let requested_day = day_of_week_from_chrono(requested_start.weekday());
+    let requested_start_time = requested_start.time();
+    let requested_end_time = requested_end.time();
+
+    schedules.iter().any(|schedule| {
+        if schedule.day_of_week != requested_day {
+            return false;
+        }
+
+        let Ok(schedule_start) = parse_schedule_time(&schedule.start_time) else {
+            return false;
+        };
+        let Ok(schedule_end) = parse_schedule_time(&schedule.end_time) else {
+            return false;
+        };
+
+        requested_start_time >= schedule_start && requested_end_time <= schedule_end
+    })
+}
+
+fn parse_schedule_time(value: &str) -> Result<NaiveTime, chrono::ParseError> {
+    NaiveTime::parse_from_str(value, "%H:%M")
+        .or_else(|_| NaiveTime::parse_from_str(value, "%H:%M:%S"))
+}
+
+fn day_of_week_from_chrono(day: Weekday) -> DayOfWeek {
+    match day {
+        Weekday::Mon => DayOfWeek::Monday,
+        Weekday::Tue => DayOfWeek::Tuesday,
+        Weekday::Wed => DayOfWeek::Wednesday,
+        Weekday::Thu => DayOfWeek::Thursday,
+        Weekday::Fri => DayOfWeek::Friday,
+        Weekday::Sat => DayOfWeek::Saturday,
+        Weekday::Sun => DayOfWeek::Sunday,
+    }
+}
 fn normalize_appointment_payload(appointment: &mut Value, doctor_id: &str) {
     let Some(object) = appointment.as_object_mut() else {
         *appointment = json!({});
         return normalize_appointment_payload(appointment, doctor_id);
     };
 
-    object.entry("id").or_insert_with(|| json!(format!("APT-{}", Uuid::new_v4())));
+    object
+        .entry("id")
+        .or_insert_with(|| json!(format!("APT-{}", Uuid::new_v4())));
     object.insert("doctor_id".to_string(), json!(doctor_id));
 
     if !object.contains_key("scheduled_at") {
@@ -198,7 +300,9 @@ fn normalize_appointment_payload(appointment: &mut Value, doctor_id: &str) {
         }
     }
 
-    object.entry("reason").or_insert_with(|| json!("Appointment"));
+    object
+        .entry("reason")
+        .or_insert_with(|| json!("Appointment"));
 }
 
 fn conflict_json(suggestions: Vec<(DateTime<Utc>, DateTime<Utc>)>) -> Value {
@@ -217,7 +321,9 @@ fn conflict_json(suggestions: Vec<(DateTime<Utc>, DateTime<Utc>)>) -> Value {
 
 pub async fn list_appointments(db: web::Data<SupabaseRestDb>) -> impl Responder {
     match db.list_appointments().await {
-        Ok(result) => HttpResponse::Ok().content_type("application/json").body(result),
+        Ok(result) => HttpResponse::Ok()
+            .content_type("application/json")
+            .body(result),
         Err(err) => HttpResponse::InternalServerError().body(err),
     }
 }
@@ -228,7 +334,9 @@ pub async fn get_appointment(
 ) -> impl Responder {
     let appointment_id = path.into_inner();
     match db.get_appointment(&appointment_id).await {
-        Ok(result) => HttpResponse::Ok().content_type("application/json").body(result),
+        Ok(result) => HttpResponse::Ok()
+            .content_type("application/json")
+            .body(result),
         Err(err) => HttpResponse::InternalServerError().body(err),
     }
 }
@@ -240,11 +348,15 @@ pub async fn create_appointment(
 ) -> impl Responder {
     match validate_and_check_conflict(&db, &doctor_service, payload.into_inner(), None).await {
         Ok(appointment) => match db.create_appointment(&appointment).await {
-            Ok(result) => HttpResponse::Created().content_type("application/json").body(result),
+            Ok(result) => HttpResponse::Created()
+                .content_type("application/json")
+                .body(result),
             Err(err) => HttpResponse::InternalServerError().body(err),
         },
         Err(AppointmentError::BadRequest(msg)) => HttpResponse::BadRequest().body(msg),
-        Err(AppointmentError::Conflict(suggestions)) => HttpResponse::Conflict().json(conflict_json(suggestions)),
+        Err(AppointmentError::Conflict(suggestions)) => {
+            HttpResponse::Conflict().json(conflict_json(suggestions))
+        }
         Err(AppointmentError::ServerError(err)) => HttpResponse::InternalServerError().body(err),
     }
 }
@@ -256,13 +368,24 @@ pub async fn update_appointment(
     payload: web::Json<Value>,
 ) -> impl Responder {
     let appointment_id = path.into_inner();
-    match validate_and_check_conflict(&db, &doctor_service, payload.into_inner(), Some(&appointment_id)).await {
+    match validate_and_check_conflict(
+        &db,
+        &doctor_service,
+        payload.into_inner(),
+        Some(&appointment_id),
+    )
+    .await
+    {
         Ok(appointment) => match db.update_appointment(&appointment_id, &appointment).await {
-            Ok(result) => HttpResponse::Ok().content_type("application/json").body(result),
+            Ok(result) => HttpResponse::Ok()
+                .content_type("application/json")
+                .body(result),
             Err(err) => HttpResponse::InternalServerError().body(err),
         },
         Err(AppointmentError::BadRequest(msg)) => HttpResponse::BadRequest().body(msg),
-        Err(AppointmentError::Conflict(suggestions)) => HttpResponse::Conflict().json(conflict_json(suggestions)),
+        Err(AppointmentError::Conflict(suggestions)) => {
+            HttpResponse::Conflict().json(conflict_json(suggestions))
+        }
         Err(AppointmentError::ServerError(err)) => HttpResponse::InternalServerError().body(err),
     }
 }
@@ -278,9 +401,11 @@ pub async fn delete_appointment(
     let status = match db.get_appointment(&appointment_id).await {
         Ok(body) => {
             let rows: Vec<Value> = serde_json::from_str(&body).unwrap_or_default();
-            rows.into_iter()
-                .next()
-                .and_then(|row| row.get("status").and_then(Value::as_str).map(str::to_string))
+            rows.into_iter().next().and_then(|row| {
+                row.get("status")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
         }
         Err(err) => return HttpResponse::InternalServerError().body(err),
     };
@@ -296,7 +421,9 @@ pub async fn delete_appointment(
     }
 
     match db.delete_appointment(&appointment_id).await {
-        Ok(result) => HttpResponse::Ok().content_type("application/json").body(result),
+        Ok(result) => HttpResponse::Ok()
+            .content_type("application/json")
+            .body(result),
         Err(err) => {
             if err.contains("violates foreign key constraint") || err.contains("23503") {
                 HttpResponse::Conflict().body(
@@ -307,5 +434,74 @@ pub async fn delete_appointment(
                 HttpResponse::InternalServerError().body("Failed to delete appointment.")
             }
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn monday_schedule(start_time: &str, end_time: &str) -> DoctorSchedule {
+        DoctorSchedule {
+            id: "DSCH-001".to_string(),
+            doctor_id: "DOC-001".to_string(),
+            day_of_week: DayOfWeek::Monday,
+            start_time: start_time.to_string(),
+            end_time: end_time.to_string(),
+        }
+    }
+
+    #[test]
+    fn accepts_appointment_inside_doctor_schedule() {
+        let schedules = vec![monday_schedule("09:00", "17:00")];
+        let requested_start = DateTime::parse_from_rfc3339("2026-07-06T10:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        assert!(appointment_fits_doctor_schedule(
+            &schedules,
+            requested_start,
+            30
+        ));
+    }
+
+    #[test]
+    fn rejects_appointment_outside_doctor_schedule() {
+        let schedules = vec![monday_schedule("09:00", "17:00")];
+        let requested_start = DateTime::parse_from_rfc3339("2026-07-06T17:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        assert!(!appointment_fits_doctor_schedule(
+            &schedules,
+            requested_start,
+            30
+        ));
+    }
+
+    #[test]
+    fn rejects_appointment_that_runs_past_schedule_end() {
+        let schedules = vec![monday_schedule("09:00", "17:00")];
+        let requested_start = DateTime::parse_from_rfc3339("2026-07-06T16:45:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        assert!(!appointment_fits_doctor_schedule(
+            &schedules,
+            requested_start,
+            30
+        ));
+    }
+    #[test]
+    fn rejects_appointment_on_unscheduled_day() {
+        let schedules = vec![monday_schedule("09:00", "17:00")];
+        let requested_start = DateTime::parse_from_rfc3339("2026-07-07T10:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        assert!(!appointment_fits_doctor_schedule(
+            &schedules,
+            requested_start,
+            30
+        ));
     }
 }
