@@ -104,6 +104,7 @@
 .timeslot .slot.selected {
     background: var(--primary);
     border-color: var(--primary);
+    color: white;
 }
 
 .timeslot .slot.disable {
@@ -155,90 +156,42 @@
     margin-bottom: 16px;
 }
 
-.level {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
-    gap: 8px;
-}
-
-.level > div {
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 14px;
-    text-align: center;
-    cursor: pointer;
-}
-
-.level >div.selected {
-    font-weight: 500;
-}
-
 #cancelledAppointments .icon,
-.priority.emergency,
-.level .emergency {
+.status.cancelled,
+.status.noshow {
     background-color: rgb(from var(--danger) r g b / 10%);
     color: var(--danger);
 }
 
-.level .emergency:hover {
-    background-color: rgb(from var(--danger) r g b / 20%);
-}
-
-.level .emergency.selected {
-    border: 1px solid var(--danger);
-}
-
-.level .urgent,
-.priority.urgent  {
-    background-color: rgb(from var(--warning) r g b / 10%);
-    color: var(--warning);
-}
-
-.level .urgent:hover {
-    background-color: rgb(from var(--warning) r g b / 20%);
-}
-
-.level .urgent.selected {
-    border: 1px solid var(--warning);
-}
-
 #upcomingAppointments .icon,
-.priority.normal,
-.level .normal {
+.status.vitalsrecorded {
     background-color: rgb(from var(--success) r g b / 10%);
     color: var(--success);
 }
 
-.level .normal:hover {
-    background-color: rgb(from var(--success) r g b / 20%);
-}
-
-.level .normal.selected {
-    border: 1px solid var(--success);
-}
-
 #todayAppointments .icon,
 #completedAppointments .icon,
-.priority.followup,
-.level .follow-up {
+.status.scheduled,
+.status.inconsultation  {
     background-color: rgb(from var(--primary) r g b / 10%);
     color: var(--primary);
 }
 
-.level .follow-up:hover {
-    background-color: rgb(from var(--primary) r g b / 20%);
+.status.completed {
+    background-color: rgb(from var(--primary-hover) r g b / 10%);
+    color: var(--primary-hover);
 }
 
-.level .follow-up.selected {
-    border: 1px solid var(--primary);
+.status.checkedin {
+    background-color: rgb(from var(--warning) r g b / 10%);
+    color: var(--warning);
 }
 
-.priority {
-    padding: 5px 10px;
-    border-radius: var(--radius);
-    font-size: 12px;
-    font-weight: 600;
+.status.notarrive {
+    background-color: rgb(from var(--secondary) r g b / 10%);
+    color: var(--secondary);
 }
+
 
 @media only screen and (max-width: 1000px) {
     main {

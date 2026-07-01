@@ -6,49 +6,37 @@ main {
 }
 
 #todayAppointments .icon,
-.badge-completed {
+.status-completed {
     background-color: rgb(from var(--primary-hover) r g b / 10%);
     color: var(--primary-hover);
 }
 
 #patientArrived .icon,
-.badge-ready,
-.badge-normal {
+.status-ready,
+.badge-normal,
+.status.occupied {
     background-color: rgb(from var(--success) r g b / 10%);
     color: var(--success);
 }
 
 #pendingViral .icon,
-.badge-pendingvital,
+.status-pendingvital,
 .badge-urgent {
     background-color: rgb(from var(--warning) r g b / 10%);
     color: var(--warning);
 }
 
 #noshow .icon,
-.badge-noshow,
-.badge-emrgency {
+.status-noshow,
+.badge-emergency {
     background-color: rgb(from var(--danger) r g b / 10%);
     color: var(--danger);
 }
 
-.tag-vacant,
-.tag-occupied {
-    padding: 4px 8px;
-    font-size: 12px;
-    font-weight: 500;
-    border-radius: var(--radius);
-}
-
-.tag-vacant,
-.badge-inroom {
+.status.vacant,
+.status-inroom {
     background-color: rgb(from var(--primary) r g b / 10%);
     color: var(--primary);
-}
-
-.tag-occupied {
-    background-color: rgb(from var(--success) r g b / 10%);
-    color: var(--success);
 }
 
 main>.card {
@@ -94,7 +82,7 @@ button.btn.disabled:hover {
     font-weight: 600;
 }
 
-.badge-notarrive {
+.status-notarrive {
     background-color: rgb(from var(--secondary) r g b / 10%);
     color: var(--secondary);
 }

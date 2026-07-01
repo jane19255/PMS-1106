@@ -141,7 +141,6 @@ span.flatpickr-weekday {
 }
 
 .badge,
-.priority,
 .action button {
     padding: 5px 10px;
     border-radius: var(--radius);
@@ -149,30 +148,29 @@ span.flatpickr-weekday {
     font-weight: 600;
 }
 
-.badge-completed {
+.status {
     background-color: rgb(from var(--secondary) r g b / 10%);
     color: var(--secondary);
 }
 
-.badge-inroom,
-.priority.Follow-up {
+.status-inroom {
     background-color: rgb(from var(--primary-hover) r g b / 10%);
     color: var(--primary-hover);
 }
 
-.badge-ready,
-.priority.Normal {
+.status-ready,
+.badge-normal {
     background-color: rgb(from var(--success) r g b / 10%);
     color: var(--success);
 }
 
-.badge-pendingvital,
-.priority.Urgent {
+.status-pendingvital,
+.badge-urgent {
     background-color: rgb(from var(--warning) r g b / 10%);
     color: var(--warning);
 }
 
-.priority.Emergency {
+.badge-emergency {
     background-color: rgb(from var(--danger) r g b / 10%);
     color: var(--danger);
 }

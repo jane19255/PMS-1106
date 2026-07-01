@@ -152,7 +152,7 @@ function renderRoomTable() {
         row.innerHTML = `
             <td>${room.doctor}</td>
             <td>${room.roomNumber}</td>
-            <td><span class="${room.roomStatus ? 'tag-occupied' : 'tag-vacant'}">${room.roomStatus ? 'OCCUPIED' : 'VACANT'}</span></td>
+            <td><span class="status ${room.roomStatus ? 'occupied' : 'vacant'}">${room.roomStatus ? 'OCCUPIED' : 'VACANT'}</span></td>
             <td>${room.currentPatient}</td>
             <td>${room.nextAppointment}</td>
         `;
@@ -162,14 +162,14 @@ function renderRoomTable() {
 
 function getPatientStatus(app) {
     switch (app.status) {
-        case "Scheduled": return { class: "badge badge-notarrive", text: "Not Arrived" };
-        case "Checked In": return { class: "badge badge-pendingvital", text: "Pending Vitals" };
-        case "Vitals Recorded": return { class: "badge badge-ready", text: "Ready for Doctor" };
-        case "In Consultation": return { class: "badge badge-inroom", text: "In Consultation" };
-        case "Completed": return { class: "badge badge-completed", text: "Completed" };
-        case "No Show": return { class: "badge badge-noshow", text: "No Show" };
-        case "Cancelled": return { class: "badge badge-cancelled", text: "Cancelled" };
-        default: return { class: "badge", text: app.status };
+        case "Scheduled": return { class: "status status-notarrive", text: "Not Arrived" };
+        case "Checked In": return { class: "status status-pendingvital", text: "Pending Vitals" };
+        case "Vitals Recorded": return { class: "status status-ready", text: "Ready for Doctor" };
+        case "In Consultation": return { class: "status status-inroom", text: "In Consultation" };
+        case "Completed": return { class: "status status-completed", text: "Completed" };
+        case "No Show": return { class: "status status-noshow", text: "No Show" };
+        case "Cancelled": return { class: "status status-cancelled", text: "Cancelled" };
+        default: return { class: "status", text: app.status };
     }
 }
 

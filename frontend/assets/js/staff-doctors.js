@@ -45,7 +45,7 @@ function refreshDoctorList() {
             <td>${escapeHtml(doctor.contact_number)}<br><span class="description">${escapeHtml(doctor.email)}</span></td>
             <td><span class="doctor-status ${doctorStatusClass(doctor.status)}">${escapeHtml(statusText)}</span></td>
             <td><div class="doctor-actions">
-                <a href="/doctors/${encodeURIComponent(doctor.id)}" aria-label="View doctor details"><i class="fa-solid fa-eye"></i></a>
+                <a href="/doctors/${encodeURIComponent(doctor.id)}" aria-label="View doctor details"><i class="fa-solid fa-circle-info"></i></a>
                 <button class="delete-doctor" type="button" data-doctor-id="${escapeHtml(doctor.id)}" aria-label="Delete doctor"><i class="fa-solid fa-trash"></i></button>
             </div></td>
         </tr>`;

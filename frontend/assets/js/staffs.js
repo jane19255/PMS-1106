@@ -108,7 +108,6 @@ async function saveNewStaff(button) {
             return;
         }
     }
-    if (!verifyInput(button)) return;
 
     try {
         const response = await fetch("/api/staff", {
@@ -196,7 +195,7 @@ async function saveStaffChanges(button) {
             return;
         }
     }
-    if (!verifyInput(button)) return;
+
 
     try {
         const response = await fetch(`/api/staff/${encodeURIComponent(staffId)}`, {
@@ -237,7 +236,7 @@ async function saveStaffChanges(button) {
         staffs = staffs.map((staff) => staff.id === updated.id ? updated : staff);
         refreshStaffList();
         notify("Changes saved!", "success");
-        closeModal(button);
+        return true;
     } catch (error) {
         notify(error.message || "Staff changes could not be saved", "error");
     }

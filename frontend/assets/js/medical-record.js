@@ -1,3 +1,50 @@
+let currentUser = null;
+let currentTodayAppointment = null;
+
+async function loadCurrentUser() {
+    try {
+        const res = await fetch('/api/me');
+        currentUser = res.ok ? await res.json() : null;
+    } catch {
+        currentUser = null;
+    }
+}
+
+async function loadTodayAppointment(patientId) {
+    const form = document.getElementById('addMRtab');
+
+    if (!form) return;
+
+    form.hidden = true;
+    currentTodayAppointment = null;
+
+    if (!currentUser?.permissions?.canEditMedicalRecords) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/medical-records/today-appointment?patient_id=${encodeURIComponent(patientId)}`);
+
+        if (!res.ok) {
+            return;
+        }
+
+        const appointment = await res.json();
+
+        if (!appointment || !appointment.id) {
+            return;
+        }
+
+        currentTodayAppointment = appointment;
+        form.hidden = false;
+
+        document.getElementById('visitDoctorId').value = appointment.doctor_id || '';
+        document.getElementById('visitReason').value = appointment.reason || '';
+    } catch {
+        return;
+    }
+}
+
 function addNewPresRow() {
     let wrap = document.getElementById("presWrap");
     let newRow = document.createElement("div");
@@ -89,6 +136,7 @@ function searchPatient() {
     window.history.replaceState({}, '', url.toString());
     loadPatient(id);
     loadHistory(id);
+    loadTodayAppointment(id);
 }
 
 async function loadPatient(patientId) {
@@ -206,6 +254,7 @@ async function saveRecord(patientId) {
     const doctorId = document.getElementById('visitDoctorId').value.trim() || null;
     const body = {
         patient_id: patientId,
+        appointment_id: currentTodayAppointment?.id || null,
         blood_pressure: document.getElementById('inp-bp').value.trim() || null,
         temperature: document.getElementById('inp-temp').value.trim() || null,
         pulse_rate: document.getElementById('inp-pulse').value.trim() || null,
@@ -299,20 +348,27 @@ async function savePrescriptions(patientId, doctorId, medicalRecordId) {
     return true;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadCurrentUser();
+
     const params = new URLSearchParams(window.location.search);
     const patientId = params.get('patient_id');
+
     if (patientId) {
         document.getElementById('patientIdInput').value = patientId;
         loadPatient(patientId);
         loadHistory(patientId);
+        loadTodayAppointment(patientId);
     }
 
     const saveBtn = document.getElementById('saveVisitBtn');
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
             const id = new URLSearchParams(window.location.search).get('patient_id');
-            if (!id) { showToast('Please load a patient first', 'error'); return; }
+            if (!id) {
+                showToast('Please load a patient first', 'error');
+                return;
+            }
             saveRecord(id);
         });
     }

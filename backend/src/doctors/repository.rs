@@ -242,6 +242,65 @@ impl SupabaseDoctorRepository {
         format!("{}/rest/v1/doctor_schedules?{}", self.url, query)
     }
 
+    fn room_status_url(&self, query: &str) -> String {
+        format!("{}/rest/v1/room_status?{}", self.url, query)
+    }
+
+    async fn assign_room_to_doctor(&self, doctor_id: &str) -> Result<(), RepositoryError> {
+        let response = self
+            .request(self.client.get(self.room_status_url("select=room")))
+            .send()
+            .await
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+        if !response.status().is_success() {
+            return Err(Self::response_error(response).await);
+        }
+
+        let rows = response
+            .json::<Vec<DatabaseRoomStatus>>()
+            .await
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+        let mut used_numbers: Vec<i32> = rows
+            .into_iter()
+            .filter_map(|row| {
+                row.room
+                    .strip_prefix('R')
+                    .and_then(|value| value.parse::<i32>().ok())
+                    .map(|number| number - 100)
+            })
+            .collect();
+
+        used_numbers.sort();
+
+        let mut next_number = 1;
+        while used_numbers.contains(&next_number) {
+            next_number += 1;
+        }
+
+        let room = format!("R{}", 100 + next_number);
+
+        let response = self
+            .request(self.client.post(self.room_status_url("select=*")))
+            .header("Prefer", "return=minimal")
+            .json(&json!({
+                "doctor_id": doctor_id,
+                "room": room,
+                "status": "Available",
+                "current_appointment_id": null
+            }))
+            .send()
+            .await
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(Self::response_error(response).await)
+        }
+    }
+
     async fn decode_doctor_rows(
         response: Response,
     ) -> Result<Vec<DatabaseDoctor>, RepositoryError> {
@@ -307,6 +366,7 @@ impl DoctorRepository for SupabaseDoctorRepository {
             }
 
             self.update_staff_profile(&doctor).await?;
+            self.assign_room_to_doctor(&doctor.id).await?;
             self.find_by_id(&doctor.id).await
         })
     }
@@ -532,6 +592,11 @@ struct DatabaseDoctorSchedule {
     day_of_week: DayOfWeek,
     start_time: String,
     end_time: String,
+}
+
+#[derive(Deserialize)]
+struct DatabaseRoomStatus {
+    room: String,
 }
 
 impl From<DatabaseDoctorSchedule> for DoctorSchedule {

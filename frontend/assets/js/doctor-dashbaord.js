@@ -26,17 +26,25 @@ function getTodayDate() {
 
 function getQueueStatus(status) {
     switch (status) {
-        case "Waiting": return { class: "badge badge-pendingvital", text: "Waiting" };
-        case "Called": return { class: "badge badge-ready", text: "Ready to consult" };
-        case "In Consultation": return { class: "badge badge-inroom", text: "In Consultation" };
-        case "Completed": return { class: "badge badge-completed", text: "Completed" };
-        default: return { class: "badge", text: status || "Not Checked In" };
+        case "Waiting": return { class: "status status-pendingvital", text: "Waiting" };
+        case "Called": return { class: "status status-ready", text: "Ready to consult" };
+        case "In Consultation": return { class: "status status-inroom", text: "In Consultation" };
+        case "Completed": return { class: "status status-completed", text: "Completed" };
+        default: return { class: "status", text: status || "Not Checked In" };
+    }
+}
+
+function getPriorityBadge(priority) {
+    switch (priority) {
+        case "Emergency": return { class: "badge badge-emergency", text: "Emergency" };
+        case "Urgent": return { class: "badge badge-urgent", text: "Urgent" };
+        default: return { class: "badge badge-normal", text: "Normal" };
     }
 }
 
 function renderAppointmentRow(app) {
     const status = getQueueStatus(app.queueStatus);
-    console.log(app)
+    const priority = getPriorityBadge(app.priority);
 
     let actionHtml = `<span class="muted">-</span>`;
 
@@ -59,6 +67,7 @@ function renderAppointmentRow(app) {
             <td>${app.patientName}</td>
             <td>${app.appointmentTime}</td>
             <td><span class="${status.class}">${status.text}</span></td>
+            <td><span class="${priority.class}">${priority.text}</span></td>
             <td class="action">${actionHtml}</td>
         </tr>
     `;
@@ -74,7 +83,7 @@ async function refreshAppointmentTable(selectedDate) {
 
     if (appointments.length === 0) {
         document.getElementById("appBody").innerHTML =
-            `<tr><td colspan="4" class="empty-row">No appointments found for this date.</td></tr>`;
+            `<tr><td colspan="5" class="empty-row">No appointments found for this date.</td></tr>`;
     }
 }
 
@@ -100,7 +109,7 @@ function applyAllFiltersAndRefresh() {
 
     if (filtered.length === 0) {
         document.getElementById("appBody").innerHTML =
-            `<tr><td colspan="4" class="empty-row">No appointments found for this date.</td></tr>`;
+            `<tr><td colspan="5" class="empty-row">No appointments found for this date.</td></tr>`;
     }
 }
 

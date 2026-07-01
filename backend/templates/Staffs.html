@@ -106,26 +106,39 @@
 
       <div class="display doctor-metrics">
         <div class="card">
-          <div class="details"><div class="data">Total Doctors</div><div class="number" id="totalDoctorCount">0</div></div>
+          <div class="details">
+            <div class="data">Total Doctors</div>
+            <div class="number" id="totalDoctorCount">0</div>
+          </div>
           <div class="icon"><i class="fa-solid fa-user-doctor"></i></div>
         </div>
         <div class="card">
-          <div class="details"><div class="data">Available</div><div class="number" id="availableDoctorCount">0</div></div>
+          <div class="details">
+            <div class="data">Available</div>
+            <div class="number" id="availableDoctorCount">0</div>
+          </div>
           <div class="icon"><i class="fa-solid fa-circle-check"></i></div>
         </div>
         <div class="card">
-          <div class="details"><div class="data">Unavailable</div><div class="number" id="unavailableDoctorCount">0</div></div>
+          <div class="details">
+            <div class="data">Unavailable</div>
+            <div class="number" id="unavailableDoctorCount">0</div>
+          </div>
           <div class="icon"><i class="fa-solid fa-user-clock"></i></div>
         </div>
         <div class="card">
-          <div class="details"><div class="data">Specialties</div><div class="number" id="doctorSpecialtyCount">0</div></div>
+          <div class="details">
+            <div class="data">Specialties</div>
+            <div class="number" id="doctorSpecialtyCount">0</div>
+          </div>
           <div class="icon"><i class="fa-solid fa-stethoscope"></i></div>
         </div>
       </div>
 
       <div class="control card">
         <div class="search">
-          <input type="text" placeholder="Search doctor ID / name / specialty" id="doctorSearchInput" oninput="refreshDoctorList()">
+          <input type="text" placeholder="Search doctor ID / name / specialty" id="doctorSearchInput"
+            oninput="refreshDoctorList()">
           <i class="fa-solid fa-magnifying-glass"></i>
         </div>
         <div class="custom-select">
@@ -147,8 +160,22 @@
 
       <div class="table-list">
         <table>
-          <thead><tr><th>Doctor</th><th>Staff ID</th><th>License</th><th>Specialty</th><th>Contact</th><th>Availability</th><th>Actions</th></tr></thead>
-          <tbody id="doctorTableBody"><tr><td class="empty-row" colspan="7">Loading doctors...</td></tr></tbody>
+          <thead>
+            <tr>
+              <th>Doctor</th>
+              <th>Staff ID</th>
+              <th>License</th>
+              <th>Specialty</th>
+              <th>Contact</th>
+              <th>Availability</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="doctorTableBody">
+            <tr>
+              <td class="empty-row" colspan="7">Loading doctors...</td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </section>
@@ -244,7 +271,8 @@
 
             <div class="field">
               <label>Phone Number</label>
-              <input type="tel" id="add-phone" maxlength="8" placeholder="e.g. 9123 4567" oninput="this.value = this.value.replace(/[^\d]/g, '')">
+              <input type="tel" id="add-phone" maxlength="8" placeholder="e.g. 9123 4567"
+                oninput="this.value = this.value.replace(/[^\d]/g, '')">
             </div>
 
             <div class="field">
@@ -285,16 +313,16 @@
                 <input id="add-doctorSpecialization" placeholder="e.g. Cardiology">
               </div>
             </div>
-            <p class="doctor-form-note">The doctor name, phone and email will use the staff information entered above.</p>
+            <p class="doctor-form-note">The doctor name, phone and email will use the staff information entered above.
+            </p>
           </div>
         </div>
 
         <div class="button-section">
           <button class="secondary" onclick="clearInput(this)">Reset</button>
           <button class="secondary" onclick="closeModal(this)&&clearInput(this)">Cancel</button>
-          <button
-            onclick="saveNewStaff(this)"><i
-              class="fas fa-save"></i>Save New Staff</button>
+          <button onclick="verifyInput(this)&&saveNewStaff(this)&&closeModal(this)&&clearInput(this)"><i class="fas fa-save"></i>Save New
+            Staff</button>
         </div>
       </div>
     </div>
@@ -479,8 +507,7 @@
         <div class="button-section">
           <button class="secondary" onclick="clearInput(this)">Reset</button>
           <button class="secondary" onclick="closeModal(this)">Cancel</button>
-          <button onclick="saveStaffChanges(this)"><i
-              class="fas fa-save"></i>Save Changes</button>
+          <button onclick="verifyInput(this)&&saveStaffChanges(this)&&closeModal(this)"><i class="fas fa-save"></i>Save Changes</button>
         </div>
       </div>
     </div>

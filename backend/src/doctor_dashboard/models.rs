@@ -8,6 +8,7 @@ pub struct DoctorQueueAppointment {
     pub patient_name: String,
     pub appointment_time: String,
     pub queue_status: String,
+    pub priority: String,
 }
 
 #[derive(Debug, Deserialize)]

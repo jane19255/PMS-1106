@@ -84,7 +84,7 @@ impl SupabaseDoctorDashboardRepository {
 
     fn appointments_url(&self, doctor_id: &str, date: NaiveDate) -> String {
         let next_day = date.succ_opt().unwrap_or(date);
-        let select = "id,patient_id,scheduled_at,patients(id,first_name,last_name),patient_queue(status)";
+        let select = "id,patient_id,scheduled_at,patients(id,first_name,last_name),patient_queue(status,priority)";
 
         format!(
             "{}/rest/v1/appointments?select={}&doctor_id=eq.{}&scheduled_at=gte.{}T00:00:00Z&scheduled_at=lt.{}T00:00:00Z&order=scheduled_at.asc",
@@ -299,6 +299,7 @@ struct DatabasePatient {
 impl From<DatabaseAppointment> for DoctorQueueAppointment {
     fn from(row: DatabaseAppointment) -> Self {
         let queue_status = queue_status_from_value(row.patient_queue.as_ref());
+        let priority = queue_priority_from_value(row.patient_queue.as_ref());
 
         DoctorQueueAppointment {
             appointment_id: row.id,
@@ -308,6 +309,7 @@ impl From<DatabaseAppointment> for DoctorQueueAppointment {
                 .to_string(),
             appointment_time: format_time(row.scheduled_at),
             queue_status,
+            priority,
         }
     }
 }
@@ -328,6 +330,25 @@ fn queue_status_from_value(value: Option<&Value>) -> String {
             .to_string(),
 
         _ => "Not Checked In".to_string(),
+    }
+}
+
+fn queue_priority_from_value(value: Option<&Value>) -> String {
+    match value {
+        Some(Value::Array(rows)) => rows
+            .first()
+            .and_then(|row| row.get("priority"))
+            .and_then(Value::as_str)
+            .unwrap_or("Normal")
+            .to_string(),
+
+        Some(Value::Object(row)) => row
+            .get("priority")
+            .and_then(Value::as_str)
+            .unwrap_or("Normal")
+            .to_string(),
+
+        _ => "Normal".to_string(),
     }
 }
 

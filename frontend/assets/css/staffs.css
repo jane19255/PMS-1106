@@ -39,24 +39,10 @@
 }
 
 .doctor-status {
-    display: inline-flex;
-    justify-content: center;
-    min-width: 92px;
-    padding: 5px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.doctor-status.available {
-    background: rgb(34 197 94 / 12%);
-    color: #15803d;
-}
-
-.doctor-status.unavailable,
-.doctor-status.on-leave {
-    background: rgb(249 115 22 / 12%);
-    color: #c2410c;
+    padding: 2px 6px 4px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 4px;
 }
 
 .doctor-actions {
@@ -124,7 +110,8 @@ i.delete {
     color: var(--primary);
 }
 
-.card:has(#availableDoctorCount) .icon {
+.card:has(#availableDoctorCount) .icon,
+.doctor-status.available {
     background-color: rgb(from var(--success) r g b / 10%);
     color: var(--success);
 }
@@ -137,4 +124,20 @@ i.delete {
 .card:has(#doctorSpecialtyCount) .icon {
     background-color: rgb(from var(--primary) r g b / 10%);
     color: var(--primary);
+}
+
+.doctor-status.unavailable,
+.doctor-status.on-leave {
+    background-color: rgb(from var(--danger) r g b / 10%);
+    color: var(--danger);
+}
+
+.field:has(#addDoctorOffDays) {
+    display: flex;
+    flex-direction: column;
+}
+
+#addDoctorOffDays {
+    display: flex;
+    justify-content: space-between
 }

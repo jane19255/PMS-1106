@@ -9,24 +9,16 @@ use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
 use serde::Deserialize;
 use tera::{Context, Tera};
+use chrono::{FixedOffset, Utc};
 
 pub fn routes(config: &mut web::ServiceConfig) {
     config
         // SSR pages
         .route("/medical-records", web::get().to(list_records_page))
-        .route(
-            "/medical-records/new",
-            web::get().to(new_record_page),
-        )
+        .route("/medical-records/new", web::get().to(new_record_page))
         .route("/medical-records", web::post().to(create_record_form))
-        .route(
-            "/medical-records/{record_id}",
-            web::get().to(show_record_page),
-        )
-        .route(
-            "/medical-records/{record_id}",
-            web::post().to(update_record_form),
-        )
+        .route("/medical-records/{record_id}", web::get().to(show_record_page))
+        .route("/medical-records/{record_id}", web::post().to(update_record_form))
         .route(
             "/medical-records/{record_id}/delete",
             web::post().to(delete_record_form),
@@ -38,6 +30,10 @@ pub fn routes(config: &mut web::ServiceConfig) {
         // JSON API
         .route("/api/medical-records", web::get().to(list_records_api))
         .route("/api/medical-records", web::post().to(create_record_api))
+        .route(
+            "/api/medical-records/today-appointment",
+            web::get().to(today_appointment_api),
+        )
         .route(
             "/api/medical-records/{record_id}",
             web::get().to(show_record_api),
@@ -451,6 +447,56 @@ pub async fn patient_timeline_api(
     }
 }
 
+pub async fn today_appointment_api(
+    req: HttpRequest,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
+    query: web::Query<TodayAppointmentQuery>,
+) -> impl Responder {
+    if let Err(rejection) = require_records_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::EditMedicalRecords,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    let patient_id = query.patient_id.trim();
+
+    if patient_id.is_empty() {
+        return HttpResponse::BadRequest().body("Patient ID is required");
+    }
+
+    let singapore_tz = FixedOffset::east_opt(8 * 3600).unwrap();
+    let today = Utc::now().with_timezone(&singapore_tz).date_naive();
+    let tomorrow = today.succ_opt().unwrap();
+
+    let filter = format!(
+        "select=id,patient_id,doctor_id,reason,status,scheduled_at&patient_id=eq.{}&scheduled_at=gte.{}T00:00:00Z&scheduled_at=lt.{}T00:00:00Z&order=scheduled_at.asc&limit=1",
+        urlencoding::encode(patient_id),
+        today,
+        tomorrow
+    );
+
+    match supabase_db.fetch_table("appointments", &filter).await {
+        Ok(raw) => {
+            let appointments: Vec<serde_json::Value> =
+                serde_json::from_str(&raw).unwrap_or_default();
+
+            if let Some(appointment) = appointments.into_iter().next() {
+                HttpResponse::Ok().json(appointment)
+            } else {
+                HttpResponse::NotFound().body("No appointment found for this patient today")
+            }
+        }
+        Err(error) => HttpResponse::InternalServerError().body(error),
+    }
+}
+
 // ── Query parameter structs ──────────────────────────────────────────────────
 
 #[derive(Deserialize)]
@@ -462,6 +508,11 @@ pub struct RecordListQuery {
 pub struct NewRecordQuery {
     pub patient_id: Option<String>,
     pub appointment_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct TodayAppointmentQuery {
+    pub patient_id: String,
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

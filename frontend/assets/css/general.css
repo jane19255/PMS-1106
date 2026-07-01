@@ -600,7 +600,7 @@ input.password+i {
 }
 
 span.status {
-    padding: 2px 6px;
+    padding: 2px 6px 4px;
     font-size: 13px;
     font-weight: 500;
     border-radius: 4px;

@@ -1,0 +1,99 @@
+.schedule-form .form-error {
+    color: var(--danger);
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.schedule-form input.is-invalid {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgb(220 38 38 / 12%);
+}
+
+.page-title {
+    margin-bottom: 0
+}
+
+.page-title a {
+    text-decoration: none;
+}
+
+.page-title div:has(button) {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.page-title button.danger-button {
+    background: var(--danger);
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--primary);
+    background-color: rgb(from var(--primary) r g b / 10%)
+}
+
+.profile-name {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.profile-id {
+    font-size: 15px;
+    color: var(--gray);
+    font-weight: 500;
+}
+
+.meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 18px;
+}
+
+.meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.meta-label {
+    font-size: 13px;
+    color: var(--secondary);
+    font-weight: 500;
+}
+
+.meta-value {
+    font-weight: 500;
+}
+
+.status {
+    width: fit-content;
+    background-color: rgb(from var(--danger) r g b / 10%);
+    color: var(--danger);
+}
+
+.status.Available {
+    background-color: rgb(from var(--success) r g b / 10%);
+    color: var(--success);
+}
