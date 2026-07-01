@@ -91,16 +91,10 @@ pub async fn show_doctor(
 
     let doctor_id = path.into_inner();
     match doctor_service.find_doctor(&doctor_id).await {
-        Ok(doctor) => render_doctor_detail_page(
-            &templates,
-            doctor,
-            doctor_service
-                .list_schedules(&doctor_id)
-                .await
-                .unwrap_or_default(),
-            None,
-            None,
-        ),
+        Ok(doctor) => match doctor_service.list_schedules(&doctor_id).await {
+            Ok(schedules) => render_doctor_detail_page(&templates, doctor, schedules, None, None),
+            Err(error) => render_error(&templates, error),
+        },
         Err(error) => render_error(&templates, error),
     }
 }
@@ -202,16 +196,16 @@ pub async fn create_schedule_form(
         Ok(_) => redirect_to(&format!("/doctors/{doctor_id}")),
         Err(error @ DoctorError::InvalidInput(_)) => {
             match doctor_service.find_doctor(&doctor_id).await {
-                Ok(doctor) => render_doctor_detail_page(
-                    &templates,
-                    doctor,
-                    doctor_service
-                        .list_schedules(&doctor_id)
-                        .await
-                        .unwrap_or_default(),
-                    Some(&submitted_form),
-                    Some(error),
-                ),
+                Ok(doctor) => match doctor_service.list_schedules(&doctor_id).await {
+                    Ok(schedules) => render_doctor_detail_page(
+                        &templates,
+                        doctor,
+                        schedules,
+                        Some(&submitted_form),
+                        Some(error),
+                    ),
+                    Err(error) => render_error(&templates, error),
+                },
                 Err(error) => render_error(&templates, error),
             }
         }
@@ -562,3 +556,4 @@ fn redirect_to(location: &str) -> HttpResponse {
         .insert_header((header::LOCATION, location))
         .finish()
 }
+

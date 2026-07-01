@@ -297,3 +297,47 @@ execute function public.set_updated_at();
 
 alter table public.appointment_queue enable row level security;
 
+
+
+create table if not exists public.room_status (
+  doctor_id text primary key references public.doctors(id) on update cascade on delete cascade,
+  room text not null unique,
+  status text not null default 'Available'
+    check (status in ('Available', 'Occupied', 'Unavailable')),
+  current_appointment_id text references public.appointments(id) on update cascade on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists room_status_room_idx on public.room_status(room);
+create index if not exists room_status_status_idx on public.room_status(status);
+
+drop trigger if exists set_room_status_updated_at on public.room_status;
+create trigger set_room_status_updated_at
+before update on public.room_status
+for each row execute function public.set_updated_at();
+
+alter table public.room_status enable row level security;
+create table if not exists public.patient_vitals (
+  id text primary key,
+  appointment_id text not null references public.appointments(id) on update cascade on delete cascade,
+  bp text not null,
+  temp numeric not null,
+  pulse integer not null,
+  height numeric not null,
+  weight numeric not null,
+  recorded_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists patient_vitals_appointment_id_idx on public.patient_vitals(appointment_id);
+create index if not exists patient_vitals_recorded_at_idx on public.patient_vitals(recorded_at);
+
+drop trigger if exists set_patient_vitals_updated_at on public.patient_vitals;
+create trigger set_patient_vitals_updated_at
+before update on public.patient_vitals
+for each row execute function public.set_updated_at();
+
+alter table public.patient_vitals enable row level security;
+

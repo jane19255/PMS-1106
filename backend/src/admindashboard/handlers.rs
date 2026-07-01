@@ -14,7 +14,7 @@ use crate::handlers::auth::{
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use chrono::{NaiveDate, Utc};
 use firebase_auth::FirebaseAuth;
-use tera::{Context, Tera};
+use tera::Tera;
 
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/dashboard", web::get().to(dashboard_html));
@@ -30,7 +30,7 @@ pub async fn dashboard_html(
     tera: web::Data<Tera>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
-    supabase_db: web::Data<SupabaseRestDb>,
+    _supabase_db: web::Data<SupabaseRestDb>,
 ) -> impl Responder {
     if let Err(redirect) = require_auth_and_permission(
         &req,
@@ -92,16 +92,12 @@ pub async fn api_calendar_appointments(
         Err(_) => Utc::now().date_naive(),
     };
 
-    let data = repository::get_appointments_by_date(
-        &supabase_db,
-        target_date,
-    )
-    .await
-    .unwrap_or("[]".to_string());
-
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .body(data)
+    match repository::get_appointments_by_date(&supabase_db, target_date).await {
+        Ok(data) => HttpResponse::Ok()
+            .content_type("application/json")
+            .body(data),
+        Err(message) => HttpResponse::InternalServerError().body(message),
+    }
 }
 
 pub async fn api_mark_arrived(
@@ -188,11 +184,11 @@ pub async fn api_room_statuses(
         return res;
     }
 
-    let data = repository::get_room_statuses(&supabase_db)
-        .await
-        .unwrap_or("[]".to_string());
-
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .body(data)
+    match repository::get_room_statuses(&supabase_db).await {
+        Ok(data) => HttpResponse::Ok()
+            .content_type("application/json")
+            .body(data),
+        Err(message) => HttpResponse::InternalServerError().body(message),
+    }
 }
+
