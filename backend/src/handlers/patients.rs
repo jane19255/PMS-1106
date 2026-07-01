@@ -10,7 +10,7 @@ use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use crate::models::{Patient, PatientView, SupabasePatientRow, UpdatePatient};
 
 #[derive(serde::Deserialize)]
-struct CreateMedicalRecordForm {
+pub(crate) struct CreateMedicalRecordForm {
     patient_id: String,
     doctor_id: Option<String>,
     reason_of_visit: Option<String>,
@@ -88,9 +88,18 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/api/patients/{id}", web::get().to(get_patient_by_id));
     cfg.route("/api/patients/{id}", web::put().to(update_patient));
     cfg.route("/api/patients/{id}", web::delete().to(delete_patient));
-    cfg.route("/api/patients/{id}/history", web::get().to(get_patient_history));
-    cfg.route("/api/medical-records", web::post().to(create_medical_record));
-    cfg.route("/api/medical-records/{id}", web::delete().to(delete_medical_record));
+    cfg.route(
+        "/api/patients/{id}/history",
+        web::get().to(get_patient_history),
+    );
+    cfg.route(
+        "/api/medical-records",
+        web::post().to(create_medical_record),
+    );
+    cfg.route(
+        "/api/medical-records/{id}",
+        web::delete().to(delete_medical_record),
+    );
 }
 
 pub async fn patients_page(

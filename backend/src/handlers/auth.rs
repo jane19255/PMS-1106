@@ -52,7 +52,7 @@ pub enum AppAction {
 
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/login", web::get().to(login_page));
-    cfg.route("/doctor-dashboard", web::get().to(doctorDashboard_page));
+    cfg.route("/doctor-dashboard", web::get().to(doctor_dashboard_page));
     cfg.route("/staff", web::get().to(staffs_page));
     cfg.route("/records", web::get().to(records_page));
     cfg.route("/session", web::post().to(create_session));
@@ -98,7 +98,7 @@ fn default_landing_path(role: &str) -> &'static str {
     }
 }
 
-pub async fn doctorDashboard_page(
+pub async fn doctor_dashboard_page(
     req: HttpRequest,
     tera: web::Data<Tera>,
     firebase_auth: web::Data<FirebaseAuth>,

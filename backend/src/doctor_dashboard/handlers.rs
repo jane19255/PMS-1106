@@ -1,6 +1,6 @@
+use super::models::AppointmentActionPayload;
 use super::service::{DoctorDashboardError, DoctorDashboardService};
 use crate::db::FirebaseRestDb;
-use super::models::AppointmentActionPayload;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
@@ -66,7 +66,7 @@ pub async fn start_consultation_api(
     firestore_db: web::Data<FirebaseRestDb>,
     payload: web::Json<AppointmentActionPayload>,
 ) -> impl Responder {
-    if let Err(rejection) = require_auth_and_permission(
+    let (firebase_uid, _) = match require_auth_and_permission(
         &req,
         &firebase_auth,
         &firestore_db,
@@ -74,11 +74,12 @@ pub async fn start_consultation_api(
     )
     .await
     {
-        return rejection;
-    }
+        Ok(data) => data,
+        Err(rejection) => return rejection,
+    };
 
     match dashboard_service
-        .start_consultation(&payload.appointment_id)
+        .start_consultation(&firebase_uid, &payload.appointment_id)
         .await
     {
         Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
@@ -93,7 +94,7 @@ pub async fn complete_consultation_api(
     firestore_db: web::Data<FirebaseRestDb>,
     payload: web::Json<AppointmentActionPayload>,
 ) -> impl Responder {
-    if let Err(rejection) = require_auth_and_permission(
+    let (firebase_uid, _) = match require_auth_and_permission(
         &req,
         &firebase_auth,
         &firestore_db,
@@ -101,11 +102,12 @@ pub async fn complete_consultation_api(
     )
     .await
     {
-        return rejection;
-    }
+        Ok(data) => data,
+        Err(rejection) => return rejection,
+    };
 
     match dashboard_service
-        .complete_consultation(&payload.appointment_id)
+        .complete_consultation(&firebase_uid, &payload.appointment_id)
         .await
     {
         Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
@@ -117,5 +119,8 @@ fn dashboard_error_response(error: DoctorDashboardError) -> HttpResponse {
     match error {
         DoctorDashboardError::StorageUnavailable => HttpResponse::ServiceUnavailable()
             .json(json!({ "error": "Doctor dashboard storage is unavailable" })),
+        DoctorDashboardError::Rejected(message) => {
+            HttpResponse::BadRequest().json(json!({ "error": message }))
+        }
     }
 }

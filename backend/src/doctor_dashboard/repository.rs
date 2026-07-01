@@ -12,6 +12,7 @@ pub type RepositoryFuture<'a, T> =
 #[derive(Debug)]
 pub enum RepositoryError {
     StorageUnavailable,
+    Rejected(String),
 }
 
 pub trait DoctorDashboardRepository: Send + Sync {
@@ -21,9 +22,17 @@ pub trait DoctorDashboardRepository: Send + Sync {
         date: NaiveDate,
     ) -> RepositoryFuture<'_, Vec<DoctorQueueAppointment>>;
 
-    fn start_consultation(&self, appointment_id: &str) -> RepositoryFuture<'_, ()>;
+    fn start_consultation(
+        &self,
+        firebase_uid: &str,
+        appointment_id: &str,
+    ) -> RepositoryFuture<'_, ()>;
 
-    fn complete_consultation(&self, appointment_id: &str) -> RepositoryFuture<'_, ()>;
+    fn complete_consultation(
+        &self,
+        firebase_uid: &str,
+        appointment_id: &str,
+    ) -> RepositoryFuture<'_, ()>;
 }
 
 #[derive(Default)]
@@ -38,11 +47,19 @@ impl DoctorDashboardRepository for InMemoryDoctorDashboardRepository {
         Box::pin(async { Ok(Vec::new()) })
     }
 
-    fn start_consultation(&self, _appointment_id: &str) -> RepositoryFuture<'_, ()> {
+    fn start_consultation(
+        &self,
+        _firebase_uid: &str,
+        _appointment_id: &str,
+    ) -> RepositoryFuture<'_, ()> {
         Box::pin(async { Ok(()) })
     }
 
-    fn complete_consultation(&self, _appointment_id: &str) -> RepositoryFuture<'_, ()> {
+    fn complete_consultation(
+        &self,
+        _firebase_uid: &str,
+        _appointment_id: &str,
+    ) -> RepositoryFuture<'_, ()> {
         Box::pin(async { Ok(()) })
     }
 }
@@ -96,30 +113,6 @@ impl SupabaseDoctorDashboardRepository {
         )
     }
 
-    fn appointment_patch_url(&self, appointment_id: &str) -> String {
-        format!(
-            "{}/rest/v1/appointments?id=eq.{}",
-            self.url,
-            urlencoding::encode(appointment_id)
-        )
-    }
-
-    fn queue_patch_url(&self, appointment_id: &str) -> String {
-        format!(
-            "{}/rest/v1/patient_queue?appointment_id=eq.{}",
-            self.url,
-            urlencoding::encode(appointment_id)
-        )
-    }
-
-    fn room_patch_url(&self, appointment_id: &str) -> String {
-        format!(
-            "{}/rest/v1/room_status?current_appointment_id=eq.{}",
-            self.url,
-            urlencoding::encode(appointment_id)
-        )
-    }
-
     async fn decode_doctor_id(response: Response) -> Result<String, RepositoryError> {
         if !response.status().is_success() {
             return Err(Self::response_error(response).await);
@@ -130,29 +123,29 @@ impl SupabaseDoctorDashboardRepository {
             .await
             .map_err(|_| RepositoryError::StorageUnavailable)?;
 
-        rows.first()
-            .map(|row| row.id.clone())
-            .ok_or(RepositoryError::StorageUnavailable)
+        rows.first().map(|row| row.id.clone()).ok_or_else(|| {
+            RepositoryError::Rejected("No doctor profile is linked to this account".to_string())
+        })
     }
 
-        async fn decode_appointments(
-            response: Response,
-        ) -> Result<Vec<DatabaseAppointment>, RepositoryError> {
-            if !response.status().is_success() {
-                return Err(Self::response_error(response).await);
-            }
-
-            let body = response
-                .text()
-                .await
-                .map_err(|_| RepositoryError::StorageUnavailable)?;
-
-            serde_json::from_str::<Vec<DatabaseAppointment>>(&body).map_err(|error| {
-                eprintln!("Doctor dashboard decode error: {error}");
-                eprintln!("Doctor dashboard response body: {body}");
-                RepositoryError::StorageUnavailable
-            })
+    async fn decode_appointments(
+        response: Response,
+    ) -> Result<Vec<DatabaseAppointment>, RepositoryError> {
+        if !response.status().is_success() {
+            return Err(Self::response_error(response).await);
         }
+
+        let body = response
+            .text()
+            .await
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+        serde_json::from_str::<Vec<DatabaseAppointment>>(&body).map_err(|error| {
+            eprintln!("Doctor dashboard decode error: {error}");
+            eprintln!("Doctor dashboard response body: {body}");
+            RepositoryError::StorageUnavailable
+        })
+    }
 
     async fn ensure_success(response: Response) -> Result<(), RepositoryError> {
         if response.status().is_success() {
@@ -166,7 +159,17 @@ impl SupabaseDoctorDashboardRepository {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         eprintln!("Supabase doctor dashboard error {status}: {body}");
-        RepositoryError::StorageUnavailable
+
+        // Postgres RPC business-rule rejections (raise exception) surface as a
+        // 4xx PostgREST error body with a "message" field; a transport-level
+        // failure has no parseable body at all, so fall back to StorageUnavailable.
+        match serde_json::from_str::<Value>(&body) {
+            Ok(json) => match json.get("message").and_then(Value::as_str) {
+                Some(message) => RepositoryError::Rejected(message.to_string()),
+                None => RepositoryError::StorageUnavailable,
+            },
+            Err(_) => RepositoryError::StorageUnavailable,
+        }
     }
 }
 
@@ -199,18 +202,31 @@ impl DoctorDashboardRepository for SupabaseDoctorDashboardRepository {
         })
     }
 
-    fn start_consultation(&self, appointment_id: &str) -> RepositoryFuture<'_, ()> {
+    fn start_consultation(
+        &self,
+        firebase_uid: &str,
+        appointment_id: &str,
+    ) -> RepositoryFuture<'_, ()> {
+        let firebase_uid = firebase_uid.to_string();
         let appointment_id = appointment_id.to_string();
 
         Box::pin(async move {
-            let payload = json!({
-                "status": "In Consultation",
-                "updated_at": Utc::now().to_rfc3339()
-            });
+            let doctor_response = self
+                .request(self.client.get(self.staff_doctor_url(&firebase_uid)))
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+            let doctor_id = Self::decode_doctor_id(doctor_response).await?;
 
+            let payload = json!({
+                "p_appointment_id": appointment_id,
+                "p_doctor_id": doctor_id,
+            });
             let response = self
-                .request(self.client.patch(self.queue_patch_url(&appointment_id)))
-                .header("Prefer", "return=minimal")
+                .request(
+                    self.client
+                        .post(format!("{}/rest/v1/rpc/start_consultation", self.url)),
+                )
                 .json(&payload)
                 .send()
                 .await
@@ -220,58 +236,37 @@ impl DoctorDashboardRepository for SupabaseDoctorDashboardRepository {
         })
     }
 
-    fn complete_consultation(&self, appointment_id: &str) -> RepositoryFuture<'_, ()> {
+    fn complete_consultation(
+        &self,
+        firebase_uid: &str,
+        appointment_id: &str,
+    ) -> RepositoryFuture<'_, ()> {
+        let firebase_uid = firebase_uid.to_string();
         let appointment_id = appointment_id.to_string();
 
         Box::pin(async move {
-            let now = Utc::now().to_rfc3339();
+            let doctor_response = self
+                .request(self.client.get(self.staff_doctor_url(&firebase_uid)))
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+            let doctor_id = Self::decode_doctor_id(doctor_response).await?;
 
-            let appointment_payload = json!({
-                "status": "Completed",
-                "updated_at": now
+            let payload = json!({
+                "p_appointment_id": appointment_id,
+                "p_doctor_id": doctor_id,
             });
-
-            let appointment_response = self
-                .request(self.client.patch(self.appointment_patch_url(&appointment_id)))
-                .header("Prefer", "return=minimal")
-                .json(&appointment_payload)
+            let response = self
+                .request(
+                    self.client
+                        .post(format!("{}/rest/v1/rpc/complete_consultation", self.url)),
+                )
+                .json(&payload)
                 .send()
                 .await
                 .map_err(|_| RepositoryError::StorageUnavailable)?;
 
-            Self::ensure_success(appointment_response).await?;
-
-            let queue_payload = json!({
-                "status": "Completed",
-                "completed_at": now,
-                "updated_at": now
-            });
-
-            let queue_response = self
-                .request(self.client.patch(self.queue_patch_url(&appointment_id)))
-                .header("Prefer", "return=minimal")
-                .json(&queue_payload)
-                .send()
-                .await
-                .map_err(|_| RepositoryError::StorageUnavailable)?;
-
-            Self::ensure_success(queue_response).await?;
-
-            let room_payload = json!({
-                "status": "Available",
-                "current_appointment_id": null,
-                "updated_at": now
-            });
-
-            let room_response = self
-                .request(self.client.patch(self.room_patch_url(&appointment_id)))
-                .header("Prefer", "return=minimal")
-                .json(&room_payload)
-                .send()
-                .await
-                .map_err(|_| RepositoryError::StorageUnavailable)?;
-
-            Self::ensure_success(room_response).await
+            Self::ensure_success(response).await
         })
     }
 }

@@ -115,8 +115,8 @@ Implemented modules include:
 
 ## Database Schema
 
-Apply `backend/supabase_schema.sql` first, then apply `backend/schema.sql` for
-billing tables and billing stored procedures.
+Apply `backend/supabase_schema.sql` in the Supabase SQL Editor. It contains the
+complete clinical, queue, prescription, and billing schema.
 
 Core relationships:
 
@@ -150,7 +150,6 @@ before calling Supabase.
 backend/
   Cargo.toml
   Cargo.lock
-  schema.sql
   supabase_schema.sql
   src/
     main.rs
@@ -180,14 +179,10 @@ backend/
       index.html
       show.html
       report.html
-  static/
-    css/
-
 frontend/
   assets/
     css/
     js/
-  pages/
 ```
 
 ## Setup
@@ -205,14 +200,14 @@ Use a Supabase secret/service key for the backend. The backend is designed to ke
 
 ## Database Setup
 
-Run the scripts in this order:
+Run the single schema script:
 
 ```text
 backend/supabase_schema.sql
-backend/schema.sql
 ```
 
-`supabase_schema.sql` creates shared patient and medical-record tables. `schema.sql` creates invoice, invoice item, payment tables, indexes, triggers, and transactional billing RPC functions.
+`supabase_schema.sql` creates all application tables, indexes, triggers, and
+transactional RPC functions, including the billing workflow.
 
 ## Running the Application
 

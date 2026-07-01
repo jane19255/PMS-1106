@@ -19,9 +19,18 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     // JSON API
     cfg.route("/api/appointments", web::get().to(list_appointments));
     cfg.route("/api/appointments", web::post().to(create_appointment));
-    cfg.route("/api/appointments/{appointment_id}", web::get().to(get_appointment));
-    cfg.route("/api/appointments/{appointment_id}", web::put().to(update_appointment));
-    cfg.route("/api/appointments/{appointment_id}", web::delete().to(delete_appointment));
+    cfg.route(
+        "/api/appointments/{appointment_id}",
+        web::get().to(get_appointment),
+    );
+    cfg.route(
+        "/api/appointments/{appointment_id}",
+        web::put().to(update_appointment),
+    );
+    cfg.route(
+        "/api/appointments/{appointment_id}",
+        web::delete().to(delete_appointment),
+    );
 }
 
 // ── SSR page shell ───────────────────────────────────────────────────────────
@@ -54,7 +63,9 @@ pub async fn appointments_page(
     );
 
     match tera.render("Appointments.html", &ctx) {
-        Ok(html) => HttpResponse::Ok().content_type("text/html; charset=utf-8").body(html),
+        Ok(html) => HttpResponse::Ok()
+            .content_type("text/html; charset=utf-8")
+            .body(html),
         Err(e) => {
             eprintln!("Template error: {e}");
             HttpResponse::InternalServerError().body("Template rendering failed")
@@ -83,11 +94,15 @@ async fn validate_and_check_conflict(
         .filter(|value| !value.is_empty())
         .map(str::to_string)
     else {
-        return Err(AppointmentError::BadRequest("doctor_id is required".to_string()));
+        return Err(AppointmentError::BadRequest(
+            "doctor_id is required".to_string(),
+        ));
     };
 
     if doctor_service.find_doctor(&doctor_id).await.is_err() {
-        return Err(AppointmentError::BadRequest("Selected doctor does not exist".to_string()));
+        return Err(AppointmentError::BadRequest(
+            "Selected doctor does not exist".to_string(),
+        ));
     }
 
     let Some(patient_id) = appointment
@@ -97,14 +112,18 @@ async fn validate_and_check_conflict(
         .filter(|value| !value.is_empty())
         .map(str::to_string)
     else {
-        return Err(AppointmentError::BadRequest("patient_id is required".to_string()));
+        return Err(AppointmentError::BadRequest(
+            "patient_id is required".to_string(),
+        ));
     };
 
     match db.get_patient(&patient_id).await {
         Ok(body) => {
             let rows: Vec<Value> = serde_json::from_str(&body).unwrap_or_default();
             if rows.is_empty() {
-                return Err(AppointmentError::BadRequest("Selected patient does not exist".to_string()));
+                return Err(AppointmentError::BadRequest(
+                    "Selected patient does not exist".to_string(),
+                ));
             }
         }
         Err(e) => return Err(AppointmentError::ServerError(e)),
@@ -114,15 +133,26 @@ async fn validate_and_check_conflict(
 
     let scheduled_at = match appointment.get("scheduled_at").and_then(Value::as_str) {
         Some(s) if !s.trim().is_empty() => s.to_string(),
-        _ => return Err(AppointmentError::BadRequest("scheduled_at is required".to_string())),
+        _ => {
+            return Err(AppointmentError::BadRequest(
+                "scheduled_at is required".to_string(),
+            ))
+        }
     };
 
     let requested_start = match DateTime::parse_from_rfc3339(&scheduled_at) {
         Ok(dt) => dt.with_timezone(&Utc),
-        Err(_) => return Err(AppointmentError::BadRequest("Invalid scheduled_at format".to_string())),
+        Err(_) => {
+            return Err(AppointmentError::BadRequest(
+                "Invalid scheduled_at format".to_string(),
+            ))
+        }
     };
 
-    let duration = appointment.get("duration_minutes").and_then(Value::as_i64).unwrap_or(30);
+    let duration = appointment
+        .get("duration_minutes")
+        .and_then(Value::as_i64)
+        .unwrap_or(30);
     if !(5..=480).contains(&duration) {
         return Err(AppointmentError::BadRequest(
             "duration_minutes must be between 5 and 480".to_string(),
@@ -135,7 +165,9 @@ async fn validate_and_check_conflict(
         .map(|s| !s.trim().is_empty())
         .unwrap_or(false);
     if !reason_ok {
-        return Err(AppointmentError::BadRequest("reason is required".to_string()));
+        return Err(AppointmentError::BadRequest(
+            "reason is required".to_string(),
+        ));
     }
 
     let appointments_json = db
@@ -147,6 +179,10 @@ async fn validate_and_check_conflict(
 
     let mut intervals = Vec::new();
     for apt in existing {
+        if !appointment_blocks_time_slot(&apt) {
+            continue;
+        }
+
         let Some(id) = apt.get("id").and_then(Value::as_str) else {
             continue;
         };
@@ -158,7 +194,10 @@ async fn validate_and_check_conflict(
             continue;
         };
 
-        let apt_duration = apt.get("duration_minutes").and_then(Value::as_i64).unwrap_or(30);
+        let apt_duration = apt
+            .get("duration_minutes")
+            .and_then(Value::as_i64)
+            .unwrap_or(30);
 
         if let Ok(start) = DateTime::parse_from_rfc3339(scheduled) {
             intervals.push(AppointmentInterval::new(
@@ -177,10 +216,19 @@ async fn validate_and_check_conflict(
     );
 
     if scheduler.has_conflict(&requested) {
-        return Err(AppointmentError::Conflict(scheduler.suggest_slots(duration)));
+        return Err(AppointmentError::Conflict(
+            scheduler.suggest_slots(duration),
+        ));
     }
 
     Ok(appointment)
+}
+
+fn appointment_blocks_time_slot(appointment: &Value) -> bool {
+    !matches!(
+        appointment.get("status").and_then(Value::as_str),
+        Some("Cancelled" | "No Show")
+    )
 }
 
 fn normalize_appointment_payload(appointment: &mut Value, doctor_id: &str) {
@@ -189,7 +237,9 @@ fn normalize_appointment_payload(appointment: &mut Value, doctor_id: &str) {
         return normalize_appointment_payload(appointment, doctor_id);
     };
 
-    object.entry("id").or_insert_with(|| json!(format!("APT-{}", Uuid::new_v4())));
+    object
+        .entry("id")
+        .or_insert_with(|| json!(format!("APT-{}", Uuid::new_v4())));
     object.insert("doctor_id".to_string(), json!(doctor_id));
 
     if !object.contains_key("scheduled_at") {
@@ -198,7 +248,9 @@ fn normalize_appointment_payload(appointment: &mut Value, doctor_id: &str) {
         }
     }
 
-    object.entry("reason").or_insert_with(|| json!("Appointment"));
+    object
+        .entry("reason")
+        .or_insert_with(|| json!("Appointment"));
 }
 
 fn conflict_json(suggestions: Vec<(DateTime<Utc>, DateTime<Utc>)>) -> Value {
@@ -215,54 +267,113 @@ fn conflict_json(suggestions: Vec<(DateTime<Utc>, DateTime<Utc>)>) -> Value {
 
 // ── JSON API handlers ────────────────────────────────────────────────────────
 
-pub async fn list_appointments(db: web::Data<SupabaseRestDb>) -> impl Responder {
+pub async fn list_appointments(
+    req: HttpRequest,
+    db: web::Data<SupabaseRestDb>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) =
+        require_appointments_permission(&req, &firebase_auth, &firestore_db).await
+    {
+        return rejection;
+    }
     match db.list_appointments().await {
-        Ok(result) => HttpResponse::Ok().content_type("application/json").body(result),
+        Ok(result) => HttpResponse::Ok()
+            .content_type("application/json")
+            .body(result),
         Err(err) => HttpResponse::InternalServerError().body(err),
     }
 }
 
 pub async fn get_appointment(
+    req: HttpRequest,
     db: web::Data<SupabaseRestDb>,
     path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
+    if let Err(rejection) =
+        require_appointments_permission(&req, &firebase_auth, &firestore_db).await
+    {
+        return rejection;
+    }
     let appointment_id = path.into_inner();
     match db.get_appointment(&appointment_id).await {
-        Ok(result) => HttpResponse::Ok().content_type("application/json").body(result),
+        Ok(result) => HttpResponse::Ok()
+            .content_type("application/json")
+            .body(result),
         Err(err) => HttpResponse::InternalServerError().body(err),
     }
 }
 
 pub async fn create_appointment(
+    req: HttpRequest,
     db: web::Data<SupabaseRestDb>,
     doctor_service: web::Data<DoctorService>,
     payload: web::Json<Value>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
+    if let Err(rejection) =
+        require_appointments_permission(&req, &firebase_auth, &firestore_db).await
+    {
+        return rejection;
+    }
     match validate_and_check_conflict(&db, &doctor_service, payload.into_inner(), None).await {
         Ok(appointment) => match db.create_appointment(&appointment).await {
-            Ok(result) => HttpResponse::Created().content_type("application/json").body(result),
+            Ok(result) => HttpResponse::Created()
+                .content_type("application/json")
+                .body(result),
+            Err(err) if is_database_schedule_conflict(&err) => {
+                HttpResponse::Conflict().json(conflict_json(Vec::new()))
+            }
             Err(err) => HttpResponse::InternalServerError().body(err),
         },
         Err(AppointmentError::BadRequest(msg)) => HttpResponse::BadRequest().body(msg),
-        Err(AppointmentError::Conflict(suggestions)) => HttpResponse::Conflict().json(conflict_json(suggestions)),
+        Err(AppointmentError::Conflict(suggestions)) => {
+            HttpResponse::Conflict().json(conflict_json(suggestions))
+        }
         Err(AppointmentError::ServerError(err)) => HttpResponse::InternalServerError().body(err),
     }
 }
 
 pub async fn update_appointment(
+    req: HttpRequest,
     db: web::Data<SupabaseRestDb>,
     doctor_service: web::Data<DoctorService>,
     path: web::Path<String>,
     payload: web::Json<Value>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
+    if let Err(rejection) =
+        require_appointments_permission(&req, &firebase_auth, &firestore_db).await
+    {
+        return rejection;
+    }
     let appointment_id = path.into_inner();
-    match validate_and_check_conflict(&db, &doctor_service, payload.into_inner(), Some(&appointment_id)).await {
+    match validate_and_check_conflict(
+        &db,
+        &doctor_service,
+        payload.into_inner(),
+        Some(&appointment_id),
+    )
+    .await
+    {
         Ok(appointment) => match db.update_appointment(&appointment_id, &appointment).await {
-            Ok(result) => HttpResponse::Ok().content_type("application/json").body(result),
+            Ok(result) => HttpResponse::Ok()
+                .content_type("application/json")
+                .body(result),
+            Err(err) if is_database_schedule_conflict(&err) => {
+                HttpResponse::Conflict().json(conflict_json(Vec::new()))
+            }
             Err(err) => HttpResponse::InternalServerError().body(err),
         },
         Err(AppointmentError::BadRequest(msg)) => HttpResponse::BadRequest().body(msg),
-        Err(AppointmentError::Conflict(suggestions)) => HttpResponse::Conflict().json(conflict_json(suggestions)),
+        Err(AppointmentError::Conflict(suggestions)) => {
+            HttpResponse::Conflict().json(conflict_json(suggestions))
+        }
         Err(AppointmentError::ServerError(err)) => HttpResponse::InternalServerError().body(err),
     }
 }
@@ -270,17 +381,27 @@ pub async fn update_appointment(
 const NON_DELETABLE_STATUSES: [&str; 3] = ["Checked In", "In Consultation", "Completed"];
 
 pub async fn delete_appointment(
+    req: HttpRequest,
     db: web::Data<SupabaseRestDb>,
     path: web::Path<String>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
 ) -> impl Responder {
+    if let Err(rejection) =
+        require_appointments_permission(&req, &firebase_auth, &firestore_db).await
+    {
+        return rejection;
+    }
     let appointment_id = path.into_inner();
 
     let status = match db.get_appointment(&appointment_id).await {
         Ok(body) => {
             let rows: Vec<Value> = serde_json::from_str(&body).unwrap_or_default();
-            rows.into_iter()
-                .next()
-                .and_then(|row| row.get("status").and_then(Value::as_str).map(str::to_string))
+            rows.into_iter().next().and_then(|row| {
+                row.get("status")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
         }
         Err(err) => return HttpResponse::InternalServerError().body(err),
     };
@@ -296,7 +417,9 @@ pub async fn delete_appointment(
     }
 
     match db.delete_appointment(&appointment_id).await {
-        Ok(result) => HttpResponse::Ok().content_type("application/json").body(result),
+        Ok(result) => HttpResponse::Ok()
+            .content_type("application/json")
+            .body(result),
         Err(err) => {
             if err.contains("violates foreign key constraint") || err.contains("23503") {
                 HttpResponse::Conflict().body(
@@ -307,5 +430,63 @@ pub async fn delete_appointment(
                 HttpResponse::InternalServerError().body("Failed to delete appointment.")
             }
         }
+    }
+}
+
+async fn require_appointments_permission(
+    req: &HttpRequest,
+    firebase_auth: &FirebaseAuth,
+    firestore_db: &FirebaseRestDb,
+) -> Result<(String, String), HttpResponse> {
+    require_auth_and_permission(
+        req,
+        firebase_auth,
+        firestore_db,
+        AppAction::ManageAppointments,
+    )
+    .await
+}
+
+fn is_database_schedule_conflict(error: &str) -> bool {
+    error.contains("23P01")
+        || error.contains("appointments_doctor_time_excl")
+        || error.contains("conflicting key value violates exclusion constraint")
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{appointment_blocks_time_slot, is_database_schedule_conflict};
+
+    #[test]
+    fn cancelled_and_no_show_appointments_do_not_block_slots() {
+        assert!(!appointment_blocks_time_slot(
+            &json!({ "status": "Cancelled" })
+        ));
+        assert!(!appointment_blocks_time_slot(
+            &json!({ "status": "No Show" })
+        ));
+    }
+
+    #[test]
+    fn active_appointments_block_slots() {
+        assert!(appointment_blocks_time_slot(
+            &json!({ "status": "Scheduled" })
+        ));
+        assert!(appointment_blocks_time_slot(
+            &json!({ "status": "Checked In" })
+        ));
+        assert!(appointment_blocks_time_slot(&json!({})));
+    }
+
+    #[test]
+    fn identifies_database_overlap_errors() {
+        assert!(is_database_schedule_conflict(
+            "23P01: appointments_doctor_time_excl"
+        ));
+        assert!(!is_database_schedule_conflict(
+            "23503: foreign key violation"
+        ));
     }
 }

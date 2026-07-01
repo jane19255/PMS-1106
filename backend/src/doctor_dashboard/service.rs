@@ -6,6 +6,7 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub enum DoctorDashboardError {
     StorageUnavailable,
+    Rejected(String),
 }
 
 pub struct DoctorDashboardService {
@@ -30,20 +31,22 @@ impl DoctorDashboardService {
 
     pub async fn start_consultation(
         &self,
+        firebase_uid: &str,
         appointment_id: &str,
     ) -> Result<(), DoctorDashboardError> {
         self.repository
-            .start_consultation(appointment_id)
+            .start_consultation(firebase_uid, appointment_id)
             .await
             .map_err(Self::map_repository_error)
     }
 
     pub async fn complete_consultation(
         &self,
+        firebase_uid: &str,
         appointment_id: &str,
     ) -> Result<(), DoctorDashboardError> {
         self.repository
-            .complete_consultation(appointment_id)
+            .complete_consultation(firebase_uid, appointment_id)
             .await
             .map_err(Self::map_repository_error)
     }
@@ -51,6 +54,7 @@ impl DoctorDashboardService {
     fn map_repository_error(error: RepositoryError) -> DoctorDashboardError {
         match error {
             RepositoryError::StorageUnavailable => DoctorDashboardError::StorageUnavailable,
+            RepositoryError::Rejected(message) => DoctorDashboardError::Rejected(message),
         }
     }
 }

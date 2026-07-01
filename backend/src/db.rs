@@ -31,38 +31,6 @@ impl FirebaseRestDb {
         let response = self.http_client.get(&url).send().await?;
         Ok(response.text().await?)
     }
-
-    pub async fn create_document(
-        &self,
-        collection: &str,
-        doc_id: &str,
-        payload: &Value,
-    ) -> Result<String, reqwest::Error> {
-        let url = format!("{}/{}?documentId={}", self.base_url(), collection, doc_id);
-        let response = self.http_client.post(&url).json(payload).send().await?;
-        Ok(response.text().await?)
-    }
-
-    pub async fn update_document(
-        &self,
-        collection: &str,
-        doc_id: &str,
-        payload: &Value,
-    ) -> Result<String, reqwest::Error> {
-        let url = format!("{}/{}/{}", self.base_url(), collection, doc_id);
-        let response = self.http_client.patch(&url).json(payload).send().await?;
-        Ok(response.text().await?)
-    }
-
-    pub async fn delete_document(
-        &self,
-        collection: &str,
-        doc_id: &str,
-    ) -> Result<String, reqwest::Error> {
-        let url = format!("{}/{}/{}", self.base_url(), collection, doc_id);
-        let response = self.http_client.delete(&url).send().await?;
-        Ok(response.text().await?)
-    }
 }
 
 #[derive(Clone)]
@@ -248,8 +216,12 @@ impl SupabaseRestDb {
             .map_err(|e| e.to_string())?;
         Self::read_response(response).await
     }
-    
-    pub async fn update_appointment(&self, appointment_id: &str,payload: &Value) -> Result<String, String> {
+
+    pub async fn update_appointment(
+        &self,
+        appointment_id: &str,
+        payload: &Value,
+    ) -> Result<String, String> {
         let encoded_id = urlencoding::encode(appointment_id);
         let url = self.rest_url(&format!("appointments?id=eq.{}", encoded_id));
         let response = self
@@ -272,10 +244,13 @@ impl SupabaseRestDb {
             .map_err(|e| e.to_string())?;
         Self::read_response(response).await
     }
-    
-    pub async fn list_appointments_by_doctor(&self, doctor_id: &str,) -> Result<String, String> {
+
+    pub async fn list_appointments_by_doctor(&self, doctor_id: &str) -> Result<String, String> {
         let encoded_id = urlencoding::encode(doctor_id);
-        let url = self.rest_url(&format!("appointments?doctor_id=eq.{}&select=*&order=scheduled_at", encoded_id));
+        let url = self.rest_url(&format!(
+            "appointments?doctor_id=eq.{}&select=*&order=scheduled_at",
+            encoded_id
+        ));
         let response = self
             .authed(self.http_client.get(url))
             .send()
@@ -288,25 +263,12 @@ impl SupabaseRestDb {
     pub async fn list_queue_by_doctor(&self, doctor_id: &str) -> Result<String, String> {
         let encoded_id = urlencoding::encode(doctor_id);
         let url = self.rest_url(&format!(
-            "appointment_queue?doctor_id=eq.{}&select=*&status=neq.Completed&order=created_at.asc",
+            "patient_queue?select=*,appointments!inner(doctor_id)&appointments.doctor_id=eq.{}&status=neq.Completed&order=checked_in_at.asc",
             encoded_id
         ));
 
         let response = self
             .authed(self.http_client.get(url))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Self::read_response(response).await
-    }
-
-    pub async fn create_queue_entry(&self, payload: &serde_json::Value) -> Result<String, String> {
-        let url = self.rest_url("appointment_queue");
-        let response = self
-            .authed(self.http_client.post(url))
-            .header("Prefer", "return=representation")
-            .json(payload)
             .send()
             .await
             .map_err(|e| e.to_string())?;
@@ -320,7 +282,7 @@ impl SupabaseRestDb {
         payload: &serde_json::Value,
     ) -> Result<String, String> {
         let encoded_id = urlencoding::encode(queue_id);
-        let url = self.rest_url(&format!("appointment_queue?id=eq.{}", encoded_id));
+        let url = self.rest_url(&format!("patient_queue?id=eq.{}", encoded_id));
         let response = self
             .authed(self.http_client.patch(url))
             .header("Prefer", "return=representation")
@@ -332,75 +294,40 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
-    // Doctor availability management methods
-    pub async fn list_doctor_availability(&self, doctor_id: &str) -> Result<String, String> {
-        let encoded_id = urlencoding::encode(doctor_id);
-        let url = self.rest_url(&format!(
-            "doctor_availability?doctor_id=eq.{}&select=*&order=available_from.asc",
-            encoded_id
-        ));
-
-        let response = self
-            .authed(self.http_client.get(url))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Self::read_response(response).await
-    }
-
-    pub async fn create_doctor_availability(
-        &self,
-        payload: &serde_json::Value,
-    ) -> Result<String, String> {
-        let url = self.rest_url("doctor_availability");
-        let response = self
-            .authed(self.http_client.post(url))
-            .header("Prefer", "return=representation")
-            .json(payload)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Self::read_response(response).await
-    }
-
-    
     pub async fn fetch_table(
         &self,
         table_name: &str,
-        filter_params: &str
+        filter_params: &str,
     ) -> Result<String, String> {
         let full_path = format!("{}?{}", table_name, filter_params);
         let url = self.rest_url(&full_path);
         let req = self.authed(self.http_client.get(url));
         let res = req.send().await.map_err(|e| e.to_string())?;
-        let full_path = format!("{}?{}", table_name, filter_params);
-        let url = self.rest_url(&full_path);
         Self::read_response(res).await
     }
     pub async fn insert_row(
         &self,
         table_name: &str,
-        payload: &serde_json::Value
+        payload: &serde_json::Value,
     ) -> Result<String, String> {
         let url = self.rest_url(table_name);
-        let req = self.authed(self.http_client.post(url))
+        let req = self
+            .authed(self.http_client.post(url))
             .header("Prefer", "return=representation")
             .json(payload);
         let res = req.send().await.map_err(|e| e.to_string())?;
         Self::read_response(res).await
     }
-    pub async fn patch_row(
-        &self,
-        filter: &str,
-        payload: &serde_json::Value
-    ) -> Result<String, String> {
-        let url = self.rest_url(&format!("{}?{}", "patient_queue", filter));
-        let req = self.authed(self.http_client.patch(url))
-            .header("Prefer", "return=representation")
-            .json(payload);
-        let res = req.send().await.map_err(|e| e.to_string())?;
-        Self::read_response(res).await
-    }
+}
+
+/// Extracts the `message` field from a PostgREST/Postgres error body embedded in a
+/// `SupabaseRestDb::read_response` error string (e.g. a `raise exception '...'` from
+/// an RPC function), so callers can surface the real business-rule reason to the
+/// client instead of a generic 500.
+pub fn pg_error_message(err: &str) -> Option<String> {
+    let start = err.find('{')?;
+    let json: Value = serde_json::from_str(&err[start..]).ok()?;
+    json.get("message")
+        .and_then(Value::as_str)
+        .map(str::to_string)
 }

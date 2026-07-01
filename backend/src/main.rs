@@ -165,7 +165,6 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(supabase_db.clone()))
             .app_data(web::Data::new(firebase_project_id.clone()))
             .app_data(web::FormConfig::default().limit(32_768))
-            .service(Files::new("/static", "static"))
             .service(Files::new("/assets", "../frontend/assets"))
             .route(
                 "/",

@@ -1,16 +1,4 @@
-use chrono::{DateTime, Utc};
-use serde::{Serialize, Deserialize};
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DashboardAppointment {
-    pub id: String,
-    pub patient_id: String,
-    pub patient_name: String,
-    pub doctor_name: String,
-    pub scheduled_at: DateTime<Utc>,
-    pub status: String,
-    pub priority: String,
-}
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct MarkArrivedPayload {

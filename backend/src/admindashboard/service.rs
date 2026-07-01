@@ -9,44 +9,40 @@ pub async fn mark_patient_arrived(
     payload: MarkArrivedPayload,
     today: NaiveDate,
 ) -> Result<Value, String> {
-    let apt_raw = repository::get_appointments_by_date(db, today).await?;
+    let apt_raw = db.get_appointment(&payload.appointment_id).await?;
     let apt_list: Vec<Value> = from_str(&apt_raw).unwrap_or_default();
 
-    let apt = apt_list
-        .iter()
-        .find(|a| a["id"].as_str() == Some(&payload.appointment_id))
-        .ok_or("Appointment not found")?;
+    let apt = apt_list.first().ok_or("Appointment not found")?;
 
     if apt["status"].as_str() != Some("Scheduled") {
         return Err("Only scheduled appointments can be marked as arrived".to_string());
+    }
+
+    let scheduled_date = apt["scheduled_at"]
+        .as_str()
+        .and_then(|value| value.get(0..10))
+        .and_then(|date_str| NaiveDate::parse_from_str(date_str, "%Y-%m-%d").ok());
+    if scheduled_date != Some(today) {
+        return Err("Only today's appointments can be marked as arrived".to_string());
     }
 
     let patient_id = apt["patient_id"]
         .as_str()
         .ok_or("Appointment is missing patient_id")?;
 
-    let queue_raw = repository::get_today_queue(db, today).await?;
-    let queue_list: Vec<Value> = from_str(&queue_raw).unwrap_or_default();
-
-    let exists = queue_list
-        .iter()
-        .any(|q| q["appointment_id"].as_str() == Some(&payload.appointment_id));
-
-    if !exists {
-        let queue_number = queue_list.len() as i32 + 1;
-
-        repository::create_queue_entry(
-            db,
-            &payload.appointment_id,
-            patient_id,
-            today,
-            queue_number,
-        )
-        .await?;
-    }
-
-    let updated_raw = repository::mark_patient_arrived(db, &payload.appointment_id).await?;
-    let updated: Value = from_str(&updated_raw).unwrap_or(Value::Null);
+    // Supabase assigns the next number while holding a database lock, so two
+    // receptionists cannot create the same queue number at the same time.
+    let updated_raw = repository::enqueue_patient(
+        db,
+        &payload.appointment_id,
+        patient_id,
+        today,
+        "Normal",
+        None,
+    )
+    .await?;
+    let updated: Value = from_str(&updated_raw)
+        .map_err(|_| "Check-in succeeded but the queue entry response was unreadable".to_string())?;
 
     Ok(updated)
 }
@@ -68,7 +64,7 @@ pub async fn save_patient_vitals(
         return Err("Weight value invalid".to_string());
     }
 
-        let priority = payload.priority.trim().to_string();
+    let priority = payload.priority.trim().to_string();
 
     if !matches!(priority.as_str(), "Normal" | "Urgent" | "Emergency") {
         return Err("Queue priority must be Normal, Urgent, or Emergency".to_string());
@@ -84,7 +80,7 @@ pub async fn save_patient_vitals(
         return Err("Reason is required for urgent or emergency priority".to_string());
     }
 
-    repository::record_vitals(
+    let updated_raw = repository::save_vitals(
         db,
         &payload.appointment_id,
         &payload.bp,
@@ -92,19 +88,12 @@ pub async fn save_patient_vitals(
         payload.pulse,
         payload.height,
         payload.weight,
-    )
-    .await?;
-
-    repository::update_queue_priority(
-        db,
-        &payload.appointment_id,
         &priority,
         priority_reason.as_deref(),
     )
     .await?;
-
-    let updated_raw = repository::mark_vitals_recorded(db, &payload.appointment_id).await?;
-    let updated: Value = from_str(&updated_raw).unwrap_or(Value::Null);
+    let updated: Value = from_str(&updated_raw)
+        .map_err(|_| "Vitals saved but the response was unreadable".to_string())?;
 
     Ok(updated)
 }
