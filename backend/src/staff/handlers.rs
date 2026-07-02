@@ -42,6 +42,7 @@ pub async fn create_staff_api(
         return rejection;
     }
 
+    // Create the Firebase login first so its UID can be stored with the staff row.
     let mut form = form.into_inner();
     let full_name = format!("{} {}", form.first_name.trim(), form.last_name.trim());
     let uid = match firebase_admin.create_user(&form.email, &full_name).await {
@@ -52,6 +53,7 @@ pub async fn create_staff_api(
 
     match staff_service.create_staff(form).await {
         Ok(staff) => {
+            // The role profile is separate because authentication and staff data use different services.
             if let Err(error) = firebase_admin
                 .save_staff_profile(
                     &staff.firebase_uid,
@@ -144,6 +146,7 @@ pub async fn delete_staff_api(
             .find(|doctor| doctor.staff_id == staff_id),
         Err(error) => return doctor_delete_error(error),
     };
+    // Remove the doctor profile first because it points to the staff record.
     if let Some(doctor) = linked_doctor {
         if let Err(error) = doctor_service.delete_doctor(&doctor.id).await {
             return doctor_delete_error(error);

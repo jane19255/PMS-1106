@@ -49,23 +49,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    const headerPlaceholder = document.getElementById('header-placeholder');
     if (document.querySelector('body > header')) {
         initializeHeader();
-    } else if (headerPlaceholder) {
-        fetch('header.html')
-            .then(response => response.text())
-            .then(html => {
-                headerPlaceholder.innerHTML = html;
-                initializeHeader();
-            });
-    }
-
-    const footerPlaceholder = document.getElementById('footer-placeholder');
-    if (footerPlaceholder && !document.querySelector('body > footer')) {
-        fetch('footer.html')
-            .then(response => response.text())
-            .then(html => { footerPlaceholder.innerHTML = html; });
     }
 });
 

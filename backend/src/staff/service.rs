@@ -1,5 +1,6 @@
 use super::models::StaffMember;
 use super::repository::{RepositoryError, StaffRepository};
+use crate::db::singapore_today;
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -178,7 +179,7 @@ impl StaffService {
         if !form.dob.trim().is_empty() {
             let dob = chrono::NaiveDate::parse_from_str(form.dob.trim(), "%Y-%m-%d")
                 .map_err(|_| StaffError::InvalidInput("Date of birth is invalid".to_string()))?;
-            if dob > chrono::Utc::now().date_naive() {
+            if dob > singapore_today() {
                 return Err(StaffError::InvalidInput(
                     "Date of birth cannot be in the future".to_string(),
                 ));

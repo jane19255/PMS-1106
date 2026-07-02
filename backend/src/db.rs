@@ -1,5 +1,12 @@
+use chrono::{FixedOffset, NaiveDate, Utc};
 use reqwest::Client;
 use serde_json::Value;
+
+pub fn singapore_today() -> NaiveDate {
+    // Clinic dates must follow Singapore time instead of the server's UTC date.
+    let singapore = FixedOffset::east_opt(8 * 60 * 60).expect("Singapore offset is valid");
+    Utc::now().with_timezone(&singapore).date_naive()
+}
 
 #[derive(Clone)]
 pub struct FirebaseRestDb {
@@ -183,6 +190,23 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
+    pub async fn reconcile_overdue_appointments(
+        &self,
+        today: NaiveDate,
+    ) -> Result<String, String> {
+        // The database marks old untouched bookings as no-shows in one update.
+        let url = self.rest_url("rpc/reconcile_overdue_appointments");
+        let response = self
+            .authed(self.http_client.post(url))
+            .json(&serde_json::json!({
+                "p_today": today.format("%Y-%m-%d").to_string()
+            }))
+            .send()
+            .await
+            .map_err(|error| error.to_string())?;
+        Self::read_response(response).await
+    }
+
     pub async fn get_appointment(&self, appointment_id: &str) -> Result<String, String> {
         let encoded_id = urlencoding::encode(appointment_id);
         let url = self.rest_url(&format!("appointments?id=eq.{}&select=*", encoded_id));
@@ -223,17 +247,6 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
-    pub async fn delete_appointment(&self, appointment_id: &str) -> Result<String, String> {
-        let encoded_id = urlencoding::encode(appointment_id);
-        let url = self.rest_url(&format!("appointments?id=eq.{}", encoded_id));
-        let response = self
-            .authed(self.http_client.delete(url))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        Self::read_response(response).await
-    }
-
     pub async fn list_appointments_by_doctor(&self, doctor_id: &str) -> Result<String, String> {
         let encoded_id = urlencoding::encode(doctor_id);
         let url = self.rest_url(&format!(
@@ -248,41 +261,6 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
-    // Queue Management methods
-    pub async fn list_queue_by_doctor(&self, doctor_id: &str) -> Result<String, String> {
-        let encoded_id = urlencoding::encode(doctor_id);
-        let url = self.rest_url(&format!(
-            "patient_queue?select=*,appointments!inner(doctor_id)&appointments.doctor_id=eq.{}&status=neq.Completed&order=checked_in_at.asc",
-            encoded_id
-        ));
-
-        let response = self
-            .authed(self.http_client.get(url))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Self::read_response(response).await
-    }
-
-    pub async fn update_queue_entry(
-        &self,
-        queue_id: &str,
-        payload: &serde_json::Value,
-    ) -> Result<String, String> {
-        let encoded_id = urlencoding::encode(queue_id);
-        let url = self.rest_url(&format!("patient_queue?id=eq.{}", encoded_id));
-        let response = self
-            .authed(self.http_client.patch(url))
-            .header("Prefer", "return=representation")
-            .json(payload)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        Self::read_response(response).await
-    }
-
     pub async fn fetch_table(
         &self,
         table_name: &str,
@@ -294,16 +272,4 @@ impl SupabaseRestDb {
         let res = req.send().await.map_err(|e| e.to_string())?;
         Self::read_response(res).await
     }
-}
-
-/// Extracts the `message` field from a PostgREST/Postgres error body embedded in a
-/// `SupabaseRestDb::read_response` error string (e.g. a `raise exception '...'` from
-/// an RPC function), so callers can surface the real business-rule reason to the
-/// client instead of a generic 500.
-pub fn pg_error_message(err: &str) -> Option<String> {
-    let start = err.find('{')?;
-    let json: Value = serde_json::from_str(&err[start..]).ok()?;
-    json.get("message")
-        .and_then(Value::as_str)
-        .map(str::to_string)
 }

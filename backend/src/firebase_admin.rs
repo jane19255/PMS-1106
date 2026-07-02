@@ -47,6 +47,7 @@ impl FirebaseAdmin {
     }
 
     pub async fn create_user(&self, email: &str, display_name: &str) -> Result<String, String> {
+        // Only the backend service account is allowed to create staff logins.
         let token = self.access_token().await?;
         let url = format!(
             "https://identitytoolkit.googleapis.com/v1/projects/{}/accounts?key={}",
@@ -123,6 +124,7 @@ impl FirebaseAdmin {
         role: &str,
         status: &str,
     ) -> Result<(), String> {
+        // Firestore stores the small profile used during login and permission checks.
         let token = self.access_token().await?;
         let url = format!(
             "https://firestore.googleapis.com/v1/projects/{}/databases/(default)/documents/staff/{}",
@@ -178,6 +180,7 @@ impl FirebaseAdmin {
     }
 
     async fn access_token(&self) -> Result<String, String> {
+        // The signed JWT is exchanged for a short-lived Google access token.
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| "System time is invalid".to_string())?

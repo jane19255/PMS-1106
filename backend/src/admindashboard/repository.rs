@@ -2,17 +2,26 @@ use crate::db::SupabaseRestDb;
 use chrono::NaiveDate;
 use serde_json::json;
 
+const APPOINTMENT_SELECT: &str =
+    "select=*,patients(*),doctors(*,staff(*),room_status(*)),patient_queue(*)";
+
 pub async fn get_appointments_by_date(
     db: &SupabaseRestDb,
     target_date: NaiveDate,
+    today: NaiveDate,
 ) -> Result<String, String> {
     let next_day = target_date.succ_opt().unwrap();
 
-    let filter = format!(
-        "select=*,patients(*),doctors(*,staff(*),room_status(*)),patient_queue(*)&scheduled_at=gte.{}T00:00:00Z&scheduled_at=lt.{}T00:00:00Z&order=scheduled_at.asc",
-        target_date,
-        next_day
-    );
+    let filter = if target_date == today {
+        // Today's dashboard also carries forward patients who already checked in.
+        format!(
+            "{APPOINTMENT_SELECT}&or=(and(scheduled_at.gte.{target_date}T00:00:00Z,scheduled_at.lt.{next_day}T00:00:00Z),and(scheduled_at.lt.{target_date}T00:00:00Z,status.in.(Checked%20In,Vitals%20Recorded,In%20Consultation)))&order=scheduled_at.asc"
+        )
+    } else {
+        format!(
+            "{APPOINTMENT_SELECT}&scheduled_at=gte.{target_date}T00:00:00Z&scheduled_at=lt.{next_day}T00:00:00Z&order=scheduled_at.asc"
+        )
+    };
 
     let raw = db.fetch_table("appointments", &filter).await?;
     Ok(raw)

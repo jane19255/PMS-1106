@@ -55,6 +55,7 @@ async fn live_supabase_exposes_required_tables_and_functions() {
         "/rpc/send_patient_to_room",
         "/rpc/start_consultation",
         "/rpc/complete_consultation",
+        "/rpc/reconcile_overdue_appointments",
         "/rpc/billing_create_invoice",
     ] {
         assert!(schema.contains(item), "Supabase schema is missing {item}");

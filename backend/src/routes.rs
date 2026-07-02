@@ -7,7 +7,6 @@ use crate::handlers::{auth, patients};
 use crate::medical_records::handlers as medical_record_handlers;
 use crate::prescriptions::handlers as prescription_handlers;
 use crate::staff::handlers as staff_handlers;
-use crate::queue::handlers as queue_handlers;
 use actix_web::web;
 
 pub fn configure(config: &mut web::ServiceConfig) {
@@ -24,7 +23,6 @@ pub fn configure(config: &mut web::ServiceConfig) {
 
     config.configure(admindashboard_handlers::routes);
     config.configure(appointment_handlers::routes);
-    config.configure(queue_handlers::routes);
 
     // Billing routes
     config.service(

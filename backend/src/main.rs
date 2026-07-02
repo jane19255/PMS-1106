@@ -11,7 +11,6 @@ mod prescriptions;
 mod routes;
 mod staff;
 mod appointments;
-mod queue;
 
 use actix_files::Files;
 use actix_web::{web, App, HttpResponse, HttpServer};
@@ -163,7 +162,6 @@ async fn main() -> std::io::Result<()> {
             .app_data(firebase_admin.clone())
             .app_data(web::Data::new(firestore_db.clone()))
             .app_data(web::Data::new(supabase_db.clone()))
-            .app_data(web::Data::new(firebase_project_id.clone()))
             .app_data(web::FormConfig::default().limit(32_768))
             .service(Files::new("/assets", "../frontend/assets"))
             .route(

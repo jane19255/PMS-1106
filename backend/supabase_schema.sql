@@ -268,6 +268,31 @@ create unique index if not exists patient_queue_daily_number_uidx
   on public.patient_queue(queue_date, queue_number);
 create index if not exists patient_queue_status_idx on public.patient_queue(status);
 
+-- Past bookings that never checked in are no-shows. Patients who did check in
+-- are left unchanged so the dashboards can carry them forward for completion.
+create or replace function public.reconcile_overdue_appointments(p_today date)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  updated_count integer;
+begin
+  update public.appointments
+  set status = 'No Show', updated_at = now()
+  where status = 'Scheduled'
+    and scheduled_at < p_today::timestamptz;
+
+  get diagnostics updated_count = row_count;
+  return updated_count;
+end;
+$$;
+
+revoke all on function public.reconcile_overdue_appointments(date)
+  from public, anon, authenticated;
+grant execute on function public.reconcile_overdue_appointments(date) to service_role;
+
 create table if not exists public.medical_records (
   id text primary key,
   patient_id text not null references public.patients(id) on update cascade on delete cascade,
@@ -464,6 +489,7 @@ declare
   appointment_doctor_id text;
   appointment_status text;
   room_appointment_id text;
+  queue_status text;
   action_time timestamptz := now();
 begin
   select appointment.doctor_id, appointment.status
@@ -478,8 +504,8 @@ begin
   if appointment_doctor_id <> p_doctor_id then
     raise exception 'Appointment is assigned to a different doctor';
   end if;
-  if appointment_status not in ('Checked In', 'Vitals Recorded', 'In Consultation') then
-    raise exception 'Patient must be checked in before entering a room';
+  if appointment_status not in ('Vitals Recorded', 'In Consultation') then
+    raise exception 'Vitals must be recorded before entering a room';
   end if;
 
   select room.current_appointment_id
@@ -491,16 +517,37 @@ begin
   if not found then
     raise exception 'Doctor does not have an assigned room';
   end if;
-  if room_appointment_id is not null and room_appointment_id <> p_appointment_id then
-    raise exception 'Consultation room is already occupied';
-  end if;
 
-  perform 1
+  select queue_row.status
+    into queue_status
   from public.patient_queue as queue_row
   where queue_row.appointment_id = p_appointment_id
   for update;
   if not found then
     raise exception 'Patient is not in the queue';
+  end if;
+
+  -- A repeated request after room assignment should not move the queue backwards.
+  if appointment_status = 'In Consultation' then
+    if room_appointment_id is distinct from p_appointment_id then
+      raise exception 'Consultation room is not assigned to this appointment';
+    end if;
+    if queue_status not in ('Called', 'In Consultation') then
+      raise exception 'Patient queue does not match the consultation state';
+    end if;
+    return jsonb_build_object(
+      'appointment_id', p_appointment_id,
+      'doctor_id', p_doctor_id,
+      'status', 'In Consultation'
+    );
+  end if;
+
+  if room_appointment_id is not null and room_appointment_id <> p_appointment_id then
+    raise exception 'Consultation room is already occupied';
+  end if;
+
+  if queue_status <> 'Waiting' then
+    raise exception 'Patient queue is not waiting for room assignment';
   end if;
 
   update public.appointments

@@ -3,12 +3,6 @@ let doctorsData = [];
 let patientsData = [];
 let currentEditId = null;
 
-const TIME_SLOTS = [
-    "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-    "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
-    "17:00", "17:30", "18:00", "18:30",
-];
-
 const pagination = new Pagination({
     data: appointmentsData,
     rowsPerPage: 5,
@@ -39,8 +33,7 @@ function patientLabel(id) {
 }
 
 function splitScheduledAt(iso) {
-    // scheduled_at is stored as literal clock digits tagged UTC (no real timezone
-    // math elsewhere in this app), so read it back with the UTC getters.
+    // scheduled_at is stored as literal clock digits tagged UTC (no real timezone math elsewhere in this app), so read it back with the UTC getters.
     const dt = new Date(iso);
     const date = iso.split("T")[0];
     let hours = dt.getUTCHours();
@@ -73,7 +66,7 @@ function renderAppointmentRow(item) {
             </div>
             <div class="has-tooltip">
                 <i class="delete fa-solid fa-trash" onclick="deleteAppointment('${item.id}')"></i>
-                <span class="tooltip-text">Delete Appointment</span>
+                <span class="tooltip-text">Cancel Appointment</span>
             </div>
         </td>
     </tr>
@@ -268,6 +261,7 @@ function setSelectedSlot(modal, time24) {
 }
 
 function computeBookedRanges(doctorId, excludeId) {
+    // Ignore the appointment being edited and slots that were already released.
     return appointmentsData
         .filter(a => a.doctor_id === doctorId && a.id !== excludeId && !["Cancelled", "No Show"].includes(a.status))
         .map(a => {
@@ -284,6 +278,7 @@ function refreshSlotAvailability(modal, dateInputId, doctorSelectId, excludeId) 
 
     const booked = computeBookedRanges(doctorId, excludeId);
 
+    // Disable any displayed slot that falls inside an existing booking.
     modal.querySelectorAll(".timeslot .slot").forEach(slot => {
         const time = slot.dataset.time;
         const slotStart = new Date(`${dateValue}T${time}:00Z`);
@@ -330,17 +325,18 @@ async function confirmDeleteAppointment(button) {
     if (!id) return;
 
     try {
+        // The backend keeps the row and changes its status to Cancelled.
         const res = await fetch(`/api/appointments/${encodeURIComponent(id)}`, {
             method: 'DELETE',
         });
 
         if (res.ok) {
-            showToast('Appointment deleted', 'success');
+            showToast('Appointment cancelled', 'success');
             closeModal(button);
             await loadAppointments();
         } else {
             const text = await res.text();
-            showToast(text || 'Failed to delete appointment', 'error');
+            showToast(text || 'Failed to cancel appointment', 'error');
         }
     } catch (error) {
         showToast('Network error: ' + error.message, 'error');

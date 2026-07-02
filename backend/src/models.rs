@@ -105,17 +105,3 @@ pub struct UpdatePatient {
     #[serde(default)]
     pub status: Option<String>,
 }
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateQueueEntryRequest {
-    pub appointment_id: String,
-    pub priority: Option<String>,
-    pub priority_reason: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateQueueStatusRequest {
-    pub status: String,
-}

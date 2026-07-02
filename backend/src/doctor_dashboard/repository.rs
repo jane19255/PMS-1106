@@ -1,4 +1,5 @@
 use super::models::DoctorQueueAppointment;
+use crate::db::singapore_today;
 use chrono::{DateTime, NaiveDate, Timelike, Utc};
 use reqwest::{Client, Response};
 use serde::Deserialize;
@@ -102,14 +103,23 @@ impl SupabaseDoctorDashboardRepository {
     fn appointments_url(&self, doctor_id: &str, date: NaiveDate) -> String {
         let next_day = date.succ_opt().unwrap_or(date);
         let select = "id,patient_id,scheduled_at,patients(id,first_name,last_name),patient_queue(status,priority)";
+        // Today's list also includes older patients whose visit is still unfinished.
+        let date_filter = if date == singapore_today() {
+            format!(
+                "or=(and(scheduled_at.gte.{date}T00:00:00Z,scheduled_at.lt.{next_day}T00:00:00Z),and(scheduled_at.lt.{date}T00:00:00Z,status.in.(Checked%20In,Vitals%20Recorded,In%20Consultation)))"
+            )
+        } else {
+            format!(
+                "scheduled_at=gte.{date}T00:00:00Z&scheduled_at=lt.{next_day}T00:00:00Z"
+            )
+        };
 
         format!(
-            "{}/rest/v1/appointments?select={}&doctor_id=eq.{}&scheduled_at=gte.{}T00:00:00Z&scheduled_at=lt.{}T00:00:00Z&order=scheduled_at.asc",
+            "{}/rest/v1/appointments?select={}&doctor_id=eq.{}&{}&order=scheduled_at.asc",
             self.url,
             select,
             urlencoding::encode(doctor_id),
-            date,
-            next_day
+            date_filter
         )
     }
 
@@ -155,6 +165,22 @@ impl SupabaseDoctorDashboardRepository {
         }
     }
 
+    async fn reconcile_overdue(&self, today: NaiveDate) -> Result<(), RepositoryError> {
+        // This keeps no-show statuses correct even if the doctor opens the system first.
+        let response = self
+            .request(
+                self.client.post(format!(
+                    "{}/rest/v1/rpc/reconcile_overdue_appointments",
+                    self.url
+                )),
+            )
+            .json(&json!({ "p_today": today.format("%Y-%m-%d").to_string() }))
+            .send()
+            .await
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+        Self::ensure_success(response).await
+    }
+
     async fn response_error(response: Response) -> RepositoryError {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
@@ -182,6 +208,9 @@ impl DoctorDashboardRepository for SupabaseDoctorDashboardRepository {
         let firebase_uid = firebase_uid.to_string();
 
         Box::pin(async move {
+            if date == singapore_today() {
+                self.reconcile_overdue(date).await?;
+            }
             let doctor_response = self
                 .request(self.client.get(self.staff_doctor_url(&firebase_uid)))
                 .send()
@@ -302,6 +331,7 @@ impl From<DatabaseAppointment> for DoctorQueueAppointment {
             patient_name: format!("{} {}", row.patients.first_name, row.patients.last_name)
                 .trim()
                 .to_string(),
+            appointment_date: row.scheduled_at.format("%Y-%m-%d").to_string(),
             appointment_time: format_time(row.scheduled_at),
             queue_status,
             priority,

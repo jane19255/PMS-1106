@@ -1,10 +1,10 @@
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
-use chrono::{NaiveDate, Utc};
+use chrono::NaiveDate;
 use firebase_auth::FirebaseAuth;
 use serde_json::{json, Value};
 use tera::{Context, Tera};
 
-use crate::db::{FirebaseRestDb, SupabaseRestDb};
+use crate::db::{singapore_today, FirebaseRestDb, SupabaseRestDb};
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use crate::models::{Patient, PatientView, SupabasePatientRow, UpdatePatient};
 
@@ -52,15 +52,7 @@ pub async fn patients_page(
         return rejection;
     }
 
-    let mut ctx = Context::new();
-    ctx.insert(
-        "firebase_api_key",
-        &std::env::var("FIREBASE_API_KEY").unwrap_or_default(),
-    );
-    ctx.insert(
-        "firebase_project_id",
-        &std::env::var("FIREBASE_PROJECT_ID").unwrap_or_default(),
-    );
+    let ctx = Context::new();
 
     match tera.render("Patients.html", &ctx) {
         Ok(html) => HttpResponse::Ok()
@@ -377,7 +369,7 @@ fn validate_dob(value: &str) -> Result<String, String> {
     let dob = NaiveDate::parse_from_str(&trimmed, "%Y-%m-%d")
         .map_err(|_| "Date of birth must use YYYY-MM-DD format.".to_string())?;
 
-    if dob > Utc::now().date_naive() {
+    if dob > singapore_today() {
         Err("Date of birth cannot be in the future.".to_string())
     } else {
         Ok(trimmed)

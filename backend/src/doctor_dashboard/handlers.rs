@@ -1,6 +1,6 @@
 use super::models::AppointmentActionPayload;
 use super::service::{DoctorDashboardError, DoctorDashboardService};
-use crate::db::FirebaseRestDb;
+use crate::db::{singapore_today, FirebaseRestDb};
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
@@ -40,15 +40,13 @@ pub async fn list_dashboard_appointments_api(
         Err(rejection) => return rejection,
     };
 
-    let default_date = chrono::Utc::now()
-        .date_naive()
-        .format("%Y-%m-%d")
-        .to_string();
+    let today = singapore_today();
+    let default_date = today.format("%Y-%m-%d").to_string();
 
     let date_str = date_query.get("date").unwrap_or(&default_date);
 
     let target_date = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-        .unwrap_or_else(|_| chrono::Utc::now().date_naive());
+        .unwrap_or(today);
 
     match dashboard_service
         .list_appointments(&firebase_uid, target_date)

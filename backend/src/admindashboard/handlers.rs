@@ -5,14 +5,10 @@ use crate::admindashboard::models::{
 };
 use crate::admindashboard::repository;
 use crate::admindashboard::service;
-use crate::db::{FirebaseRestDb, SupabaseRestDb};
-use crate::handlers::auth::{
-    require_auth_and_permission,
-    AppAction,
-    insert_firebase_config,
-};
+use crate::db::{singapore_today, FirebaseRestDb, SupabaseRestDb};
+use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
-use chrono::{NaiveDate, Utc};
+use chrono::NaiveDate;
 use firebase_auth::FirebaseAuth;
 use tera::Tera;
 
@@ -30,7 +26,6 @@ pub async fn dashboard_html(
     tera: web::Data<Tera>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
-    _supabase_db: web::Data<SupabaseRestDb>,
 ) -> impl Responder {
     if let Err(redirect) = require_auth_and_permission(
         &req,
@@ -41,8 +36,7 @@ pub async fn dashboard_html(
         return redirect;
     }
 
-    let mut ctx = tera::Context::new();
-    insert_firebase_config(&mut ctx);
+    let ctx = tera::Context::new();
 
     match tera.render("dashboard.html", &ctx) {
         Ok(html) => HttpResponse::Ok()
@@ -75,10 +69,8 @@ pub async fn api_calendar_appointments(
         return res;
     }
 
-    let default_date = Utc::now()
-        .date_naive()
-        .format("%Y-%m-%d")
-        .to_string();
+    let today = singapore_today();
+    let default_date = today.format("%Y-%m-%d").to_string();
 
     let date_str = date_query
         .get("date")
@@ -89,10 +81,17 @@ pub async fn api_calendar_appointments(
         "%Y-%m-%d",
     ) {
         Ok(d) => d,
-        Err(_) => Utc::now().date_naive(),
+        Err(_) => today,
     };
 
-    match repository::get_appointments_by_date(&supabase_db, target_date).await {
+    if target_date == today {
+        // Reconcile first so yesterday's scheduled bookings do not stay open forever.
+        if let Err(message) = supabase_db.reconcile_overdue_appointments(today).await {
+            return HttpResponse::InternalServerError().body(message);
+        }
+    }
+
+    match repository::get_appointments_by_date(&supabase_db, target_date, today).await {
         Ok(data) => HttpResponse::Ok()
             .content_type("application/json")
             .body(data),
@@ -110,7 +109,7 @@ pub async fn api_mark_arrived(
     if let Err(res) = require_auth_and_permission(&req, &firebase_auth, &firestore_db, AppAction::ManageAppointments).await {
         return res;
     }
-    let today = Utc::now().date_naive();
+    let today = singapore_today();
     match service::mark_patient_arrived(&supabase_db, payload.into_inner(), today).await {
         Ok(json_data) => HttpResponse::Ok().json(json_data),
         Err(msg) => HttpResponse::BadRequest().body(msg),

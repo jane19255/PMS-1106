@@ -45,6 +45,12 @@ function getPriorityBadge(priority) {
 function renderAppointmentRow(app) {
     const status = getQueueStatus(app.queueStatus);
     const priority = getPriorityBadge(app.priority);
+    // Show the original date so the doctor can identify a carried-forward visit.
+    const isOverdue = app.appointmentDate < getTodayDate();
+    const displayedTime = isOverdue
+        ? `${app.appointmentDate} ${app.appointmentTime}`
+        : app.appointmentTime;
+    const statusText = isOverdue ? `Overdue: ${status.text}` : status.text;
 
     let actionHtml = `<span class="muted">-</span>`;
 
@@ -65,8 +71,8 @@ function renderAppointmentRow(app) {
     return `
         <tr onclick="window.location.href='/medical-records?patient_id=${app.patientId}'">
             <td>${app.patientName}</td>
-            <td>${app.appointmentTime}</td>
-            <td><span class="${status.class}">${status.text}</span></td>
+            <td>${displayedTime}</td>
+            <td><span class="${status.class}">${statusText}</span></td>
             <td><span class="${priority.class}">${priority.text}</span></td>
             <td class="action">${actionHtml}</td>
         </tr>
@@ -143,29 +149,37 @@ async function loadDashboardAppointments(dateStr = currentSelectedDate) {
 }
 
 async function startConsultation(appointmentId) {
-    const res = await fetch("/api/doctor-dashboard/start-consultation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointment_id: appointmentId })
-    });
+    try {
+        const res = await fetch("/api/doctor-dashboard/start-consultation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ appointment_id: appointmentId })
+        });
 
-    if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) throw new Error(await res.text());
 
-    showToast("Consultation started", "success");
-    await refreshAppointmentTable(currentSelectedDate);
+        showToast("Consultation started", "success");
+        await refreshAppointmentTable(currentSelectedDate);
+    } catch (error) {
+        showToast(error.message || "Consultation could not be started", "error");
+    }
 }
 
 async function completeConsultation(appointmentId) {
-    const res = await fetch("/api/doctor-dashboard/complete-consultation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointment_id: appointmentId })
-    });
+    try {
+        const res = await fetch("/api/doctor-dashboard/complete-consultation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ appointment_id: appointmentId })
+        });
 
-    if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) throw new Error(await res.text());
 
-    showToast("Consultation completed", "success");
-    await refreshAppointmentTable(currentSelectedDate);
+        showToast("Consultation completed", "success");
+        await refreshAppointmentTable(currentSelectedDate);
+    } catch (error) {
+        showToast(error.message || "Consultation could not be completed", "error");
+    }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

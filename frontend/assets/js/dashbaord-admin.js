@@ -199,6 +199,7 @@ async function fetchAppointmentsByDate(dateStr) {
         const res = await fetch(`/api/dashboard/appointments?date=${dateStr}`);
         if (!res.ok) throw new Error("Failed to load appointments");
         const rawList = await res.json();
+        // Convert the nested API response into the simpler shape used by the table.
         globalAppointments = rawList.map(row => {
             const queue = Array.isArray(row.patient_queue) ? row.patient_queue[0] : row.patient_queue;
             return {
@@ -230,37 +231,41 @@ async function fetchAppointmentsByDate(dateStr) {
     }
 }
 
-function renderAppointmentRow(app, index) {
+function renderAppointmentRow(app) {
     const status = getPatientStatus(app);
     const fullName = `${app.patient.firstName} ${app.patient.lastName}`;
     const todayStr = getTodayDate();
     const isToday = app.date === todayStr;
-    const isArrived = ["Checked In", "Vitals Recorded", "In Consultation", "Completed"].includes(app.status);
+    // Checked-in patients stay actionable even if the visit passed midnight.
+    const isOverdue = app.date < todayStr && ["Checked In", "Vitals Recorded", "In Consultation"].includes(app.status);
     const canEnterVitals = app.status === "Checked In";
     const canSendRoom = app.status === "Vitals Recorded" && app.roomStatus === "Available";
+    const canArrive = isToday && app.status === "Scheduled";
     const priority = getPriorityBadge(app.priority);
+    const displayedTime = isOverdue ? `${app.date} ${app.time}` : app.time;
+    const statusText = isOverdue ? `Overdue: ${status.text}` : status.text;
 
     let html = `
         <tr data-doctor="${app.doctor}" data-status="${app.status}" data-app-id="${app.appointmentId}">
             <td>${fullName}</td>
             <td>${app.doctor}</td>
-            <td>${app.time}</td>`;
+            <td>${displayedTime}</td>`;
 
-    if (isToday) {
+    if (isToday || isOverdue) {
         html += `
-        <td><span class="${status.class}">${status.text}</span></td>
+        <td><span class="${status.class}">${statusText}</span></td>
         <td><span class="${priority.class}">${priority.text}</span></td>
         <td class="action">
             <div class="has-tooltip">
-                <button class="btn btn-arrive ${isArrived ? 'disabled' : ''}" ${isArrived ? 'disabled' : ''} onclick="handleMarkArrive('${app.appointmentId}')"><i class="fa-solid fa-user-check"></i></button>
+                <button class="btn btn-arrive ${!canArrive ? 'disabled' : ''}" ${!canArrive ? 'disabled' : ''} onclick="handleMarkArrive('${app.appointmentId}')"><i class="fa-solid fa-user-check"></i></button>
                 <span class="tooltip-text">Arrive</span>
             </div>
             <div class="has-tooltip">
-                <button class="btn btn-vitals ${!canEnterVitals ? 'disabled' : ''}" onclick="openVital('${fullName}', '${app.appointmentId}')"><i class="fa-solid fa-file-waveform"></i></button>
+                <button class="btn btn-vitals ${!canEnterVitals ? 'disabled' : ''}" ${!canEnterVitals ? 'disabled' : ''} onclick="openVital('${fullName}', '${app.appointmentId}')"><i class="fa-solid fa-file-waveform"></i></button>
                 <span class="tooltip-text">Enter Vitals</span>
             </div>
             <div class="has-tooltip">
-                <button class="btn btn-sendRoom ${!canSendRoom ? 'disabled' : ''}" onclick="sendToRoom('${app.appointmentId}', '${fullName}', '${app.doctorId}')"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
+                <button class="btn btn-sendRoom ${!canSendRoom ? 'disabled' : ''}" ${!canSendRoom ? 'disabled' : ''} onclick="sendToRoom('${app.appointmentId}', '${fullName}', '${app.doctorId}')"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
                 <span class="tooltip-text">Send to room</span>
             </div>
         </td>`;

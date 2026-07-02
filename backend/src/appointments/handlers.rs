@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::appointments::interval::AppointmentInterval;
 use crate::appointments::scheduler::AppointmentScheduler;
-use crate::db::{FirebaseRestDb, SupabaseRestDb};
+use crate::db::{singapore_today, FirebaseRestDb, SupabaseRestDb};
 use crate::doctors::service::DoctorService;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 
@@ -52,15 +52,7 @@ pub async fn appointments_page(
         return rejection;
     }
 
-    let mut ctx = Context::new();
-    ctx.insert(
-        "firebase_api_key",
-        &std::env::var("FIREBASE_API_KEY").unwrap_or_default(),
-    );
-    ctx.insert(
-        "firebase_project_id",
-        &std::env::var("FIREBASE_PROJECT_ID").unwrap_or_default(),
-    );
+    let ctx = Context::new();
 
     match tera.render("Appointments.html", &ctx) {
         Ok(html) => HttpResponse::Ok()
@@ -87,6 +79,7 @@ async fn validate_and_check_conflict(
     mut appointment: Value,
     exclude_id: Option<&str>,
 ) -> Result<Value, AppointmentError> {
+    // Check the linked records before checking the requested time slot.
     let Some(doctor_id) = appointment
         .get("doctor_id")
         .and_then(Value::as_str)
@@ -129,7 +122,7 @@ async fn validate_and_check_conflict(
         Err(e) => return Err(AppointmentError::ServerError(e)),
     }
 
-    normalize_appointment_payload(&mut appointment, &doctor_id);
+    normalize_appointment_payload(&mut appointment, &doctor_id, exclude_id.is_none());
 
     let scheduled_at = match appointment.get("scheduled_at").and_then(Value::as_str) {
         Some(s) if !s.trim().is_empty() => s.to_string(),
@@ -148,6 +141,11 @@ async fn validate_and_check_conflict(
             ))
         }
     };
+    if requested_start.date_naive() < singapore_today() {
+        return Err(AppointmentError::BadRequest(
+            "Appointments cannot be scheduled in the past".to_string(),
+        ));
+    }
 
     let duration = appointment
         .get("duration_minutes")
@@ -170,6 +168,7 @@ async fn validate_and_check_conflict(
         ));
     }
 
+    // Load this doctor's bookings so the same time cannot be booked twice.
     let appointments_json = db
         .list_appointments_by_doctor(&doctor_id)
         .await
@@ -179,6 +178,7 @@ async fn validate_and_check_conflict(
 
     let mut intervals = Vec::new();
     for apt in existing {
+        // Cancelled and no-show appointments no longer reserve their time slot.
         if !appointment_blocks_time_slot(&apt) {
             continue;
         }
@@ -207,6 +207,7 @@ async fn validate_and_check_conflict(
         }
     }
 
+    // The interval tree finds an overlap without checking every pair manually.
     let scheduler = AppointmentScheduler::new(intervals);
     let requested = AppointmentInterval::new(requested_start, duration);
 
@@ -226,15 +227,25 @@ fn appointment_blocks_time_slot(appointment: &Value) -> bool {
     )
 }
 
-fn normalize_appointment_payload(appointment: &mut Value, doctor_id: &str) {
+fn normalize_appointment_payload(appointment: &mut Value, doctor_id: &str, is_new: bool) {
     let Some(object) = appointment.as_object_mut() else {
         *appointment = json!({});
-        return normalize_appointment_payload(appointment, doctor_id);
+        return normalize_appointment_payload(appointment, doctor_id, is_new);
     };
 
-    object
-        .entry("id")
-        .or_insert_with(|| json!(format!("APT-{}", Uuid::new_v4())));
+    if is_new {
+        object
+            .entry("id")
+            .or_insert_with(|| json!(format!("APT-{}", Uuid::new_v4())));
+    } else {
+        // The URL identifies the existing row, so an edit must not replace its ID.
+        object.remove("id");
+    }
+    // Workflow status is changed only by the check-in and consultation actions.
+    object.remove("status");
+    object.remove("created_at");
+    object.remove("updated_at");
+    object.remove("scheduled_end_at");
     object.insert("doctor_id".to_string(), json!(doctor_id));
 
     if !object.contains_key("scheduled_at") {
@@ -272,6 +283,9 @@ pub async fn list_appointments(
         require_appointments_permission(&req, &firebase_auth, &firestore_db).await
     {
         return rejection;
+    }
+    if let Err(error) = db.reconcile_overdue_appointments(singapore_today()).await {
+        return HttpResponse::InternalServerError().body(error);
     }
     match db.list_appointments().await {
         Ok(result) => HttpResponse::Ok()
@@ -348,6 +362,18 @@ pub async fn update_appointment(
         return rejection;
     }
     let appointment_id = path.into_inner();
+    // Once check-in starts, schedule edits could break the queue and room records.
+    match appointment_status(&db, &appointment_id).await {
+        Ok(Some(status)) if status == "Scheduled" => {}
+        Ok(Some(status)) => {
+            return HttpResponse::BadRequest().body(format!(
+                "Cannot edit an appointment that is already \"{status}\"."
+            ))
+        }
+        Ok(None) => return HttpResponse::NotFound().body("Appointment was not found."),
+        Err(error) => return HttpResponse::InternalServerError().body(error),
+    }
+
     match validate_and_check_conflict(
         &db,
         &doctor_service,
@@ -373,7 +399,25 @@ pub async fn update_appointment(
     }
 }
 
-const NON_DELETABLE_STATUSES: [&str; 3] = ["Checked In", "In Consultation", "Completed"];
+const NON_CANCELLABLE_STATUSES: [&str; 4] = [
+    "Checked In",
+    "Vitals Recorded",
+    "In Consultation",
+    "Completed",
+];
+
+async fn appointment_status(
+    db: &SupabaseRestDb,
+    appointment_id: &str,
+) -> Result<Option<String>, String> {
+    let body = db.get_appointment(appointment_id).await?;
+    let rows: Vec<Value> = serde_json::from_str(&body).unwrap_or_default();
+    Ok(rows.into_iter().next().and_then(|row| {
+        row.get("status")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    }))
+}
 
 pub async fn delete_appointment(
     req: HttpRequest,
@@ -389,41 +433,37 @@ pub async fn delete_appointment(
     }
     let appointment_id = path.into_inner();
 
-    let status = match db.get_appointment(&appointment_id).await {
-        Ok(body) => {
-            let rows: Vec<Value> = serde_json::from_str(&body).unwrap_or_default();
-            rows.into_iter().next().and_then(|row| {
-                row.get("status")
-                    .and_then(Value::as_str)
-                    .map(str::to_string)
-            })
-        }
+    let status = match appointment_status(&db, &appointment_id).await {
+        Ok(status) => status,
         Err(err) => return HttpResponse::InternalServerError().body(err),
     };
 
+    // Only a future or untouched scheduled appointment can be cancelled.
     if let Some(status) = status.as_deref() {
-        if NON_DELETABLE_STATUSES.contains(&status) {
+        if NON_CANCELLABLE_STATUSES.contains(&status) {
             return HttpResponse::BadRequest().body(format!(
-                "Cannot delete an appointment that is already \"{status}\". Cancel it instead, or contact an administrator."
+                "Cannot cancel an appointment that is already \"{status}\"."
             ));
+        }
+        if matches!(status, "Cancelled" | "No Show") {
+            return HttpResponse::BadRequest()
+                .body(format!("Appointment is already marked as \"{status}\"."));
         }
     } else {
         return HttpResponse::NotFound().body("Appointment was not found.");
     }
 
-    match db.delete_appointment(&appointment_id).await {
+    // Keep the appointment for audit/history instead of deleting the row.
+    match db
+        .update_appointment(&appointment_id, &json!({ "status": "Cancelled" }))
+        .await
+    {
         Ok(result) => HttpResponse::Ok()
             .content_type("application/json")
             .body(result),
         Err(err) => {
-            if err.contains("violates foreign key constraint") || err.contains("23503") {
-                HttpResponse::Conflict().body(
-                    "This appointment can't be deleted because it has linked records (e.g. a queue entry or room assignment). Cancel it instead.",
-                )
-            } else {
-                eprintln!("Failed to delete appointment {appointment_id}: {err}");
-                HttpResponse::InternalServerError().body("Failed to delete appointment.")
-            }
+            eprintln!("Failed to cancel appointment {appointment_id}: {err}");
+            HttpResponse::InternalServerError().body("Failed to cancel appointment.")
         }
     }
 }
@@ -452,7 +492,10 @@ fn is_database_schedule_conflict(error: &str) -> bool {
 mod tests {
     use serde_json::json;
 
-    use super::{appointment_blocks_time_slot, is_database_schedule_conflict};
+    use super::{
+        appointment_blocks_time_slot, is_database_schedule_conflict,
+        normalize_appointment_payload, NON_CANCELLABLE_STATUSES,
+    };
 
     #[test]
     fn cancelled_and_no_show_appointments_do_not_block_slots() {
@@ -483,5 +526,25 @@ mod tests {
         assert!(!is_database_schedule_conflict(
             "23503: foreign key violation"
         ));
+    }
+
+    #[test]
+    fn appointment_update_cannot_replace_id_or_status() {
+        let mut payload = json!({
+            "id": "NEW-ID",
+            "status": "Completed",
+            "doctor_id": "DOC-OLD"
+        });
+
+        normalize_appointment_payload(&mut payload, "DOC-1", false);
+
+        assert!(payload.get("id").is_none());
+        assert!(payload.get("status").is_none());
+        assert_eq!(payload["doctor_id"], "DOC-1");
+    }
+
+    #[test]
+    fn appointments_with_vitals_cannot_be_cancelled() {
+        assert!(NON_CANCELLABLE_STATUSES.contains(&"Vitals Recorded"));
     }
 }

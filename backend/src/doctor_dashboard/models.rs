@@ -6,6 +6,7 @@ pub struct DoctorQueueAppointment {
     pub appointment_id: String,
     pub patient_id: String,
     pub patient_name: String,
+    pub appointment_date: String,
     pub appointment_time: String,
     pub queue_status: String,
     pub priority: String,

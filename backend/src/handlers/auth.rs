@@ -428,8 +428,7 @@ fn render_login(tera: &Tera, ctx: Context) -> HttpResponse {
 }
 
 fn render_template(tera: &Tera, template_name: &str) -> HttpResponse {
-    let mut ctx = Context::new();
-    insert_firebase_config(&mut ctx);
+    let ctx = Context::new();
 
     match tera.render(template_name, &ctx) {
         Ok(html) => HttpResponse::Ok()

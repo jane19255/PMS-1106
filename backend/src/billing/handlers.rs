@@ -64,6 +64,7 @@ pub async fn create_invoice(
     body: web::Bytes,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
 ) -> impl Responder {
     if let Err(rejection) = require_auth_and_permission(
         &req,
@@ -81,10 +82,56 @@ pub async fn create_invoice(
         Err(error) => return render_error(&templates, error),
     };
 
+    if let Err(error) = validate_billable_appointment(&supabase_db, &form).await {
+        return render_error(&templates, error);
+    }
+
     match billing_service.create_invoice(form).await {
         Ok(_) => redirect_to("/billing"),
         Err(error) => render_error(&templates, error),
     }
+}
+
+async fn validate_billable_appointment(
+    db: &SupabaseRestDb,
+    form: &CreateInvoiceForm,
+) -> Result<(), BillingError> {
+    // An invoice without an appointment is allowed for other clinic charges.
+    let Some(appointment_id) = form
+        .appointment_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(());
+    };
+
+    let body = db
+        .get_appointment(appointment_id)
+        .await
+        .map_err(|_| BillingError::StorageUnavailable)?;
+    let rows: Vec<serde_json::Value> =
+        serde_json::from_str(&body).map_err(|_| BillingError::StorageUnavailable)?;
+    let appointment = rows.first().ok_or_else(|| {
+        BillingError::InvalidInput("The selected appointment was not found.".to_string())
+    })?;
+
+    // Stop users from attaching another patient's appointment to this invoice.
+    if appointment.get("patient_id").and_then(serde_json::Value::as_str)
+        != Some(form.patient_id.trim())
+    {
+        return Err(BillingError::InvalidInput(
+            "The selected appointment belongs to a different patient.".to_string(),
+        ));
+    }
+    // Appointment charges should only be billed after the visit is finished.
+    if appointment.get("status").and_then(serde_json::Value::as_str) != Some("Completed") {
+        return Err(BillingError::InvalidInput(
+            "The appointment must be completed before an invoice is created.".to_string(),
+        ));
+    }
+
+    Ok(())
 }
 
 pub async fn show_invoice(
