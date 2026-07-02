@@ -29,7 +29,7 @@ impl FirebaseRestDb {
     ) -> Result<String, reqwest::Error> {
         let url = format!("{}/{}/{}", self.base_url(), collection, doc_id);
         let response = self.http_client.get(&url).send().await?;
-        Ok(response.text().await?)
+        response.text().await
     }
 }
 
@@ -172,17 +172,6 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
-    pub async fn delete_medical_record(&self, record_id: &str) -> Result<String, String> {
-        let encoded_id = urlencoding::encode(record_id);
-        let url = self.rest_url(&format!("medical_records?id=eq.{}", encoded_id));
-        let response = self
-            .authed(self.http_client.delete(url))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        Self::read_response(response).await
-    }
-
     // Appointment Scheduling methods
     pub async fn list_appointments(&self) -> Result<String, String> {
         let url = self.rest_url("appointments?select=*&order=scheduled_at");
@@ -302,19 +291,6 @@ impl SupabaseRestDb {
         let full_path = format!("{}?{}", table_name, filter_params);
         let url = self.rest_url(&full_path);
         let req = self.authed(self.http_client.get(url));
-        let res = req.send().await.map_err(|e| e.to_string())?;
-        Self::read_response(res).await
-    }
-    pub async fn insert_row(
-        &self,
-        table_name: &str,
-        payload: &serde_json::Value,
-    ) -> Result<String, String> {
-        let url = self.rest_url(table_name);
-        let req = self
-            .authed(self.http_client.post(url))
-            .header("Prefer", "return=representation")
-            .json(payload);
         let res = req.send().await.map_err(|e| e.to_string())?;
         Self::read_response(res).await
     }

@@ -92,11 +92,6 @@ async function fetchRooms() {
     }
 }
 
-function getTodaysDoctors() {
-    const todaysApps = globalAppointments.filter(a => a.date === currentSelectedDate);
-    return [...new Set(todaysApps.map(a => a.doctor))];
-}
-
 async function loadDoctors() {
     const doctorFilter = document.getElementById("doctorFilter");
     doctorFilter.innerHTML = `<option value="all">All Doctors</option>`;
@@ -257,7 +252,7 @@ function renderAppointmentRow(app, index) {
         <td><span class="${priority.class}">${priority.text}</span></td>
         <td class="action">
             <div class="has-tooltip">
-                <button class="btn btn-arrive ${isArrived ? 'disabled' : ''}" ${isArrived ? 'disabled' : ''} onclick="handleMarkArrive('${app.appointmentId}', '${fullName}')"><i class="fa-solid fa-user-check"></i></button>
+                <button class="btn btn-arrive ${isArrived ? 'disabled' : ''}" ${isArrived ? 'disabled' : ''} onclick="handleMarkArrive('${app.appointmentId}')"><i class="fa-solid fa-user-check"></i></button>
                 <span class="tooltip-text">Arrive</span>
             </div>
             <div class="has-tooltip">
@@ -329,15 +324,15 @@ async function apiSaveVitals(appointmentId, vitalsPayload) {
         await fetchRooms();
         await refreshAppointmentTable(currentSelectedDate);
         renderRoomTable();
+        return true;
     } catch (err) {
         showToast(err.message, "danger");
+        return false;
     }
 }
 
 async function refreshAppointmentTable(selectedDateStr) {
-    const loadingToast = showToast("Loading appointments...", "loading", {
-        persist: true
-    });
+    showToast("Loading appointments...", "loading");
 
     try {
         currentSelectedDate = selectedDateStr;
@@ -351,14 +346,13 @@ async function refreshAppointmentTable(selectedDateStr) {
             document.getElementById("appBody").innerHTML =
                 `<tr><td colspan="6" class="empty-row">No appointments found for this date.</td></tr>`;
         }
+        showToast("Appointments loaded!", "success");
     } catch (err) {
         showToast("Appointments could not be loaded!", "error");
-    } finally {
-        showToast("Appointments loaded!", "success");
     }
 }
 
-async function handleMarkArrive(appointmentId, patientName) {
+async function handleMarkArrive(appointmentId) {
     await apiMarkArrived(appointmentId);
 }
 
@@ -375,7 +369,7 @@ function openVital(patientName, appId) {
     openModal('vitalModal');
 }
 
-async function saveVital() {
+async function saveVital(button) {
     const payload = {
         bp: document.getElementById("bp").value,
         temp: document.getElementById("temp").value,
@@ -386,7 +380,12 @@ async function saveVital() {
         priorityReason: document.getElementById("priorityReason").value.trim()
     };
 
-    await apiSaveVitals(activeVitalAppId, payload);
+    // Wait for the server before closing so users can correct rejected values.
+    const saved = await apiSaveVitals(activeVitalAppId, payload);
+    if (saved) {
+        closeModal(button);
+        clearInput(button);
+    }
 }
 
 function applyAllFiltersAndRefresh() {

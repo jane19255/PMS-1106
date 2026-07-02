@@ -98,14 +98,13 @@ function closeModal(button) {
 function showToast(msg, condition) {
     const toast = document.getElementById('toast');
     if (!toast) return false;
-    console.log(condition)
-
     toast.className = "toast card show"; 
 
     const icons = {
         success: "fa-check-circle",
         warning: "fa-triangle-exclamation",
         loading: "fa-spinner",
+        danger: "fa-circle-exclamation",
         error: "fa-circle-exclamation"
     };
 
@@ -247,7 +246,8 @@ class Pagination {
     }
 
     get totalPages() {
-        return Math.ceil(this.data.length / this.rowsPerPage);
+        // Keep one page available even when there are no rows to display.
+        return Math.max(1, Math.ceil(this.data.length / this.rowsPerPage));
     }
 
     get paginatedData() {
@@ -292,6 +292,10 @@ class Pagination {
     }
 
     updateInfo() {
+        if (this.data.length === 0) {
+            document.getElementById(this.pageInfoId).innerText = 'Showing 0 - 0 of 0';
+            return;
+        }
         const start = (this.currentPage - 1) * this.rowsPerPage + 1;
         const end = Math.min(this.currentPage * this.rowsPerPage, this.data.length);
         document.getElementById(this.pageInfoId).innerText = `Showing ${start} - ${end} of ${this.data.length}`;

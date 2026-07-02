@@ -47,6 +47,8 @@ pub async fn enqueue_patient(
     SupabaseRestDb::read_response(res).await
 }
 
+// These values map directly to the save_patient_vitals database function.
+#[allow(clippy::too_many_arguments)]
 pub async fn save_vitals(
     db: &SupabaseRestDb,
     appointment_id: &str,

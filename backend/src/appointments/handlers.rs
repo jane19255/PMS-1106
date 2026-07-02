@@ -201,7 +201,6 @@ async fn validate_and_check_conflict(
 
         if let Ok(start) = DateTime::parse_from_rfc3339(scheduled) {
             intervals.push(AppointmentInterval::new(
-                id.to_string(),
                 start.with_timezone(&Utc),
                 apt_duration,
             ));
@@ -209,11 +208,7 @@ async fn validate_and_check_conflict(
     }
 
     let scheduler = AppointmentScheduler::new(intervals);
-    let requested = AppointmentInterval::new(
-        exclude_id.unwrap_or("").to_string(),
-        requested_start,
-        duration,
-    );
+    let requested = AppointmentInterval::new(requested_start, duration);
 
     if scheduler.has_conflict(&requested) {
         return Err(AppointmentError::Conflict(

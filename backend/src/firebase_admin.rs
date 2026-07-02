@@ -115,6 +115,68 @@ impl FirebaseAdmin {
         }
     }
 
+    pub async fn save_staff_profile(
+        &self,
+        uid: &str,
+        first_name: &str,
+        last_name: &str,
+        role: &str,
+        status: &str,
+    ) -> Result<(), String> {
+        let token = self.access_token().await?;
+        let url = format!(
+            "https://firestore.googleapis.com/v1/projects/{}/databases/(default)/documents/staff/{}",
+            self.project_id,
+            urlencoding::encode(uid)
+        );
+        // Inactive staff keep their account but are blocked by the normal role check.
+        let login_role = if status.eq_ignore_ascii_case("active") {
+            role.trim().to_lowercase()
+        } else {
+            "unauthorized".to_string()
+        };
+        let response = self
+            .client
+            .patch(url)
+            .bearer_auth(token)
+            .json(&json!({
+                "fields": {
+                    "firstName": { "stringValue": first_name.trim() },
+                    "lastName": { "stringValue": last_name.trim() },
+                    "role": { "stringValue": login_role }
+                }
+            }))
+            .send()
+            .await
+            .map_err(|_| "Could not update the Firebase staff profile".to_string())?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err("Firebase staff profile could not be saved".to_string())
+        }
+    }
+
+    pub async fn delete_staff_profile(&self, uid: &str) -> Result<(), String> {
+        let token = self.access_token().await?;
+        let url = format!(
+            "https://firestore.googleapis.com/v1/projects/{}/databases/(default)/documents/staff/{}",
+            self.project_id,
+            urlencoding::encode(uid)
+        );
+        let response = self
+            .client
+            .delete(url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(|_| "Could not delete the Firebase staff profile".to_string())?;
+        if response.status().is_success() || response.status() == reqwest::StatusCode::NOT_FOUND {
+            Ok(())
+        } else {
+            Err("Firebase staff profile could not be deleted".to_string())
+        }
+    }
+
     async fn access_token(&self) -> Result<String, String> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -122,7 +184,7 @@ impl FirebaseAdmin {
             .as_secs();
         let claims = ServiceAccountClaims {
             iss: &self.client_email,
-            scope: "https://www.googleapis.com/auth/identitytoolkit",
+            scope: "https://www.googleapis.com/auth/identitytoolkit https://www.googleapis.com/auth/datastore",
             aud: TOKEN_URL,
             iat: now,
             exp: now + 3600,

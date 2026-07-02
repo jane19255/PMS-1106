@@ -65,7 +65,8 @@ impl PrescriptionRepository for InMemoryPrescriptionRepository {
                 .map_err(|_| RepositoryError::StorageUnavailable)?;
 
             let mut prescription_list: Vec<Prescription> = prescriptions.values().cloned().collect();
-            prescription_list.sort_by(|left, right| right.issued_at.cmp(&left.issued_at));
+            prescription_list
+                .sort_by_key(|prescription| std::cmp::Reverse(prescription.issued_at));
             Ok(prescription_list)
         })
     }

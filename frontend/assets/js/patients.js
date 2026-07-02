@@ -463,7 +463,7 @@ function viewPatient(index) {
     ? past
         .map(
           (v) => `
-    <div class="card" onclick="window.location.href='/records'">
+    <div class="card" onclick="window.location.href='/medical-records'">
         <div class="top"><div class="purpose">${v.purpose}</div><div class="date">${formatDate(v.date)}</div></div>
         <div class="summary">${v.summary}</div>
         <div class="navigation"><i class="fa-solid fa-file-medical"></i>View Record</div>

@@ -77,7 +77,7 @@ impl InvoiceRepository for InMemoryInvoiceRepository {
                 .map_err(|_| RepositoryError::StorageUnavailable)?;
 
             let mut invoice_list: Vec<Invoice> = invoices.values().cloned().collect();
-            invoice_list.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+            invoice_list.sort_by_key(|invoice| std::cmp::Reverse(invoice.created_at));
             Ok(invoice_list)
         })
     }

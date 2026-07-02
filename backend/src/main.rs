@@ -97,7 +97,7 @@ async fn main() -> std::io::Result<()> {
             }
             _ => {
                 println!("Doctor dashboard storage: in-memory (set DOCTOR_DASHBOARD_STORAGE=supabase to persist)");
-                Arc::new(InMemoryDoctorDashboardRepository::default())
+                Arc::new(InMemoryDoctorDashboardRepository)
             }
         };
     let doctor_dashboard_service = web::Data::new(DoctorDashboardService::new(doctor_dashboard_repository));
@@ -176,10 +176,7 @@ async fn main() -> std::io::Result<()> {
             )
             .configure(routes::configure)
             .default_service(web::route().to(|req: actix_web::HttpRequest| async move {
-                println!(
-                    ">>> ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ ACTIX 404 REJECTION: The browser asked for '{}', but no route matched!",
-                    req.path()
-                );
+                println!("No route matched: {}", req.path());
                 HttpResponse::NotFound().body(format!("404 Not Found: {}", req.path()))
             }))
     })

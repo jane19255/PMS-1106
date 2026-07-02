@@ -63,7 +63,7 @@ function renderAppointmentRow(app) {
     }
 
     return `
-        <tr onclick="window.location.href='/records?patient_id=${app.patientId}'">
+        <tr onclick="window.location.href='/medical-records?patient_id=${app.patientId}'">
             <td>${app.patientName}</td>
             <td>${app.appointmentTime}</td>
             <td><span class="${status.class}">${status.text}</span></td>

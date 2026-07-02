@@ -65,7 +65,7 @@ impl MedicalRecordRepository for InMemoryMedicalRecordRepository {
                 .lock()
                 .map_err(|_| RepositoryError::StorageUnavailable)?;
             let mut list: Vec<MedicalRecord> = records.values().cloned().collect();
-            list.sort_by(|a, b| b.recorded_at.cmp(&a.recorded_at));
+            list.sort_by_key(|record| std::cmp::Reverse(record.recorded_at));
             Ok(list)
         })
     }

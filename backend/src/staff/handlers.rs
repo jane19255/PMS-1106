@@ -52,6 +52,21 @@ pub async fn create_staff_api(
 
     match staff_service.create_staff(form).await {
         Ok(staff) => {
+            if let Err(error) = firebase_admin
+                .save_staff_profile(
+                    &staff.firebase_uid,
+                    &staff.first_name,
+                    &staff.last_name,
+                    &staff.role,
+                    &staff.status,
+                )
+                .await
+            {
+                // Do not leave a staff login half-created if its role cannot be read.
+                let _ = staff_service.delete_staff(&staff.id).await;
+                let _ = firebase_admin.delete_user(&uid).await;
+                return HttpResponse::InternalServerError().body(error);
+            }
             if let Err(error) = firebase_admin.send_password_setup(&staff.email).await {
                 eprintln!("Firebase password setup email failed: {error}");
             }
@@ -69,6 +84,7 @@ pub async fn create_staff_api(
 pub async fn update_staff_api(
     req: HttpRequest,
     staff_service: web::Data<StaffService>,
+    firebase_admin: web::Data<FirebaseAdmin>,
     path: web::Path<String>,
     form: web::Json<StaffForm>,
     firebase_auth: web::Data<FirebaseAuth>,
@@ -82,7 +98,21 @@ pub async fn update_staff_api(
         .update_staff(&path.into_inner(), form.into_inner())
         .await
     {
-        Ok(staff) => HttpResponse::Ok().json(staff),
+        Ok(staff) => {
+            if let Err(error) = firebase_admin
+                .save_staff_profile(
+                    &staff.firebase_uid,
+                    &staff.first_name,
+                    &staff.last_name,
+                    &staff.role,
+                    &staff.status,
+                )
+                .await
+            {
+                return HttpResponse::InternalServerError().body(error);
+            }
+            HttpResponse::Ok().json(staff)
+        }
         Err(error) => staff_error_response(error),
     }
 }
@@ -123,6 +153,9 @@ pub async fn delete_staff_api(
     match staff_service.delete_staff(&staff_id).await {
         Ok(()) => {
             if let Some(uid) = firebase_uid {
+                if let Err(error) = firebase_admin.delete_staff_profile(&uid).await {
+                    eprintln!("Firebase staff profile deletion failed: {error}");
+                }
                 if let Err(error) = firebase_admin.delete_user(&uid).await {
                     eprintln!("Firebase user deletion failed: {error}");
                 }

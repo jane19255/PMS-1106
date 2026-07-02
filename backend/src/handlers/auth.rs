@@ -54,7 +54,6 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/login", web::get().to(login_page));
     cfg.route("/doctor-dashboard", web::get().to(doctor_dashboard_page));
     cfg.route("/staff", web::get().to(staffs_page));
-    cfg.route("/records", web::get().to(records_page));
     cfg.route("/session", web::post().to(create_session));
     cfg.route("/logout", web::get().to(logout));
     cfg.route("/forgot-password", web::post().to(forgot_password));
@@ -111,23 +110,6 @@ pub async fn doctor_dashboard_page(
         Some(firestore_db),
         "Doctor-Dashboard.html",
         Some(AppAction::ManageDoctorAppt),
-    )
-    .await
-}
-
-pub async fn records_page(
-    req: HttpRequest,
-    tera: web::Data<Tera>,
-    firebase_auth: web::Data<FirebaseAuth>,
-    firestore_db: web::Data<FirebaseRestDb>,
-) -> impl Responder {
-    render_protected_page(
-        req,
-        tera,
-        firebase_auth,
-        Some(firestore_db),
-        "Medical-Records.html",
-        Some(AppAction::ViewMedicalRecords),
     )
     .await
 }

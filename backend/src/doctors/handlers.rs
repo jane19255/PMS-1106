@@ -152,6 +152,8 @@ pub async fn update_doctor_form(
     }
 }
 
+// Actix supplies these request, service, template and authentication values.
+#[allow(clippy::too_many_arguments)]
 pub async fn delete_doctor_form(
     req: HttpRequest,
     doctor_service: web::Data<DoctorService>,

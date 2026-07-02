@@ -93,9 +93,8 @@ mod tests {
 
     use super::*;
 
-    fn interval(id: &str, hour: u32, minute: u32, duration: i64) -> AppointmentInterval {
+    fn interval(hour: u32, minute: u32, duration: i64) -> AppointmentInterval {
         AppointmentInterval::new(
-            id.to_string(),
             Utc.with_ymd_and_hms(2026, 7, 1, hour, minute, 0)
                 .single()
                 .unwrap(),
@@ -106,22 +105,22 @@ mod tests {
     #[test]
     fn checks_right_branch_when_left_branch_has_no_overlap() {
         let mut tree = IntervalTree::new();
-        tree.insert(interval("root", 10, 0, 60));
-        tree.insert(interval("left", 8, 0, 240));
-        tree.insert(interval("right", 11, 30, 120));
+        tree.insert(interval(10, 0, 60));
+        tree.insert(interval(8, 0, 240));
+        tree.insert(interval(11, 30, 120));
 
-        let requested = interval("requested", 12, 0, 30);
+        let requested = interval(12, 0, 30);
         let overlap = tree.find_overlap(&requested);
 
-        assert_eq!(overlap.map(|item| item.id), Some("right".to_string()));
+        assert_eq!(overlap.map(|item| item.start), Some(interval(11, 30, 120).start));
     }
 
     #[test]
     fn allows_appointment_to_start_when_previous_one_ends() {
         let mut tree = IntervalTree::new();
-        tree.insert(interval("existing", 9, 0, 30));
+        tree.insert(interval(9, 0, 30));
 
-        let requested = interval("requested", 9, 30, 30);
+        let requested = interval(9, 30, 30);
 
         assert!(tree.find_overlap(&requested).is_none());
     }
@@ -129,13 +128,13 @@ mod tests {
     #[test]
     fn finds_a_normal_overlapping_appointment() {
         let mut tree = IntervalTree::new();
-        tree.insert(interval("existing", 9, 0, 60));
+        tree.insert(interval(9, 0, 60));
 
-        let requested = interval("requested", 9, 30, 30);
+        let requested = interval(9, 30, 30);
 
         assert_eq!(
-            tree.find_overlap(&requested).map(|item| item.id),
-            Some("existing".to_string())
+            tree.find_overlap(&requested).map(|item| item.start),
+            Some(interval(9, 0, 60).start)
         );
     }
 }
