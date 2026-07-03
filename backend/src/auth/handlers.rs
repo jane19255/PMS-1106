@@ -1,3 +1,8 @@
+//! Login, session, and role-based authorization handlers.
+//!
+//! This module owns the authentication routes plus reusable permission helpers used by
+//! feature modules before serving protected pages or API endpoints.
+
 use actix_web::cookie::{time::Duration, Cookie};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
@@ -6,22 +11,26 @@ use tera::{Context, Tera};
 
 use crate::db::FirebaseRestDb;
 
+/// Form payload submitted by the login page after Firebase client authentication.
 #[derive(Deserialize)]
 pub struct SessionForm {
     pub id_token: String,
     pub remember: Option<String>,
 }
 
+/// Form payload used to request a Firebase password reset email.
 #[derive(Deserialize)]
 pub struct ForgotPasswordForm {
     pub email: String,
 }
 
+/// Minimal Firebase token claims needed by the backend after verification.
 #[derive(Deserialize)]
 pub struct FirebaseClaims {
     pub sub: String,
 }
 
+/// Application actions used by role-based permission checks.
 #[derive(Clone, Copy)]
 pub enum AppAction {
     ViewPatient,
@@ -50,6 +59,7 @@ pub enum AppAction {
     GenerateBillingReport,
 }
 
+/// Registers authentication, session, and current-user routes.
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/login", web::get().to(login_page));
     cfg.route("/doctor-dashboard", web::get().to(doctor_dashboard_page));
@@ -316,6 +326,7 @@ pub async fn require_auth(
     }
 }
 
+/// Loads the active staff profile linked to a Firebase UID.
 pub async fn get_staff_profile(
     firestore_db: &FirebaseRestDb,
     uid: &str,
@@ -458,6 +469,7 @@ fn render_template(tera: &Tera, template_name: &str) -> HttpResponse {
     }
 }
 
+/// Inserts Firebase client configuration into a Tera template context.
 pub fn insert_firebase_config(ctx: &mut Context) {
     ctx.insert(
         "firebase_api_key",

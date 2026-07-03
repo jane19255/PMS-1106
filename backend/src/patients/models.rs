@@ -1,5 +1,11 @@
+//! Patient data transfer types shared by patient-owned workflows.
+//!
+//! These structs live in the patient module because billing and medical records
+//! read patient summaries, but they should not own the patient data shape.
+
 use serde::{Deserialize, Serialize};
 
+/// Request body used when registering a new patient.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Patient {
     pub first_name: String,
@@ -18,6 +24,7 @@ pub struct Patient {
     pub conditions: Option<String>,
 }
 
+/// Raw patient row returned by Supabase before API-facing field renaming.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SupabasePatientRow {
     pub id: String,
@@ -39,6 +46,7 @@ pub struct SupabasePatientRow {
     pub created_at: Option<String>,
 }
 
+/// Patient representation returned to frontend clients.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PatientView {
@@ -85,6 +93,7 @@ impl From<SupabasePatientRow> for PatientView {
     }
 }
 
+/// Request body used when updating an existing patient.
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePatient {
