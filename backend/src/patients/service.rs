@@ -7,7 +7,7 @@ use chrono::NaiveDate;
 use serde_json::{json, Value};
 
 use crate::db::singapore_today;
-use crate::models::{Patient, UpdatePatient};
+use super::models::{Patient, UpdatePatient};
 
 const VALID_GENDERS: [&str; 2] = ["Male", "Female"];
 const VALID_PATIENT_STATUSES: [&str; 2] = ["Active", "Inactive"];

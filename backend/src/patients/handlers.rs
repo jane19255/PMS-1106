@@ -16,7 +16,7 @@ use super::service::{
 
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::auth::{require_auth_and_permission, AppAction};
-use crate::models::{Patient, UpdatePatient};
+use super::models::{Patient, UpdatePatient};
 
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/patients", web::get().to(patients_page));

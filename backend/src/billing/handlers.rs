@@ -4,7 +4,7 @@ use super::service::{BillingError, BillingService};
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::doctors::service::DoctorService;
 use crate::auth::{require_auth_and_permission, AppAction};
-use crate::models::{PatientView, SupabasePatientRow};
+use crate::patients::models::{PatientView, SupabasePatientRow};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;

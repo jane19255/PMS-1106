@@ -6,7 +6,7 @@
 use serde_json::Value;
 
 use crate::db::SupabaseRestDb;
-use crate::models::{PatientView, SupabasePatientRow};
+use super::models::{PatientView, SupabasePatientRow};
 
 pub async fn list_patients(db: &SupabaseRestDb) -> Result<Vec<PatientView>, String> {
     let body = db.list_patients().await?;

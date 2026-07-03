@@ -7,7 +7,6 @@ mod doctor_dashboard;
 mod auth;
 mod patients;
 mod medical_records;
-mod models;
 mod prescriptions;
 mod routes;
 mod staff;

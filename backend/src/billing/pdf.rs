@@ -1,5 +1,5 @@
 use super::models::{ClinicalSummary, MedicalReport};
-use crate::models::PatientView;
+use crate::patients::models::PatientView;
 use printpdf::{
     BuiltinFont, Color, IndirectFontRef, Line, Mm, PdfDocument, PdfLayerReference, Point, Rgb,
 };
