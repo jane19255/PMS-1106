@@ -64,7 +64,12 @@
                 <datalist id="invoicePatientOptions"></datalist>
                 <small id="selectedPatientDetails">Select a patient from the database.</small>
             </label>
-            <label>Appointment ID<input type="text" name="appointment_id"></label>
+            <label>Completed appointment
+                <select id="invoiceAppointmentId" name="appointment_id" disabled>
+                    <option value="">Select a patient first</option>
+                </select>
+                <small id="appointmentHelp">Only completed appointments without an active invoice are shown.</small>
+            </label>
             <label>Treatment name<input type="text" name="treatment_name" required></label>
             <label>Treatment cost<input type="number" name="treatment_cost" min="0" step="0.01" required></label>
             <section class="prescription-panel" aria-label="Prescriptions">
@@ -194,5 +199,5 @@
 {% endblock content %}
 
 {% block scripts %}
-<script src="/assets/js/billing-ssr.js?v=prescriptions-2" defer></script>
+<script src="/assets/js/billing-ssr.js?v=appointments-1" defer></script>
 {% endblock scripts %}

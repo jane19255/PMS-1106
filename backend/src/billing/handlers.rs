@@ -8,7 +8,7 @@ use crate::models::{PatientView, SupabasePatientRow};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tera::{Context, Tera};
 
 pub async fn list_invoices(
@@ -91,6 +91,62 @@ pub async fn create_invoice(
         Ok(_) => redirect_to("/billing"),
         Err(error) => render_error(&templates, error),
     }
+}
+
+pub async fn list_billable_appointments(
+    req: HttpRequest,
+    billing_service: web::Data<BillingService>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
+    query: web::Query<HashMap<String, String>>,
+) -> impl Responder {
+    if let Err(rejection) = require_auth_and_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::CreateInvoice,
+    )
+    .await
+    {
+        return rejection;
+    }
+
+    let patient_id = query.get("patient_id").map(|value| value.trim()).unwrap_or("");
+    if patient_id.is_empty() {
+        return HttpResponse::BadRequest().body("Patient ID is required");
+    }
+
+    let filter = format!(
+        "select=id,patient_id,doctor_id,scheduled_at,reason,status&patient_id=eq.{}&status=eq.Completed&order=scheduled_at.desc",
+        urlencoding::encode(patient_id)
+    );
+    let body = match supabase_db.fetch_table("appointments", &filter).await {
+        Ok(body) => body,
+        Err(_) => return HttpResponse::ServiceUnavailable().body("Appointments are unavailable"),
+    };
+    let mut appointments: Vec<serde_json::Value> = match serde_json::from_str(&body) {
+        Ok(rows) => rows,
+        Err(_) => return HttpResponse::InternalServerError().body("Invalid appointment data"),
+    };
+
+    let invoiced_ids: HashSet<String> = match billing_service.list_invoices().await {
+        Ok(invoices) => invoices
+            .into_iter()
+            .filter(|invoice| invoice.status != PaymentStatus::Cancelled)
+            .filter_map(|invoice| invoice.appointment_id)
+            .collect(),
+        Err(_) => return HttpResponse::ServiceUnavailable().body("Invoices are unavailable"),
+    };
+    appointments.retain(|appointment| {
+        appointment
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .map(|id| !invoiced_ids.contains(id))
+            .unwrap_or(false)
+    });
+
+    HttpResponse::Ok().json(appointments)
 }
 
 async fn validate_billable_appointment(

@@ -29,6 +29,10 @@ pub fn configure(config: &mut web::ServiceConfig) {
         web::scope("/billing")
             .route("", web::get().to(billing_handlers::list_invoices))
             .route(
+                "/billable-appointments",
+                web::get().to(billing_handlers::list_billable_appointments),
+            )
+            .route(
                 "/invoices",
                 web::post().to(billing_handlers::create_invoice),
             )

@@ -17,6 +17,8 @@
   const patientId = document.getElementById("invoicePatientId");
   const patientOptions = document.getElementById("invoicePatientOptions");
   const selectedPatientDetails = document.getElementById("selectedPatientDetails");
+  const appointmentSelect = document.getElementById("invoiceAppointmentId");
+  const appointmentHelp = document.getElementById("appointmentHelp");
   const prescriptionRows = document.getElementById("prescriptionRows");
   const addPrescriptionRow = document.getElementById("addPrescriptionRow");
   const prescriptionTotal = document.getElementById("prescriptionTotal");
@@ -24,11 +26,13 @@
   const CUSTOM_PRESCRIPTION_VALUE = "__custom__";
   let page = 1;
   let prescriptionLoadToken = 0;
+  let appointmentLoadToken = 0;
 
   function selectPatient(patient) {
     if (!patient) {
       patientId.value = "";
       selectedPatientDetails.textContent = "Select a patient from the database.";
+      resetAppointmentSelector();
       clearFetchedPrescriptionOptions();
       return;
     }
@@ -42,6 +46,68 @@
       patient.phone ? `Phone: ${patient.phone}` : null,
     ].filter(Boolean).join(" | ");
     loadPatientPrescriptions(patient.id);
+    loadBillableAppointments(patient.id);
+  }
+
+  function resetAppointmentSelector() {
+    if (!appointmentSelect) return;
+    appointmentLoadToken += 1;
+    appointmentSelect.innerHTML = '<option value="">Select a patient first</option>';
+    appointmentSelect.disabled = true;
+    appointmentSelect.setCustomValidity("");
+    if (appointmentHelp) {
+      appointmentHelp.textContent = "Only completed appointments without an active invoice are shown.";
+    }
+  }
+
+  async function loadBillableAppointments(patientIdValue) {
+    if (!appointmentSelect || !patientIdValue) {
+      resetAppointmentSelector();
+      return;
+    }
+
+    appointmentSelect.disabled = true;
+    appointmentSelect.innerHTML = '<option value="">Loading appointments...</option>';
+    appointmentSelect.setCustomValidity("");
+    const token = appointmentLoadToken + 1;
+    appointmentLoadToken = token;
+
+    try {
+      const response = await fetch(`/billing/billable-appointments?patient_id=${encodeURIComponent(patientIdValue)}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(await response.text());
+
+      const appointments = await response.json();
+      if (token !== appointmentLoadToken) return;
+      appointmentSelect.innerHTML = '<option value="">No linked appointment (other charge)</option>';
+      appointments.forEach((appointment) => {
+        const option = document.createElement("option");
+        const scheduled = new Date(appointment.scheduled_at).toLocaleString("en-SG", {
+          timeZone: "Asia/Singapore",
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+        option.value = appointment.id;
+        option.textContent = `${appointment.id} - ${scheduled} - ${appointment.reason || "Appointment"}`;
+        appointmentSelect.appendChild(option);
+      });
+      appointmentSelect.disabled = false;
+
+      if (appointments.length > 0) {
+        appointmentSelect.value = appointments[0].id;
+        appointmentHelp.textContent = "The latest completed appointment has been selected.";
+      } else {
+        appointmentHelp.textContent = "No completed uninvoiced appointments were found for this patient.";
+      }
+    } catch (error) {
+      if (token !== appointmentLoadToken) return;
+      console.error("Unable to load billable appointments:", error);
+      appointmentSelect.innerHTML = '<option value="">Appointments could not be loaded</option>';
+      appointmentSelect.disabled = false;
+      appointmentSelect.setCustomValidity("Appointments could not be loaded. Select the patient again.");
+      appointmentHelp.textContent = "Try selecting the patient again.";
+    }
   }
 
   async function loadPatientOptions() {
