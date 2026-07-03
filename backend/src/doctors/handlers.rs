@@ -5,7 +5,7 @@ use super::service::{
 use crate::appointments::handlers::validate_and_check_conflict;
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::firebase_admin::FirebaseAdmin;
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 use crate::staff::service::{StaffForm, StaffService};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};

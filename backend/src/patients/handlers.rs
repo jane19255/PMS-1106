@@ -15,7 +15,7 @@ use super::service::{
 };
 
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 use crate::models::{Patient, UpdatePatient};
 
 pub fn routes(cfg: &mut web::ServiceConfig) {

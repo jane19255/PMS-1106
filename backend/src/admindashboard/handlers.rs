@@ -6,7 +6,7 @@ use crate::admindashboard::models::{
 use crate::admindashboard::repository;
 use crate::admindashboard::service;
 use crate::db::{singapore_today, FirebaseRestDb, SupabaseRestDb};
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use chrono::NaiveDate;
 use firebase_auth::FirebaseAuth;

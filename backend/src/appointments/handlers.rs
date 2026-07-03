@@ -10,7 +10,7 @@ use crate::appointments::scheduler::AppointmentScheduler;
 use crate::db::{singapore_offset, singapore_today, FirebaseRestDb, SupabaseRestDb};
 use crate::doctors::models::{DayOfWeek, DoctorSchedule, DoctorStatus};
 use crate::doctors::service::DoctorService;
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 
 /// Registers the appointment page and appointment JSON API routes.
 ///

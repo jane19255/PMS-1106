@@ -2,7 +2,7 @@ use super::service::{StaffError, StaffForm, StaffService};
 use crate::db::FirebaseRestDb;
 use crate::doctors::service::{DoctorError, DoctorService};
 use crate::firebase_admin::FirebaseAdmin;
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
 use serde::Deserialize;

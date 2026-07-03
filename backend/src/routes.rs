@@ -8,12 +8,12 @@ use crate::medical_records::handlers as medical_record_handlers;
 use crate::prescriptions::handlers as prescription_handlers;
 use crate::staff::handlers as staff_handlers;
 
-use crate::handlers::auth; // To delete when safe
+use crate::auth::handlers as auth_handlers;
 
 /// Registers each feature module's route group with the Actix application.
 pub fn configure(config: &mut actix_web::web::ServiceConfig) {
     // Authentication routes
-    config.configure(auth::routes);
+    config.configure(auth_handlers::routes);
 
     // Patient management routes
     config.configure(patient_handlers::routes);

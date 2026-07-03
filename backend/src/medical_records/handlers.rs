@@ -4,7 +4,7 @@ use super::service::{
 };
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::doctors::service::DoctorService;
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 use crate::models::{PatientView, SupabasePatientRow};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
