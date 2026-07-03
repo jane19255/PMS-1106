@@ -62,6 +62,11 @@ impl BillingService {
         ]
     }
 
+    /// Creates an invoice from treatment and prescription charges.
+    ///
+    /// When an appointment id is supplied, the service rejects duplicate active
+    /// invoices for the same appointment so a completed visit can only be billed
+    /// once unless the previous invoice was cancelled.
     pub async fn create_invoice(&self, form: CreateInvoiceForm) -> Result<Invoice, BillingError> {
         self.validate_create_invoice(&form)?;
 
@@ -139,6 +144,10 @@ impl BillingService {
             .map_err(Self::map_repository_error)
     }
 
+    /// Records a payment and recalculates the invoice balance and status.
+    ///
+    /// Payments are blocked for cancelled or fully paid invoices, and the
+    /// amount cannot exceed the outstanding balance.
     pub async fn record_payment(
         &self,
         invoice_id: &str,
@@ -234,6 +243,10 @@ impl BillingService {
             .map_err(Self::map_repository_error)
     }
 
+    /// Builds the printable/downloadable medical report data for an invoice.
+    ///
+    /// The report is derived from the stored invoice so it reflects the patient,
+    /// treatment, prescription charges, and payment status shown in billing.
     pub async fn generate_medical_report(
         &self,
         invoice_id: &str,

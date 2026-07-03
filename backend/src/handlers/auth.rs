@@ -290,6 +290,11 @@ pub async fn forgot_password(form: web::Form<ForgotPasswordForm>) -> impl Respon
     }
 }
 
+/// Verifies the Firebase session cookie and returns the authenticated user's
+/// Firebase UID.
+///
+/// Page handlers use this to redirect unauthenticated users back to `/login`,
+/// while API handlers build stricter permission checks on top of it.
 pub async fn require_auth(
     req: &HttpRequest,
     firebase_auth: &FirebaseAuth,
@@ -342,12 +347,20 @@ pub async fn get_staff_profile(
     }
 }
 
+/// Looks up the active staff role associated with a Firebase UID.
+///
+/// Firebase proves who the user is; this staff profile decides what the user is
+/// allowed to do inside the PMS.
 pub async fn get_staff_role(firestore_db: &FirebaseRestDb, uid: &str) -> Option<String> {
     get_staff_profile(firestore_db, uid)
         .await
         .map(|(_, role)| role)
 }
 
+/// Combines Firebase authentication with application role authorization.
+///
+/// Protected handlers call this before doing work so direct API requests follow
+/// the same role rules as the visible navigation.
 pub async fn require_auth_and_permission(
     req: &HttpRequest,
     firebase_auth: &FirebaseAuth,
@@ -372,6 +385,10 @@ pub async fn require_auth_and_permission(
     }
 }
 
+/// Central role-permission matrix for the application.
+///
+/// Keeping this in one function prevents each handler from inventing its own
+/// version of the access rules.
 pub fn has_permission(role: &str, action: AppAction) -> bool {
     // Keep the role rules in one place so the frontend and API do not disagree.
     let normalized_role = role.trim().to_lowercase();

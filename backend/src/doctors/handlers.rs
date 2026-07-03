@@ -14,6 +14,11 @@ use serde::Deserialize;
 use serde_json::json;
 use tera::{Context, Tera};
 
+/// Registers doctor management pages and doctor JSON API routes.
+///
+/// The page routes support normal form navigation under `/doctors`, while the
+/// `/api/doctors...` routes are used by dynamic screens such as appointments,
+/// staff management, and dashboard workflows.
 pub fn routes(config: &mut web::ServiceConfig) {
     config
         .route("/doctors", web::get().to(doctors_page))
@@ -370,6 +375,12 @@ pub struct ReassignDoctorForm {
 }
 
 #[allow(clippy::too_many_arguments)]
+/// Reassigns a doctor's future scheduled appointments before deactivating the
+/// doctor account.
+///
+/// This is the safer offboarding route: historical consultations remain linked
+/// to the original doctor, while upcoming work is moved to another available
+/// doctor.
 pub async fn reassign_doctor_api(
     req: HttpRequest,
     doctor_service: web::Data<DoctorService>,

@@ -12,6 +12,11 @@ use crate::doctors::models::{DayOfWeek, DoctorSchedule, DoctorStatus};
 use crate::doctors::service::DoctorService;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 
+/// Registers the appointment page and appointment JSON API routes.
+///
+/// `/appointments` serves the server-rendered page shell, while
+/// `/api/appointments...` is used by the frontend JavaScript for listing,
+/// creating, updating, and cancelling appointments.
 pub fn routes(cfg: &mut web::ServiceConfig) {
     // SSR page shell — the appointment list/table, stat cards, and modals are
     // populated client-side from the JSON API below (see assets/js/appointments.js).
@@ -74,6 +79,11 @@ pub(crate) enum AppointmentError {
     ServerError(String),
 }
 
+/// Validates an appointment request before it is inserted or updated.
+///
+/// This is the core scheduling guard: it confirms that the doctor and patient
+/// exist, the doctor is available, the requested time fits the doctor's weekly
+/// schedule, and the slot does not overlap another active appointment.
 pub(crate) async fn validate_and_check_conflict(
     db: &SupabaseRestDb,
     doctor_service: &DoctorService,

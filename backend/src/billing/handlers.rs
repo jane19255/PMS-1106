@@ -93,6 +93,12 @@ pub async fn create_invoice(
     }
 }
 
+/// Returns completed appointments for a patient that do not already have an
+/// active invoice.
+///
+/// The billing page uses this endpoint when a receptionist selects a patient,
+/// so invoices can be tied to the correct completed consultation without
+/// accidentally billing the same appointment twice.
 pub async fn list_billable_appointments(
     req: HttpRequest,
     billing_service: web::Data<BillingService>,
@@ -149,6 +155,11 @@ pub async fn list_billable_appointments(
     HttpResponse::Ok().json(appointments)
 }
 
+/// Confirms that an invoice's optional appointment belongs to the same patient
+/// and is in a completed state.
+///
+/// This server-side check is kept separate from the frontend dropdown because a
+/// user could still submit a forged appointment id manually.
 async fn validate_billable_appointment(
     db: &SupabaseRestDb,
     form: &CreateInvoiceForm,

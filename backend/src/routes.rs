@@ -9,6 +9,11 @@ use crate::prescriptions::handlers as prescription_handlers;
 use crate::staff::handlers as staff_handlers;
 use actix_web::web;
 
+/// Registers the application's top-level route groups.
+///
+/// Most modules expose their own `routes` function because they own both page
+/// routes and JSON API routes. Billing is registered here as a scoped group so
+/// every billing endpoint shares the `/billing` prefix.
 pub fn configure(config: &mut web::ServiceConfig) {
     // Authentication routes
     config.configure(auth::routes);
