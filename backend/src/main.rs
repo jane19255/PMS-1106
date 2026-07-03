@@ -5,6 +5,7 @@ mod firebase_admin;
 mod admindashboard;
 mod doctor_dashboard;
 mod handlers;
+mod patients;
 mod medical_records;
 mod models;
 mod prescriptions;
