@@ -35,7 +35,23 @@ use prescriptions::service::PrescriptionService;
 use staff::repository::{InMemoryStaffRepository, StaffRepository, SupabaseStaffRepository};
 use staff::service::StaffService;
 use std::sync::Arc;
+use std::time::Duration;
 use tera::Tera;
+
+fn start_appointment_reconciliation(db: db::SupabaseRestDb) {
+    // Keep appointment states current even when nobody has opened a dashboard.
+    actix_web::rt::spawn(async move {
+        loop {
+            if let Err(error) = db
+                .reconcile_overdue_appointments(db::singapore_today())
+                .await
+            {
+                eprintln!("Appointment reconciliation failed: {error}");
+            }
+            actix_web::rt::time::sleep(Duration::from_secs(300)).await;
+        }
+    });
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -146,6 +162,8 @@ async fn main() -> std::io::Result<()> {
         };
     let staff_service = web::Data::new(StaffService::new(staff_repository));
     let template_data = web::Data::new(templates);
+
+    start_appointment_reconciliation(supabase_db.clone());
 
     println!("Server running at http://127.0.0.1:8080");
 

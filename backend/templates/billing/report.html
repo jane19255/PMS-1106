@@ -51,10 +51,11 @@
 
             <div class="clinic-note-block">
                 <strong>Reason:</strong>
-                <p>{% if clinical_record %}{{ clinical_record.doctor_notes | default(value="Not recorded") }}{% else %}Not recorded{% endif %}</p>
+                <p>{% if clinical_record %}{{ clinical_record.reason_of_visit | default(value="Not recorded") }}{% else %}Not recorded{% endif %}</p>
             </div>
             <div class="clinic-note-block">
                 <strong>Findings & Diagnosis:</strong>
+                <p>{% if clinical_record %}{{ clinical_record.clinical_findings | default(value="Not recorded") }}{% else %}Not recorded{% endif %}</p>
                 <p>{% if clinical_record %}{{ clinical_record.diagnosis | default(value="Not recorded") }}{% else %}Not recorded{% endif %}</p>
             </div>
             <div class="clinic-note-block">

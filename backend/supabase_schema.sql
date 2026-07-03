@@ -128,6 +128,31 @@ where scheduled_end_at is null
 alter table public.appointments
   alter column scheduled_end_at set not null;
 
+-- Older versions saved Singapore wall-clock values with a false Z suffix.
+-- This guarded update runs once and converts those rows to real UTC instants.
+create table if not exists public.schema_migrations (
+  name text primary key,
+  applied_at timestamptz not null default now()
+);
+
+alter table public.schema_migrations enable row level security;
+revoke all on table public.schema_migrations from anon, authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1 from public.schema_migrations
+    where name = '20260703_appointment_singapore_timezone'
+  ) then
+    update public.appointments
+    set scheduled_at = scheduled_at - interval '8 hours';
+
+    insert into public.schema_migrations(name)
+    values ('20260703_appointment_singapore_timezone');
+  end if;
+end;
+$$;
+
 create extension if not exists btree_gist;
 
 alter table public.appointments
@@ -268,8 +293,11 @@ create unique index if not exists patient_queue_daily_number_uidx
   on public.patient_queue(queue_date, queue_number);
 create index if not exists patient_queue_status_idx on public.patient_queue(status);
 
--- Past bookings that never checked in are no-shows. Patients who did check in
--- are left unchanged so the dashboards can carry them forward for completion.
+-- Past bookings that never checked in are no-shows. Patients who checked in,
+-- had vitals recorded, or were called into a room but never actually started
+-- a consultation before the day ended are also closed out as no-shows — an
+-- active consultation (queue status 'In Consultation') is left alone because
+-- the doctor must explicitly complete it.
 create or replace function public.reconcile_overdue_appointments(p_today date)
 returns integer
 language plpgsql
@@ -277,14 +305,41 @@ security definer
 set search_path = public
 as $$
 declare
-  updated_count integer;
+  updated_count integer := 0;
+  missed_appointment record;
 begin
   update public.appointments
   set status = 'No Show', updated_at = now()
   where status = 'Scheduled'
-    and scheduled_at < p_today::timestamptz;
+    and scheduled_at < (p_today::timestamp at time zone 'Asia/Singapore');
 
   get diagnostics updated_count = row_count;
+
+  for missed_appointment in
+    select appointment.id
+    from public.appointments as appointment
+    join public.patient_queue as queue_row
+      on queue_row.appointment_id = appointment.id
+    where appointment.status in ('Checked In', 'Vitals Recorded', 'In Consultation')
+      and appointment.scheduled_at < (p_today::timestamp at time zone 'Asia/Singapore')
+      and queue_row.status in ('Waiting', 'Called')
+    for update of appointment
+  loop
+    update public.appointments
+    set status = 'No Show', consultation_deadline = null, updated_at = now()
+    where id = missed_appointment.id;
+
+    update public.patient_queue
+    set status = 'Skipped', updated_at = now()
+    where appointment_id = missed_appointment.id;
+
+    update public.room_status
+    set status = 'Available', current_appointment_id = null, updated_at = now()
+    where current_appointment_id = missed_appointment.id;
+
+    updated_count := updated_count + 1;
+  end loop;
+
   return updated_count;
 end;
 $$;
@@ -476,6 +531,23 @@ for each row execute function public.set_updated_at();
 
 alter table public.room_status enable row level security;
 
+-- These timestamps keep a simple audit trail of the actual consultation.
+alter table public.appointments
+  add column if not exists consultation_started_at timestamptz,
+  add column if not exists consultation_completed_at timestamptz,
+  add column if not exists consultation_deadline timestamptz;
+
+-- Repair patients who were marked in consultation when they were only called
+-- into the room by the older workflow.
+update public.appointments as appointment
+set status = 'Vitals Recorded', consultation_deadline = null
+where appointment.status = 'In Consultation'
+  and exists (
+    select 1 from public.patient_queue as queue_row
+    where queue_row.appointment_id = appointment.id
+      and queue_row.status = 'Called'
+  );
+
 -- Moving a patient into a room changes three related records. Keeping these
 -- updates in one function prevents a partly updated consultation state.
 create or replace function public.send_patient_to_room(
@@ -504,7 +576,7 @@ begin
   if appointment_doctor_id <> p_doctor_id then
     raise exception 'Appointment is assigned to a different doctor';
   end if;
-  if appointment_status not in ('Vitals Recorded', 'In Consultation') then
+  if appointment_status <> 'Vitals Recorded' then
     raise exception 'Vitals must be recorded before entering a room';
   end if;
 
@@ -527,18 +599,12 @@ begin
     raise exception 'Patient is not in the queue';
   end if;
 
-  -- A repeated request after room assignment should not move the queue backwards.
-  if appointment_status = 'In Consultation' then
-    if room_appointment_id is distinct from p_appointment_id then
-      raise exception 'Consultation room is not assigned to this appointment';
-    end if;
-    if queue_status not in ('Called', 'In Consultation') then
-      raise exception 'Patient queue does not match the consultation state';
-    end if;
+  -- A repeated request returns the existing waiting-in-room state.
+  if room_appointment_id = p_appointment_id and queue_status = 'Called' then
     return jsonb_build_object(
       'appointment_id', p_appointment_id,
       'doctor_id', p_doctor_id,
-      'status', 'In Consultation'
+      'status', 'Waiting for Doctor'
     );
   end if;
 
@@ -549,10 +615,6 @@ begin
   if queue_status <> 'Waiting' then
     raise exception 'Patient queue is not waiting for room assignment';
   end if;
-
-  update public.appointments
-  set status = 'In Consultation', updated_at = action_time
-  where id = p_appointment_id;
 
   update public.patient_queue
   set status = 'Called', called_at = action_time, updated_at = action_time
@@ -567,7 +629,7 @@ begin
   return jsonb_build_object(
     'appointment_id', p_appointment_id,
     'doctor_id', p_doctor_id,
-    'status', 'In Consultation'
+    'status', 'Waiting for Doctor'
   );
 end;
 $$;
@@ -583,11 +645,13 @@ as $$
 declare
   appointment_doctor_id text;
   appointment_status text;
+  appointment_duration integer;
   queue_status text;
   room_doctor_id text;
+  action_time timestamptz := now();
 begin
-  select appointment.doctor_id, appointment.status
-    into appointment_doctor_id, appointment_status
+  select appointment.doctor_id, appointment.status, appointment.duration_minutes
+    into appointment_doctor_id, appointment_status, appointment_duration
   from public.appointments as appointment
   where appointment.id = p_appointment_id
   for update;
@@ -598,10 +662,6 @@ begin
   if appointment_doctor_id <> p_doctor_id then
     raise exception 'Appointment belongs to a different doctor';
   end if;
-  if appointment_status <> 'In Consultation' then
-    raise exception 'Patient has not been sent to the consultation room';
-  end if;
-
   select queue_row.status
     into queue_status
   from public.patient_queue as queue_row
@@ -623,25 +683,103 @@ begin
     raise exception 'Consultation room belongs to a different doctor';
   end if;
 
-  if queue_status = 'In Consultation' then
+  if appointment_status = 'In Consultation' and queue_status = 'In Consultation' then
     return jsonb_build_object(
       'appointment_id', p_appointment_id,
       'doctor_id', p_doctor_id,
       'status', 'In Consultation'
     );
   end if;
+  if appointment_status <> 'Vitals Recorded' then
+    raise exception 'Patient is not ready to start consultation';
+  end if;
   if queue_status <> 'Called' then
     raise exception 'Patient must be called before consultation starts';
   end if;
 
+  update public.appointments
+  set status = 'In Consultation',
+      consultation_started_at = action_time,
+      consultation_completed_at = null,
+      consultation_deadline = action_time + make_interval(mins => appointment_duration),
+      updated_at = action_time
+  where id = p_appointment_id;
+
   update public.patient_queue
-  set status = 'In Consultation', updated_at = now()
+  set status = 'In Consultation', updated_at = action_time
   where appointment_id = p_appointment_id;
 
   return jsonb_build_object(
     'appointment_id', p_appointment_id,
     'doctor_id', p_doctor_id,
     'status', 'In Consultation'
+  );
+end;
+$$;
+
+-- Pushes a consultation's deadline further out when more time is needed.
+create or replace function public.extend_consultation(
+  p_appointment_id text,
+  p_doctor_id text,
+  p_extension_minutes integer default 15
+)
+returns jsonb
+language plpgsql
+as $$
+declare
+  appointment_doctor_id text;
+  appointment_status text;
+  room_doctor_id text;
+  new_deadline timestamptz;
+  action_time timestamptz := now();
+begin
+  if p_extension_minutes <= 0 then
+    raise exception 'Extension must be a positive number of minutes';
+  end if;
+
+  select appointment.doctor_id, appointment.status
+    into appointment_doctor_id, appointment_status
+  from public.appointments as appointment
+  where appointment.id = p_appointment_id
+  for update;
+
+  if not found then
+    raise exception 'Appointment not found';
+  end if;
+  if appointment_doctor_id <> p_doctor_id then
+    raise exception 'Appointment belongs to a different doctor';
+  end if;
+  if appointment_status <> 'In Consultation' then
+    raise exception 'Only an in-progress consultation can be extended';
+  end if;
+
+  select room.doctor_id
+    into room_doctor_id
+  from public.room_status as room
+  where room.current_appointment_id = p_appointment_id
+  for update;
+  if not found then
+    raise exception 'Consultation room is not assigned to this appointment';
+  end if;
+  if room_doctor_id <> p_doctor_id then
+    raise exception 'Consultation room belongs to a different doctor';
+  end if;
+
+  new_deadline := greatest(action_time, coalesce(
+    (select appointment.consultation_deadline
+       from public.appointments as appointment
+      where appointment.id = p_appointment_id),
+    action_time
+  )) + make_interval(mins => p_extension_minutes);
+
+  update public.appointments
+  set consultation_deadline = new_deadline, updated_at = action_time
+  where id = p_appointment_id;
+
+  return jsonb_build_object(
+    'appointment_id', p_appointment_id,
+    'doctor_id', p_doctor_id,
+    'consultation_deadline', new_deadline
   );
 end;
 $$;
@@ -707,7 +845,10 @@ begin
   end if;
 
   update public.appointments
-  set status = 'Completed', updated_at = action_time
+  set status = 'Completed',
+      consultation_completed_at = action_time,
+      consultation_deadline = null,
+      updated_at = action_time
   where id = p_appointment_id;
 
   update public.patient_queue
@@ -726,6 +867,10 @@ begin
 end;
 $$;
 
+-- Older versions force-completed timed-out consultations. Completion now
+-- requires the doctor to confirm it, so remove the old cleanup function.
+drop function if exists public.reconcile_expired_consultations(integer);
+
 create table if not exists public.patient_vitals (
   id text primary key,
   appointment_id text not null references public.appointments(id) on update cascade on delete cascade,
@@ -738,6 +883,17 @@ create table if not exists public.patient_vitals (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Re-align environments where this column was manually altered to uuid; the
+-- app always writes prefixed ids (e.g. "V-<uuid>"), which only fit as text.
+alter table public.patient_vitals
+  alter column id type text using id::text;
+
+-- Re-align environments created before these audit columns were added to
+-- the table definition above; save_patient_vitals writes to updated_at.
+alter table public.patient_vitals
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
 
 create unique index if not exists patient_vitals_appointment_id_uidx
   on public.patient_vitals(appointment_id);

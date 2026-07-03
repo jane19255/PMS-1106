@@ -175,6 +175,22 @@ span.flatpickr-weekday {
     color: var(--danger);
 }
 
+.status-timeup {
+    background-color: rgb(from var(--danger) r g b / 10%);
+    color: var(--danger);
+}
+
+.timeup-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.timeup-actions button {
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .card .title {
     font-size: 16px;
     font-weight: 700;

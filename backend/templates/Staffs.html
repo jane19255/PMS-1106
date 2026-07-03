@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="/assets/css/staffs.css">
   <script src="https://kit.fontawesome.com/4897704fad.js"></script>
   <script src="/assets/js/general.js"></script>
-  <script src="/assets/js/staffs.js?v=staff-api-1"></script>
-  <script src="/assets/js/staff-doctors.js?v=1" defer></script>
+  <script src="/assets/js/staffs.js?v=staff-api-2"></script>
+  <script src="/assets/js/staff-doctors.js?v=2" defer></script>
 </head>
 
 <body>
@@ -166,6 +166,31 @@
         </table>
       </div>
     </section>
+
+    <div id="offboardDoctorModal" class="modal">
+      <div class="modal-box card">
+        <div class="top-title">Offboard Doctor</div>
+        <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+        <div class="modal-content">
+          <p id="offboardDoctorDescription" class="description"></p>
+          <div class="error-box"></div>
+          <div class="field">
+            <label>Reassign upcoming appointments to</label>
+            <div class="custom-select">
+              <select id="offboard-target-doctor">
+                <option value="" disabled selected>Select a doctor&hellip;</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="button-section">
+          <button class="secondary" onclick="closeModal(this)">Cancel</button>
+          <button onclick="submitOffboardDoctor()">Reassign &amp; Deactivate</button>
+        </div>
+      </div>
+    </div>
 
     <div id="filterModal" class="modal">
       <div class="modal-box card">
@@ -495,6 +520,31 @@
           <button class="secondary" onclick="clearInput(this)">Reset</button>
           <button class="secondary" onclick="closeModal(this)">Cancel</button>
           <button onclick="verifyInput(this)&&saveStaffChanges(this)&&closeModal(this)"><i class="fas fa-save"></i>Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="setPasswordModal" class="modal">
+      <div class="modal-box card">
+        <div class="top-title">Set Password</div>
+        <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+        <div class="modal-content">
+          <p id="setPasswordDescription" class="description"></p>
+          <div class="error-box"></div>
+          <div class="field">
+            <label class="required">New Password</label>
+            <input type="password" id="setPassword-new" placeholder="At least 6 characters" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label class="required">Confirm Password</label>
+            <input type="password" id="setPassword-confirm" placeholder="Re-enter the password" autocomplete="new-password">
+          </div>
+        </div>
+
+        <div class="button-section">
+          <button class="secondary" onclick="closeModal(this)">Cancel</button>
+          <button onclick="submitSetPassword()">Set Password</button>
         </div>
       </div>
     </div>

@@ -99,7 +99,7 @@
 <div class="patient-banner">
     <i class="fa-solid fa-user-injured"></i>
     <div>
-        <div class="name">{{ patient.first_name }} {{ patient.last_name }}</div>
+        <div class="name">{{ patient.firstName }} {{ patient.lastName }}</div>
         <div class="meta">NRIC: {{ patient.nric }} &nbsp;·&nbsp; DOB: {{ patient.dob }} &nbsp;·&nbsp; {{ patient.gender }}</div>
         {% if patient.allergies %}<div class="meta" style="color:#b45309"><i class="fa-solid fa-triangle-exclamation"></i> Allergies: {{ patient.allergies }}</div>{% endif %}
     </div>

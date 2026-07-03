@@ -10,6 +10,8 @@ pub struct DoctorQueueAppointment {
     pub appointment_time: String,
     pub queue_status: String,
     pub priority: String,
+    // RFC 3339 timestamp; the consultation must end by this time unless extended.
+    pub consultation_deadline: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,10 +1,12 @@
+use super::models::DoctorStatus;
 use super::service::{
     CreateDoctorForm, CreateDoctorScheduleForm, DoctorError, DoctorService, UpdateDoctorForm,
 };
-use crate::db::FirebaseRestDb;
+use crate::appointments::handlers::validate_and_check_conflict;
+use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::firebase_admin::FirebaseAdmin;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
-use crate::staff::service::StaffService;
+use crate::staff::service::{StaffForm, StaffService};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
@@ -37,6 +39,10 @@ pub fn routes(config: &mut web::ServiceConfig) {
         .route(
             "/api/doctors/{doctor_id}",
             web::delete().to(delete_doctor_api),
+        )
+        .route(
+            "/api/doctors/{doctor_id}/reassign",
+            web::post().to(reassign_doctor_api),
         )
         .route(
             "/api/doctors/{doctor_id}/schedules",
@@ -356,6 +362,195 @@ async fn delete_doctor_account(
         eprintln!("Firebase user deletion failed: {error}");
     }
     Ok(())
+}
+
+#[derive(Deserialize)]
+pub struct ReassignDoctorForm {
+    pub target_doctor_id: String,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn reassign_doctor_api(
+    req: HttpRequest,
+    doctor_service: web::Data<DoctorService>,
+    staff_service: web::Data<StaffService>,
+    firebase_admin: web::Data<FirebaseAdmin>,
+    supabase_db: web::Data<SupabaseRestDb>,
+    path: web::Path<String>,
+    payload: web::Json<ReassignDoctorForm>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_doctor_admin(&req, &firebase_auth, &firestore_db).await {
+        return rejection;
+    }
+
+    let doctor_id = path.into_inner();
+    match reassign_and_deactivate_doctor(
+        &doctor_service,
+        &staff_service,
+        &firebase_admin,
+        &supabase_db,
+        &doctor_id,
+        payload.target_doctor_id.trim(),
+    )
+    .await
+    {
+        Ok(reassigned_count) => {
+            HttpResponse::Ok().json(json!({ "success": true, "reassigned": reassigned_count }))
+        }
+        Err(error) => doctor_error_response(error),
+    }
+}
+
+// Offboards a doctor safely: moves their still-`Scheduled` appointments to
+// another doctor, then deactivates the doctor/staff/login instead of
+// deleting them, so past visits stay attributed to the original doctor.
+async fn reassign_and_deactivate_doctor(
+    doctor_service: &DoctorService,
+    staff_service: &StaffService,
+    firebase_admin: &FirebaseAdmin,
+    db: &SupabaseRestDb,
+    doctor_id: &str,
+    target_doctor_id: &str,
+) -> Result<usize, DoctorError> {
+    if target_doctor_id.is_empty() {
+        return Err(DoctorError::InvalidInput(
+            "Choose a doctor to reassign appointments to".to_string(),
+        ));
+    }
+    if doctor_id == target_doctor_id {
+        return Err(DoctorError::InvalidInput(
+            "Choose a different doctor to reassign appointments to".to_string(),
+        ));
+    }
+
+    let doctor = doctor_service.find_doctor(doctor_id).await?;
+    if doctor_service.find_doctor(target_doctor_id).await.is_err() {
+        return Err(DoctorError::InvalidInput(
+            "Target doctor was not found".to_string(),
+        ));
+    }
+
+    let appointments_json = db
+        .list_appointments_by_doctor(doctor_id)
+        .await
+        .map_err(|_| DoctorError::StorageUnavailable)?;
+    let appointments: Vec<serde_json::Value> =
+        serde_json::from_str(&appointments_json).unwrap_or_default();
+
+    let in_progress_count = appointments
+        .iter()
+        .filter(|appointment| {
+            matches!(
+                appointment.get("status").and_then(serde_json::Value::as_str),
+                Some("Checked In" | "Vitals Recorded" | "In Consultation")
+            )
+        })
+        .count();
+    if in_progress_count > 0 {
+        return Err(DoctorError::InvalidInput(format!(
+            "{in_progress_count} appointment(s) are currently in progress for this doctor. \
+             Complete or cancel them before offboarding."
+        )));
+    }
+
+    let scheduled = appointments.into_iter().filter(|appointment| {
+        appointment.get("status").and_then(serde_json::Value::as_str) == Some("Scheduled")
+    });
+
+    let mut failed_appointment_ids = Vec::new();
+    let mut reassigned_count = 0usize;
+
+    for mut appointment in scheduled {
+        let Some(appointment_id) = appointment
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string)
+        else {
+            continue;
+        };
+
+        if let Some(object) = appointment.as_object_mut() {
+            object.insert("doctor_id".to_string(), json!(target_doctor_id));
+        }
+
+        let update_result = match validate_and_check_conflict(
+            db,
+            doctor_service,
+            appointment,
+            Some(&appointment_id),
+        )
+        .await
+        {
+            Ok(updated) => db.update_appointment(&appointment_id, &updated).await,
+            Err(_) => Err("conflict".to_string()),
+        };
+
+        match update_result {
+            Ok(_) => reassigned_count += 1,
+            Err(_) => failed_appointment_ids.push(appointment_id),
+        }
+    }
+
+    if !failed_appointment_ids.is_empty() {
+        return Err(DoctorError::InvalidInput(format!(
+            "Could not reassign {} appointment(s) because the target doctor already has a \
+             conflicting booking: {}",
+            failed_appointment_ids.len(),
+            failed_appointment_ids.join(", ")
+        )));
+    }
+
+    let staff = staff_service
+        .list_staff()
+        .await
+        .map_err(|_| DoctorError::StorageUnavailable)?
+        .into_iter()
+        .find(|staff| staff.id == doctor.staff_id)
+        .ok_or(DoctorError::StorageUnavailable)?;
+
+    doctor_service
+        .update_doctor(
+            doctor_id,
+            UpdateDoctorForm {
+                staff_id: doctor.staff_id.clone(),
+                license_number: doctor.license_number.clone(),
+                name: doctor.name.clone(),
+                specialization: doctor.specialization.clone(),
+                contact_number: doctor.contact_number.clone(),
+                email: doctor.email.clone(),
+                status: DoctorStatus::Unavailable,
+            },
+        )
+        .await?;
+
+    staff_service
+        .update_staff(
+            &staff.id,
+            StaffForm {
+                firebase_uid: staff.firebase_uid.clone(),
+                first_name: staff.first_name.clone(),
+                last_name: staff.last_name.clone(),
+                dob: staff.dob.clone(),
+                gender: staff.gender.clone(),
+                nric: staff.nric.clone(),
+                role: staff.role.clone(),
+                phone: staff.phone.clone(),
+                email: staff.email.clone(),
+                status: Some("Inactive".to_string()),
+                address: staff.address.clone(),
+                emergency: staff.emergency.clone(),
+            },
+        )
+        .await
+        .map_err(|_| DoctorError::StorageUnavailable)?;
+
+    if let Err(error) = firebase_admin.disable_user(&staff.firebase_uid).await {
+        eprintln!("Firebase user disable failed: {error}");
+    }
+
+    Ok(reassigned_count)
 }
 
 pub async fn list_schedules_api(

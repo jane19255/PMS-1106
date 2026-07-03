@@ -16,6 +16,10 @@ pub fn routes(config: &mut web::ServiceConfig) {
         web::post().to(start_consultation_api),
     );
     config.route(
+        "/api/doctor-dashboard/extend-consultation",
+        web::post().to(extend_consultation_api),
+    );
+    config.route(
         "/api/doctor-dashboard/complete-consultation",
         web::post().to(complete_consultation_api),
     );
@@ -78,6 +82,34 @@ pub async fn start_consultation_api(
 
     match dashboard_service
         .start_consultation(&firebase_uid, &payload.appointment_id)
+        .await
+    {
+        Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),
+        Err(error) => dashboard_error_response(error),
+    }
+}
+
+pub async fn extend_consultation_api(
+    req: HttpRequest,
+    dashboard_service: web::Data<DoctorDashboardService>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+    payload: web::Json<AppointmentActionPayload>,
+) -> impl Responder {
+    let (firebase_uid, _) = match require_auth_and_permission(
+        &req,
+        &firebase_auth,
+        &firestore_db,
+        AppAction::ManageDoctorAppt,
+    )
+    .await
+    {
+        Ok(data) => data,
+        Err(rejection) => return rejection,
+    };
+
+    match dashboard_service
+        .extend_consultation(&firebase_uid, &payload.appointment_id)
         .await
     {
         Ok(_) => HttpResponse::Ok().json(json!({ "success": true })),

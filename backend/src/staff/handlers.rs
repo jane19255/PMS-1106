@@ -5,13 +5,18 @@ use crate::firebase_admin::FirebaseAdmin;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
+use serde::Deserialize;
 
 pub fn routes(config: &mut web::ServiceConfig) {
     config
         .route("/api/staff", web::get().to(list_staff_api))
         .route("/api/staff", web::post().to(create_staff_api))
         .route("/api/staff/{staff_id}", web::put().to(update_staff_api))
-        .route("/api/staff/{staff_id}", web::delete().to(delete_staff_api));
+        .route("/api/staff/{staff_id}", web::delete().to(delete_staff_api))
+        .route(
+            "/api/staff/{staff_id}/password",
+            web::put().to(set_staff_password_api),
+        );
 }
 
 pub async fn list_staff_api(
@@ -102,6 +107,12 @@ pub async fn update_staff_api(
     {
         Ok(staff) => {
             if let Err(error) = firebase_admin
+                .update_email(&staff.firebase_uid, &staff.email)
+                .await
+            {
+                return HttpResponse::InternalServerError().body(error);
+            }
+            if let Err(error) = firebase_admin
                 .save_staff_profile(
                     &staff.firebase_uid,
                     &staff.first_name,
@@ -166,6 +177,48 @@ pub async fn delete_staff_api(
             HttpResponse::NoContent().finish()
         }
         Err(error) => staff_error_response(error),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct SetPasswordForm {
+    pub new_password: String,
+}
+
+pub async fn set_staff_password_api(
+    req: HttpRequest,
+    staff_service: web::Data<StaffService>,
+    firebase_admin: web::Data<FirebaseAdmin>,
+    path: web::Path<String>,
+    form: web::Json<SetPasswordForm>,
+    firebase_auth: web::Data<FirebaseAuth>,
+    firestore_db: web::Data<FirebaseRestDb>,
+) -> impl Responder {
+    if let Err(rejection) = require_staff_admin(&req, &firebase_auth, &firestore_db).await {
+        return rejection;
+    }
+
+    let new_password = form.new_password.trim();
+    if new_password.chars().count() < 6 {
+        return HttpResponse::BadRequest().body("Password must be at least 6 characters.");
+    }
+
+    let staff_id = path.into_inner();
+    let firebase_uid = match staff_service.list_staff().await {
+        Ok(staff) => staff
+            .into_iter()
+            .find(|item| item.id == staff_id)
+            .map(|item| item.firebase_uid),
+        Err(error) => return staff_error_response(error),
+    };
+
+    let Some(firebase_uid) = firebase_uid else {
+        return HttpResponse::NotFound().body("Staff member was not found.");
+    };
+
+    match firebase_admin.set_password(&firebase_uid, new_password).await {
+        Ok(()) => HttpResponse::Ok().finish(),
+        Err(error) => HttpResponse::BadRequest().body(error),
     }
 }
 

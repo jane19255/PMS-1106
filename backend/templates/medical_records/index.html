@@ -4,69 +4,6 @@
 
 {% block styles %}
 <style>
-    .page-heading {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 24px;
-    }
-
-    .page-heading h1 { margin: 0; }
-    .page-heading p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
-
-    .filter-bar {
-        display: flex;
-        gap: 12px;
-        margin-bottom: 20px;
-        align-items: flex-end;
-        flex-wrap: wrap;
-    }
-
-    .filter-bar input {
-        flex: 1;
-        min-width: 200px;
-    }
-
-    .records-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    .records-table th,
-    .records-table td {
-        padding: 12px 14px;
-        text-align: left;
-        border-bottom: 1px solid var(--border);
-        font-size: 14px;
-    }
-
-    .records-table th {
-        background: var(--surface);
-        font-weight: 600;
-        color: var(--muted);
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-
-    .records-table tr:hover td { background: var(--surface); }
-
-    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: var(--radius); font-size: 14px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; }
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-primary:hover { background: var(--primary-hover); }
-    .btn-sm { padding: 6px 12px; font-size: 13px; }
-    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
-    .btn-ghost:hover { background: var(--surface); }
-
-    .empty-state {
-        text-align: center;
-        padding: 64px 24px;
-        color: var(--muted);
-    }
-
-    .empty-state i { font-size: 40px; margin-bottom: 12px; display: block; }
-
     .tag {
         display: inline-block;
         padding: 3px 10px;
@@ -76,45 +13,43 @@
         background: var(--surface);
         color: var(--muted);
     }
+
+    .empty-row {
+        text-align: center;
+        color: var(--muted);
+        padding: 32px 16px !important;
+    }
 </style>
 {% endblock styles %}
 
 {% block content %}
-<div class="page-heading">
+<div class="page-title">
     <div>
-        <h1>Medical Records</h1>
-        <p class="description">View and manage clinical records across all patients.</p>
+        <div class="title">Medical Records</div>
+        <div class="description">View and manage clinical records across all patients.</div>
     </div>
-    <a href="/medical-records/new" class="btn btn-primary">
-        <i class="fa-solid fa-plus"></i> New Record
-    </a>
+    <button id="newRecordBtn" onclick="openNewRecordModal()">
+        <i class="fa-solid fa-plus"></i>New Record
+    </button>
 </div>
 
-<form class="filter-bar" method="get" action="/medical-records">
-    <div style="flex:1">
-        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:6px">Filter by Patient ID</label>
-        <input type="text" name="patient_id" value="{{ filter_patient_id }}" placeholder="e.g. PAT-abc123">
+<div class="control card">
+    <div class="search">
+        <input type="text" placeholder="Search patient ID / record ID / diagnosis" id="searchInput"
+            oninput="refreshMedicalRecordsList()">
+        <i class="fa-solid fa-magnifying-glass"></i>
     </div>
-    <button type="submit" class="btn btn-primary">Filter</button>
-    {% if filter_patient_id %}
-        <a href="/medical-records" class="btn btn-ghost">Clear</a>
-    {% endif %}
-</form>
-
-{% if records | length == 0 %}
-<div class="card empty-state">
-    <i class="fa-solid fa-file-medical"></i>
-    <p>No medical records found.</p>
-    {% if filter_patient_id %}
-        <p style="font-size:13px">No records for patient ID <strong>{{ filter_patient_id }}</strong>.</p>
-        <a href="/medical-records" class="btn btn-ghost" style="margin-top:12px">Clear Filter</a>
-    {% else %}
-        <a href="/medical-records/new" class="btn btn-primary" style="margin-top:12px">Create First Record</a>
-    {% endif %}
+    <div class="custom-select">
+        <select id="sortBy" onchange="refreshMedicalRecordsList()">
+            <option value="recorded_desc">Newest First</option>
+            <option value="recorded_asc">Oldest First</option>
+            <option value="patient_id">Patient ID</option>
+        </select>
+    </div>
 </div>
-{% else %}
-<section class="card" style="padding:0;overflow:hidden">
-    <table class="records-table">
+
+<div class="table-list">
+    <table>
         <thead>
             <tr>
                 <th>Record ID</th>
@@ -122,40 +57,127 @@
                 <th>Diagnosis</th>
                 <th>Date Recorded</th>
                 <th>Doctor ID</th>
-                <th></th>
+                <th>Action</th>
             </tr>
         </thead>
-        <tbody>
-            {% for record in records %}
+        <tbody id="medicalRecordsTableBody">
             <tr>
-                <td><code style="font-size:12px">{{ record.id }}</code></td>
-                <td>
-                    <a href="/patients/{{ record.patient_id }}/timeline" style="color:var(--primary);font-weight:500">
-                        {{ record.patient_id }}
-                    </a>
-                </td>
-                <td>
-                    {% if record.diagnosis %}
-                        {{ record.diagnosis }}
-                    {% else %}
-                        <span class="tag">—</span>
-                    {% endif %}
-                </td>
-                <td>{{ record.recorded_at | date(format="%d %b %Y %H:%M") }}</td>
-                <td>
-                    {% if record.doctor_id %}
-                        {{ record.doctor_id }}
-                    {% else %}
-                        <span class="tag">—</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <a href="/medical-records/{{ record.id }}" class="btn btn-ghost btn-sm">View</a>
-                </td>
+                <td class="empty-row" colspan="6">Loading medical records...</td>
             </tr>
-            {% endfor %}
         </tbody>
     </table>
-</section>
-{% endif %}
+
+    <div class="pagination">
+        <p id="pageInfo"></p>
+        <div>
+            <div class="rowsPage">
+                <span>Rows per page:</span>
+                <select id="rowsPerPageSelect" onchange="pagination.changeRowsPerPage(this.value)">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
+
+            <div class="controls">
+                <button class="secondary" id="prevBtn" onclick="pagination.prev()">
+                    <i class="fa fa-chevron-left"></i>
+                </button>
+                <span>Page:</span>
+                <select id="pageSelect" onchange="pagination.goToPage(this.value)"></select>
+                <button class="secondary" id="nextBtn" onclick="pagination.next()">
+                    <i class="fa fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="addRecordModal" class="modal">
+    <div class="modal-box card">
+        <div class="top-title">New Medical Record</div>
+        <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+        <div class="modal-content">
+            <div class="error-box"></div>
+
+            <div class="row-section">
+                <div class="field">
+                    <label class="required">Patient</label>
+                    <div class="custom-select">
+                        <select id="add-record-patient" required>
+                            <option value="" disabled selected>Select a patient&hellip;</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Doctor</label>
+                    <div class="custom-select">
+                        <select id="add-record-doctor">
+                            <option value="">Not assigned</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <p class="subsection-title" style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 10px">Vitals</p>
+            <div class="row-section">
+                <div class="field">
+                    <label>Blood Pressure</label>
+                    <input type="text" id="add-record-bp" placeholder="e.g. 120/80">
+                </div>
+                <div class="field">
+                    <label>Temperature (°C)</label>
+                    <input type="text" id="add-record-temp" placeholder="e.g. 36.8">
+                </div>
+                <div class="field">
+                    <label>Pulse Rate (bpm)</label>
+                    <input type="text" id="add-record-pulse" placeholder="e.g. 72">
+                </div>
+                <div class="field">
+                    <label>Height (cm)</label>
+                    <input type="text" id="add-record-height" placeholder="e.g. 170">
+                </div>
+                <div class="field">
+                    <label>Weight (kg)</label>
+                    <input type="text" id="add-record-weight" placeholder="e.g. 65">
+                </div>
+            </div>
+
+            <p class="subsection-title" style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 10px">Clinical Notes</p>
+            <div class="field">
+                <label>Reason of Visit</label>
+                <textarea id="add-record-reason" rows="2" placeholder="Patient's main complaint or reason for today's visit..."></textarea>
+            </div>
+            <div class="field">
+                <label>Clinical Findings</label>
+                <textarea id="add-record-findings" rows="2" placeholder="Physical examination findings..."></textarea>
+            </div>
+            <div class="field">
+                <label>Diagnosis</label>
+                <textarea id="add-record-diagnosis" rows="2" placeholder="Final diagnosis..."></textarea>
+            </div>
+            <div class="field">
+                <label>Treatment Plan</label>
+                <textarea id="add-record-treatment" rows="2" placeholder="Prescribed treatment, medication instructions, follow-up plan..."></textarea>
+            </div>
+            <div class="field">
+                <label>Doctor Notes</label>
+                <textarea id="add-record-notes" rows="2" placeholder="Additional clinical notes or observations..."></textarea>
+            </div>
+        </div>
+
+        <div class="button-section">
+            <button class="secondary" onclick="clearInput(this)">Reset</button>
+            <button class="secondary" onclick="closeModal(this)">Cancel</button>
+            <button onclick="saveNewMedicalRecord(this)"><i class="fas fa-save"></i>Save Record</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast card" id="toast"></div>
 {% endblock content %}
+
+{% block scripts %}
+<script src="/assets/js/medical-records.js?v=3" defer></script>
+{% endblock scripts %}

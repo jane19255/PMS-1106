@@ -103,10 +103,16 @@ pub struct MedicalReport {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClinicalSummary {
-    pub record_id: Option<String>,
+    // The medical_records primary key column is "id", not "record_id" — this
+    // was mismatched before, which made every lookup silently fail to
+    // deserialize (serde errors on a missing key, even for an Option field).
+    pub id: Option<String>,
     pub appointment_id: Option<String>,
     pub recorded_at: Option<DateTime<Utc>>,
+    pub doctor_id: Option<String>,
     pub doctor_name: Option<String>,
+    pub reason_of_visit: Option<String>,
+    pub clinical_findings: Option<String>,
     pub diagnosis: Option<String>,
     pub doctor_notes: Option<String>,
     pub treatment_plan: Option<String>,

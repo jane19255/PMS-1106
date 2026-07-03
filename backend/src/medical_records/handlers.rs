@@ -1,15 +1,18 @@
+use super::models::PatientTimelineEntry;
 use super::service::{
     CreateMedicalRecordForm, MedicalRecordError, MedicalRecordService, UpdateMedicalRecordForm,
 };
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
+use crate::doctors::service::DoctorService;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use crate::models::{PatientView, SupabasePatientRow};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
 use serde::Deserialize;
+use std::collections::HashMap;
 use tera::{Context, Tera};
-use chrono::{FixedOffset, Utc};
+use chrono::SecondsFormat;
 
 pub fn routes(config: &mut web::ServiceConfig) {
     config
@@ -56,11 +59,9 @@ pub fn routes(config: &mut web::ServiceConfig) {
 
 pub async fn list_records_page(
     req: HttpRequest,
-    service: web::Data<MedicalRecordService>,
     templates: web::Data<Tera>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
-    query: web::Query<RecordListQuery>,
 ) -> impl Responder {
     if let Err(rejection) = require_records_permission(
         &req,
@@ -73,24 +74,9 @@ pub async fn list_records_page(
         return rejection;
     }
 
-    let records_result = if let Some(patient_id) = query.patient_id.as_deref() {
-        service.list_records_for_patient(patient_id).await
-    } else {
-        service.list_records().await
-    };
-
-    match records_result {
-        Ok(records) => {
-            let mut context = Context::new();
-            context.insert("records", &records);
-            context.insert(
-                "filter_patient_id",
-                query.patient_id.as_deref().unwrap_or(""),
-            );
-            render_template(&templates, "medical_records/index.html", &context)
-        }
-        Err(error) => render_error(&templates, error),
-    }
+    // The table itself is fetch-driven client-side (see medical-records.js),
+    // same pattern as Patients/Appointments — this just renders the shell.
+    render_template(&templates, "medical_records/index.html", &Context::new())
 }
 
 pub async fn new_record_page(
@@ -253,9 +239,11 @@ pub async fn delete_record_form(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn patient_timeline_page(
     req: HttpRequest,
     service: web::Data<MedicalRecordService>,
+    doctor_service: web::Data<DoctorService>,
     templates: web::Data<Tera>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
@@ -278,7 +266,8 @@ pub async fn patient_timeline_page(
     let patient = fetch_patient(&supabase_db, &patient_id).await.ok();
 
     match timeline_result {
-        Ok(entries) => {
+        Ok(mut entries) => {
+            resolve_doctor_names(&mut entries, &doctor_service).await;
             let mut context = Context::new();
             context.insert("entries", &entries);
             context.insert("patient_id", &patient_id);
@@ -288,6 +277,25 @@ pub async fn patient_timeline_page(
             render_template(&templates, "medical_records/timeline.html", &context)
         }
         Err(error) => render_error(&templates, error),
+    }
+}
+
+// The record only stores doctor_id — resolve a display name for each entry,
+// caching by id since a patient's visits often share the same doctor.
+async fn resolve_doctor_names(entries: &mut [PatientTimelineEntry], doctor_service: &DoctorService) {
+    let mut names: HashMap<String, String> = HashMap::new();
+    for entry in entries.iter_mut() {
+        let Some(doctor_id) = entry.record.doctor_id.clone() else {
+            continue;
+        };
+        if let Some(name) = names.get(&doctor_id) {
+            entry.doctor_name = Some(name.clone());
+            continue;
+        }
+        if let Ok(doctor) = doctor_service.find_doctor(&doctor_id).await {
+            names.insert(doctor_id, doctor.name.clone());
+            entry.doctor_name = Some(doctor.name);
+        }
     }
 }
 
@@ -426,6 +434,7 @@ pub async fn delete_record_api(
 pub async fn patient_timeline_api(
     req: HttpRequest,
     service: web::Data<MedicalRecordService>,
+    doctor_service: web::Data<DoctorService>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
     path: web::Path<String>,
@@ -442,7 +451,10 @@ pub async fn patient_timeline_api(
     }
 
     match service.patient_timeline(&path.into_inner()).await {
-        Ok(entries) => HttpResponse::Ok().json(entries),
+        Ok(mut entries) => {
+            resolve_doctor_names(&mut entries, &doctor_service).await;
+            HttpResponse::Ok().json(entries)
+        }
         Err(error) => record_error_response(error),
     }
 }
@@ -471,15 +483,16 @@ pub async fn today_appointment_api(
         return HttpResponse::BadRequest().body("Patient ID is required");
     }
 
-    let singapore_tz = FixedOffset::east_opt(8 * 3600).unwrap();
-    let today = Utc::now().with_timezone(&singapore_tz).date_naive();
-    let tomorrow = today.succ_opt().unwrap();
+    let today = crate::db::singapore_today();
+    let (start, end) = crate::db::singapore_day_bounds(today);
+    let start = start.to_rfc3339_opts(SecondsFormat::Secs, true);
+    let end = end.to_rfc3339_opts(SecondsFormat::Secs, true);
 
     let filter = format!(
-        "select=id,patient_id,doctor_id,reason,status,scheduled_at&patient_id=eq.{}&scheduled_at=gte.{}T00:00:00Z&scheduled_at=lt.{}T00:00:00Z&order=scheduled_at.asc&limit=1",
+        "select=id,patient_id,doctor_id,reason,status,scheduled_at&patient_id=eq.{}&scheduled_at=gte.{}&scheduled_at=lt.{}&order=scheduled_at.asc&limit=1",
         urlencoding::encode(patient_id),
-        today,
-        tomorrow
+        start,
+        end
     );
 
     match supabase_db.fetch_table("appointments", &filter).await {
@@ -540,8 +553,21 @@ fn render_template(templates: &Tera, template_name: &str, context: &Context) -> 
         Ok(body) => HttpResponse::Ok().content_type("text/html").body(body),
         Err(error) => HttpResponse::InternalServerError()
             .content_type("text/plain")
-            .body(format!("Template error: {error}")),
+            .body(format!("Template error: {}", describe_tera_error(&error))),
     }
+}
+
+// Tera's top-level Display is just "Failed to render 'X'" — the actual
+// cause (e.g. a missing variable) is nested in the error's source chain.
+fn describe_tera_error(error: &tera::Error) -> String {
+    let mut message = error.to_string();
+    let mut source = std::error::Error::source(error);
+    while let Some(err) = source {
+        message.push_str(" | caused by: ");
+        message.push_str(&err.to_string());
+        source = err.source();
+    }
+    message
 }
 
 fn render_error(templates: &Tera, error: MedicalRecordError) -> HttpResponse {

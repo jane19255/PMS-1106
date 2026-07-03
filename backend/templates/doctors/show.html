@@ -3,7 +3,7 @@
 {% block title %}Doctor{% endblock title %}
 
 {% block styles %}
-<link rel="stylesheet" href="/assets/css/doctor.css?v=5">
+<link rel="stylesheet" href="/assets/css/doctor.css?v=6">
 {% endblock styles %}
 
 {% block content %}
@@ -16,7 +16,7 @@
     <div>
         <button onclick="openModal('editModal')">Edit Profile</button>
         <form action="/doctors/{{ doctor.id }}/delete" method="post"
-            onsubmit="return confirm('Delete this doctor, their staff record, schedules, and login account?');">
+            onsubmit="return confirm('Delete this doctor, their staff record, schedules, and login account? This only works if they have no appointment history — use Offboard in Staff Management for a doctor who has seen patients.');">
             <button class="danger-button" type="submit">Delete Doctor</button>
         </form>
     </div>
@@ -24,7 +24,7 @@
 
 <h1>Doctor Profile</h1>
 
-
+<div class="container">
 <section class="card">
     <div class="header">
         <div class="avatar"><i class="fa-solid fa-user"></i></div>
@@ -90,15 +90,18 @@
     <p>No schedules created yet.</p>
     {% endif %}
 
-    {% for schedule in schedules %}
-    <div class="card">
-        <p>{{ schedule.day_of_week }}: {{ schedule.start_time }} - {{ schedule.end_time }}</p>
-        <form action="/doctors/schedules/{{ schedule.id }}/delete" method="post">
-            <button class="danger-button" type="submit">Delete Schedule</button>
-        </form>
+    <div class="schedule-list">
+        {% for schedule in schedules %}
+        <div class="card schedule-item">
+            <p>{{ schedule.day_of_week }}: {{ schedule.start_time }} - {{ schedule.end_time }}</p>
+            <form action="/doctors/schedules/{{ schedule.id }}/delete" method="post">
+                <button class="danger-button" type="submit">Delete Schedule</button>
+            </form>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 </section>
+</div>
 
 <div id="editModal" class="modal">
     <div class="modal-box card">

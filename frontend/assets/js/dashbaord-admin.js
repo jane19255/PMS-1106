@@ -27,24 +27,30 @@ const pagination = new Pagination({
 });
 
 function getTodayDate() {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, "0");
-    const d = String(today.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Singapore",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).format(new Date());
 }
 
 function formatIsoTime(isoStr) {
-    const dt = new Date(isoStr);
-    let hours = dt.getUTCHours();
-    const minutes = String(dt.getUTCMinutes()).padStart(2, "0");
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
-    return `${hours}:${minutes} ${ampm}`;
+    return new Intl.DateTimeFormat("en-SG", {
+        timeZone: "Asia/Singapore",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+    }).format(new Date(isoStr));
 }
 
 function extractIsoDate(isoStr) {
-    return isoStr.split("T")[0];
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Singapore",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).format(new Date(isoStr));
 }
 
 function updateStatsCards() {
@@ -75,13 +81,19 @@ async function fetchRooms() {
 
         const rawRooms = await res.json();
 
-        globalRooms = rawRooms.map(row => ({
-            doctorId: row.doctor_id,
-            doctor: row.doctors?.staff?.full_name || "Unknown Doctor",
-            roomNumber: row.room || "Unassigned",
-            roomStatus: row.status || "Unavailable",
-            currentAppointmentId: row.current_appointment_id || null
-        }));
+        // Offboarded doctors keep their room row (for history), and a doctor
+        // marked Unavailable/On Leave still keeps theirs too — neither should
+        // show up as an active room on the monitor.
+        globalRooms = rawRooms
+            .filter(row => (row.doctors?.staff?.status || "active").toLowerCase() !== "inactive")
+            .filter(row => (row.doctors?.availability_status || "Available") === "Available")
+            .map(row => ({
+                doctorId: row.doctor_id,
+                doctor: row.doctors?.staff?.full_name || "Unknown Doctor",
+                roomNumber: row.room || "Unassigned",
+                roomStatus: row.status || "Unavailable",
+                currentAppointmentId: row.current_appointment_id || null
+            }));
 
         return globalRooms;
     } catch (err) {
@@ -156,6 +168,20 @@ function renderRoomTable() {
 }
 
 function getPatientStatus(app) {
+    if (app.queueStatus === "Called" && app.currentAppointmentId === app.appointmentId) {
+        const waitingMinutes = app.calledAt
+            ? Math.max(0, Math.floor((Date.now() - new Date(app.calledAt).getTime()) / 60000))
+            : 0;
+        const text = waitingMinutes >= 10
+            ? `Doctor delay: ${waitingMinutes} min`
+            : "Waiting for Doctor";
+        return { class: "status status-ready", text };
+    }
+    if (app.status === "In Consultation"
+        && app.raw.consultation_deadline
+        && Date.now() >= new Date(app.raw.consultation_deadline).getTime()) {
+        return { class: "status status-inroom", text: "Consultation Overdue" };
+    }
     switch (app.status) {
         case "Scheduled": return { class: "status status-notarrive", text: "Not Arrived" };
         case "Checked In": return { class: "status status-pendingvital", text: "Pending Vitals" };
@@ -208,6 +234,8 @@ async function fetchAppointmentsByDate(dateStr) {
                 date: extractIsoDate(row.scheduled_at),
                 time: formatIsoTime(row.scheduled_at),
                 status: row.status,
+                queueStatus: queue?.status || "Not Checked In",
+                calledAt: queue?.called_at || null,
                 priority: queue?.priority || "Normal",
                 priorityReason: queue?.priority_reason || "",
                 room: row.doctors?.room || "Unassigned",
@@ -239,7 +267,9 @@ function renderAppointmentRow(app) {
     // Checked-in patients stay actionable even if the visit passed midnight.
     const isOverdue = app.date < todayStr && ["Checked In", "Vitals Recorded", "In Consultation"].includes(app.status);
     const canEnterVitals = app.status === "Checked In";
-    const canSendRoom = app.status === "Vitals Recorded" && app.roomStatus === "Available";
+    const canSendRoom = app.status === "Vitals Recorded"
+        && app.queueStatus === "Waiting"
+        && app.roomStatus === "Available";
     const canArrive = isToday && app.status === "Scheduled";
     const priority = getPriorityBadge(app.priority);
     const displayedTime = isOverdue ? `${app.date} ${app.time}` : app.time;
@@ -336,8 +366,8 @@ async function apiSaveVitals(appointmentId, vitalsPayload) {
     }
 }
 
-async function refreshAppointmentTable(selectedDateStr) {
-    showToast("Loading appointments...", "loading");
+async function refreshAppointmentTable(selectedDateStr, silent = false) {
+    if (!silent) showToast("Loading appointments...", "loading");
 
     try {
         currentSelectedDate = selectedDateStr;
@@ -351,9 +381,9 @@ async function refreshAppointmentTable(selectedDateStr) {
             document.getElementById("appBody").innerHTML =
                 `<tr><td colspan="6" class="empty-row">No appointments found for this date.</td></tr>`;
         }
-        showToast("Appointments loaded!", "success");
+        if (!silent) showToast("Appointments loaded!", "success");
     } catch (err) {
-        showToast("Appointments could not be loaded!", "error");
+        if (!silent) showToast("Appointments could not be loaded!", "error");
     }
 }
 
@@ -520,4 +550,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
     await refreshAppointmentTable(todayStr);
+
+    // Refresh the queue so reception can see room and doctor delays promptly.
+    setInterval(async () => {
+        await fetchRooms();
+        await refreshAppointmentTable(currentSelectedDate, true);
+        renderRoomTable();
+    }, 30000);
 });

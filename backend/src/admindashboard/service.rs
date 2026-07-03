@@ -1,7 +1,7 @@
 use crate::admindashboard::models::{MarkArrivedPayload, SaveVitalPayload};
 use crate::admindashboard::repository;
-use crate::db::SupabaseRestDb;
-use chrono::NaiveDate;
+use crate::db::{singapore_offset, SupabaseRestDb};
+use chrono::{DateTime, NaiveDate};
 use serde_json::{from_str, Value};
 
 pub async fn mark_patient_arrived(
@@ -20,8 +20,8 @@ pub async fn mark_patient_arrived(
 
     let scheduled_date = apt["scheduled_at"]
         .as_str()
-        .and_then(|value| value.get(0..10))
-        .and_then(|date_str| NaiveDate::parse_from_str(date_str, "%Y-%m-%d").ok());
+        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+        .map(|value| value.with_timezone(&singapore_offset()).date_naive());
     if scheduled_date != Some(today) {
         return Err("Only today's appointments can be marked as arrived".to_string());
     }

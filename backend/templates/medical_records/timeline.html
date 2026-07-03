@@ -4,18 +4,6 @@
 
 {% block styles %}
 <style>
-    .page-heading {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 24px;
-        flex-wrap: wrap;
-    }
-
-    .page-heading h1 { margin: 0 0 4px; }
-    .page-heading p { margin: 0; color: var(--muted); font-size: 14px; }
-
     .patient-banner {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -56,15 +44,19 @@
         content: '';
         position: absolute;
         left: 14px;
-        top: 0;
-        bottom: 0;
+        top: 18px;
+        bottom: 18px;
         width: 2px;
         background: var(--border);
     }
 
     .timeline-entry {
         position: relative;
-        margin-bottom: 28px;
+        margin-bottom: 20px;
+    }
+
+    .timeline-entry:last-child {
+        margin-bottom: 0;
     }
 
     .timeline-entry::before {
@@ -72,12 +64,12 @@
         position: absolute;
         left: -29px;
         top: 18px;
-        width: 14px;
-        height: 14px;
+        width: 12px;
+        height: 12px;
         border-radius: 50%;
-        background: var(--primary);
-        border: 3px solid var(--background, white);
-        box-shadow: 0 0 0 2px var(--primary);
+        background: var(--background, white);
+        border: 2px solid var(--primary);
+        z-index: 1;
     }
 
     .timeline-card {
@@ -85,6 +77,7 @@
         border: 1px solid var(--border);
         border-radius: var(--radius);
         overflow: hidden;
+        transition: border-color .15s;
     }
 
     .timeline-head {
@@ -96,6 +89,7 @@
         cursor: pointer;
         gap: 12px;
         user-select: none;
+        transition: background-color .15s;
     }
 
     .timeline-head:hover { background: var(--border); }
@@ -106,9 +100,37 @@
     }
 
     .timeline-summary {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
         font-size: 13px;
-        color: var(--muted);
         flex: 1;
+    }
+
+    .timeline-summary .summary-text {
+        color: var(--text);
+        font-weight: 500;
+    }
+
+    .timeline-summary .summary-text.na {
+        color: var(--muted);
+        font-weight: 400;
+        font-style: italic;
+    }
+
+    .doctor-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 2px 10px;
     }
 
     .timeline-head-actions { display: flex; gap: 8px; align-items: center; }
@@ -185,26 +207,26 @@
 {% endblock styles %}
 
 {% block content %}
-<div class="page-heading">
+<div class="page-title">
     <div>
-        <h1><i class="fa-solid fa-clock-rotate-left" style="margin-right:8px;color:var(--primary)"></i>Patient History Timeline</h1>
-        <p>Chronological medical history for this patient.</p>
+        <div class="title">Patient History Timeline</div>
+        <div class="description">Chronological medical history for this patient.</div>
     </div>
     <div style="display:flex;gap:10px">
-        <a href="/medical-records/new?patient_id={{ patient_id }}" class="btn btn-primary">
+        <button onclick="openNewRecordModal()">
             <i class="fa-solid fa-plus"></i> New Record
-        </a>
-        <a href="/medical-records?patient_id={{ patient_id }}" class="btn btn-ghost">
+        </button>
+        <button class="secondary" onclick="window.location.href='/medical-records?patient_id={{ patient_id }}'">
             <i class="fa-solid fa-table-list"></i> Table View
-        </a>
+        </button>
     </div>
 </div>
 
 {% if patient %}
 <div class="patient-banner">
-    <div class="patient-avatar">{{ patient.first_name | truncate(length=1, end="") }}</div>
+    <div class="patient-avatar">{{ patient.firstName | truncate(length=1, end="") }}</div>
     <div class="patient-info">
-        <p class="name">{{ patient.first_name }} {{ patient.last_name }}</p>
+        <p class="name">{{ patient.firstName }} {{ patient.lastName }}</p>
         <p class="meta">
             NRIC: <strong>{{ patient.nric }}</strong> &nbsp;·&nbsp;
             DOB: {{ patient.dob }} &nbsp;·&nbsp;
@@ -229,9 +251,9 @@
 <div class="card empty-timeline">
     <i class="fa-solid fa-file-circle-question"></i>
     <p>No medical records found for this patient.</p>
-    <a href="/medical-records/new?patient_id={{ patient_id }}" class="btn btn-primary" style="margin-top:12px">
+    <button onclick="openNewRecordModal()" style="margin-top:12px">
         <i class="fa-solid fa-plus"></i> Create First Record
-    </a>
+    </button>
 </div>
 {% else %}
 <p style="font-size:13px;color:var(--muted);margin-bottom:20px">
@@ -257,16 +279,16 @@
                     </div>
                     <div class="timeline-summary">
                         {% if entry.record.diagnosis %}
-                            {{ entry.record.diagnosis | truncate(length=80) }}
+                            <span class="summary-text">{{ entry.record.diagnosis | truncate(length=80) }}</span>
                         {% elif entry.record.reason_of_visit %}
-                            {{ entry.record.reason_of_visit | truncate(length=80) }}
+                            <span class="summary-text">{{ entry.record.reason_of_visit | truncate(length=80) }}</span>
                         {% else %}
-                            <em>No diagnosis recorded</em>
+                            <span class="summary-text na">No diagnosis recorded</span>
                         {% endif %}
                         {% if entry.doctor_name %}
-                            &nbsp;·&nbsp; Dr. {{ entry.doctor_name }}
+                            <span class="doctor-badge"><i class="fa-solid fa-user-doctor"></i> {{ entry.doctor_name }}</span>
                         {% elif entry.record.doctor_id %}
-                            &nbsp;·&nbsp; {{ entry.record.doctor_id }}
+                            <span class="doctor-badge"><i class="fa-solid fa-user-doctor"></i> {{ entry.record.doctor_id }}</span>
                         {% endif %}
                     </div>
                 </div>
@@ -356,10 +378,144 @@
     {% endfor %}
 </div>
 {% endif %}
+
+<div id="addRecordModal" class="modal">
+    <div class="modal-box card">
+        <div class="top-title">New Medical Record</div>
+        <div class="close" onclick="closeModal(this)"><i class="fa-solid fa-xmark"></i></div>
+
+        <div class="modal-content">
+            <div class="error-box"></div>
+
+            <div class="field">
+                <label>Doctor</label>
+                <div class="custom-select">
+                    <select id="add-record-doctor">
+                        <option value="">Not assigned</option>
+                    </select>
+                </div>
+            </div>
+
+            <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 10px">Vitals</p>
+            <div class="row-section">
+                <div class="field">
+                    <label>Blood Pressure</label>
+                    <input type="text" id="add-record-bp" placeholder="e.g. 120/80">
+                </div>
+                <div class="field">
+                    <label>Temperature (°C)</label>
+                    <input type="text" id="add-record-temp" placeholder="e.g. 36.8">
+                </div>
+                <div class="field">
+                    <label>Pulse Rate (bpm)</label>
+                    <input type="text" id="add-record-pulse" placeholder="e.g. 72">
+                </div>
+                <div class="field">
+                    <label>Height (cm)</label>
+                    <input type="text" id="add-record-height" placeholder="e.g. 170">
+                </div>
+                <div class="field">
+                    <label>Weight (kg)</label>
+                    <input type="text" id="add-record-weight" placeholder="e.g. 65">
+                </div>
+            </div>
+
+            <p style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:16px 0 10px">Clinical Notes</p>
+            <div class="field">
+                <label>Reason of Visit</label>
+                <textarea id="add-record-reason" rows="2" placeholder="Patient's main complaint or reason for today's visit..."></textarea>
+            </div>
+            <div class="field">
+                <label>Clinical Findings</label>
+                <textarea id="add-record-findings" rows="2" placeholder="Physical examination findings..."></textarea>
+            </div>
+            <div class="field">
+                <label>Diagnosis</label>
+                <textarea id="add-record-diagnosis" rows="2" placeholder="Final diagnosis..."></textarea>
+            </div>
+            <div class="field">
+                <label>Treatment Plan</label>
+                <textarea id="add-record-treatment" rows="2" placeholder="Prescribed treatment, medication instructions, follow-up plan..."></textarea>
+            </div>
+            <div class="field">
+                <label>Doctor Notes</label>
+                <textarea id="add-record-notes" rows="2" placeholder="Additional clinical notes or observations..."></textarea>
+            </div>
+        </div>
+
+        <div class="button-section">
+            <button class="secondary" onclick="clearInput(this)">Reset</button>
+            <button class="secondary" onclick="closeModal(this)">Cancel</button>
+            <button onclick="saveNewRecord(this)"><i class="fas fa-save"></i>Save Record</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast card" id="toast"></div>
 {% endblock content %}
 
 {% block scripts %}
 <script>
+const timelinePatientId = "{{ patient_id }}";
+let timelineDoctorsLoaded = false;
+
+async function ensureDoctorOptions() {
+    if (timelineDoctorsLoaded) return;
+    try {
+        const response = await fetch("/api/doctors", { headers: { Accept: "application/json" } });
+        if (response.ok) {
+            const doctors = await response.json();
+            const select = document.getElementById("add-record-doctor");
+            select.innerHTML = '<option value="">Not assigned</option>' +
+                doctors.map(d => `<option value="${d.id}">${d.name} — ${d.specialization}</option>`).join("");
+        }
+        timelineDoctorsLoaded = true;
+    } catch (error) {
+        console.warn("Could not load doctors:", error);
+    }
+}
+
+async function openNewRecordModal() {
+    await ensureDoctorOptions();
+    openModal("addRecordModal");
+}
+
+async function saveNewRecord(button) {
+    const modal = button.closest(".modal");
+    const errorBox = modal.querySelector(".error-box");
+    errorBox.style.display = "none";
+
+    const payload = {
+        patient_id: timelinePatientId,
+        doctor_id: document.getElementById("add-record-doctor").value || null,
+        blood_pressure: document.getElementById("add-record-bp").value || null,
+        temperature: document.getElementById("add-record-temp").value || null,
+        pulse_rate: document.getElementById("add-record-pulse").value || null,
+        height_cm: document.getElementById("add-record-height").value || null,
+        weight_kg: document.getElementById("add-record-weight").value || null,
+        reason_of_visit: document.getElementById("add-record-reason").value || null,
+        clinical_findings: document.getElementById("add-record-findings").value || null,
+        diagnosis: document.getElementById("add-record-diagnosis").value || null,
+        treatment_plan: document.getElementById("add-record-treatment").value || null,
+        doctor_notes: document.getElementById("add-record-notes").value || null,
+    };
+
+    try {
+        const response = await fetch("/api/medical-records", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(await response.text());
+
+        // Reload so the new entry appears in the server-rendered timeline.
+        window.location.reload();
+    } catch (error) {
+        errorBox.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${error.message || "Could not save the record."}`;
+        errorBox.style.display = "flex";
+    }
+}
+
 function toggleEntry(head) {
     const body = head.nextElementSibling;
     const chevron = head.querySelector('.chevron');

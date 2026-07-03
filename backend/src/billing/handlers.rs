@@ -2,6 +2,7 @@ use super::models::{ClinicalSummary, CreateInvoiceForm, PaymentStatus, RecordPay
 use super::pdf::render_medical_report_pdf;
 use super::service::{BillingError, BillingService};
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
+use crate::doctors::service::DoctorService;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 use crate::models::{PatientView, SupabasePatientRow};
 use actix_web::http::header;
@@ -222,9 +223,11 @@ pub async fn cancel_invoice(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn show_medical_report(
     req: HttpRequest,
     billing_service: web::Data<BillingService>,
+    doctor_service: web::Data<DoctorService>,
     templates: web::Data<Tera>,
     path: web::Path<String>,
     firebase_auth: web::Data<FirebaseAuth>,
@@ -251,6 +254,7 @@ pub async fn show_medical_report(
             let patient = find_patient(&supabase_db, &report.invoice.patient_id).await;
             let clinical_record = find_clinical_summary(
                 &supabase_db,
+                &doctor_service,
                 &report.invoice.patient_id,
                 report.invoice.appointment_id.as_deref(),
             )
@@ -264,9 +268,11 @@ pub async fn show_medical_report(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn download_medical_report_pdf(
     req: HttpRequest,
     billing_service: web::Data<BillingService>,
+    doctor_service: web::Data<DoctorService>,
     templates: web::Data<Tera>,
     path: web::Path<String>,
     firebase_auth: web::Data<FirebaseAuth>,
@@ -292,6 +298,7 @@ pub async fn download_medical_report_pdf(
             let patient = find_patient(&supabase_db, &report.invoice.patient_id).await;
             let clinical_record = find_clinical_summary(
                 &supabase_db,
+                &doctor_service,
                 &report.invoice.patient_id,
                 report.invoice.appointment_id.as_deref(),
             )
@@ -328,6 +335,7 @@ async fn find_patient(database: &SupabaseRestDb, patient_id: &str) -> Option<Pat
 
 async fn find_clinical_summary(
     database: &SupabaseRestDb,
+    doctor_service: &DoctorService,
     patient_id: &str,
     appointment_id: Option<&str>,
 ) -> Option<ClinicalSummary> {
@@ -335,10 +343,23 @@ async fn find_clinical_summary(
         .get_latest_medical_record(patient_id, appointment_id)
         .await
         .ok()?;
-    serde_json::from_str::<Vec<ClinicalSummary>>(&body)
+    let mut summary = serde_json::from_str::<Vec<ClinicalSummary>>(&body)
         .ok()?
         .into_iter()
-        .next()
+        .next()?;
+
+    // The record's doctor_name column is rarely filled in directly — the
+    // record form only ever captures doctor_id — so resolve the name from
+    // the doctor profile whenever it's missing.
+    if summary.doctor_name.is_none() {
+        if let Some(doctor_id) = summary.doctor_id.as_deref() {
+            if let Ok(doctor) = doctor_service.find_doctor(doctor_id).await {
+                summary.doctor_name = Some(doctor.name);
+            }
+        }
+    }
+
+    Some(summary)
 }
 
 fn render_template(templates: &Tera, template_name: &str, context: &Context) -> HttpResponse {

@@ -59,6 +59,10 @@ function renderStaffRow(staff, index) {
                 <span class="tooltip-text">Edit Details</span>
             </div>
             <div class="has-tooltip">
+                <i class="fa-solid fa-key" onclick="openSetPasswordModal(${index})"></i>
+                <span class="tooltip-text">Set Password</span>
+            </div>
+            <div class="has-tooltip">
                 <i class="delete fa-solid fa-trash" onclick="deleteStaff('${escapeHtml(staff.id)}')"></i>
                 <span class="tooltip-text">Delete Staff</span>
             </div>
@@ -312,6 +316,65 @@ function editStaff(index) {
     toggleEditDoctorFields();
 
     openModal("editStaffModal");
+}
+
+let setPasswordStaffId = null;
+
+function openSetPasswordModal(index) {
+    const s = pagination.paginatedData[index];
+    if (!s) return;
+
+    setPasswordStaffId = s.id;
+    const fullName = `${s.firstName} ${s.lastName}`.trim();
+    document.getElementById("setPasswordDescription").textContent =
+        `Set a new login password for ${fullName || s.id}. They can sign in with it immediately.`;
+    document.getElementById("setPassword-new").value = "";
+    document.getElementById("setPassword-confirm").value = "";
+
+    const modal = document.getElementById("setPasswordModal");
+    modal.querySelectorAll(".error-box").forEach(box => { box.style.display = "none"; });
+
+    openModal("setPasswordModal");
+}
+
+async function submitSetPassword() {
+    const modal = document.getElementById("setPasswordModal");
+    const errorBox = modal.querySelector(".error-box");
+    const newPassword = document.getElementById("setPassword-new").value;
+    const confirmPassword = document.getElementById("setPassword-confirm").value;
+
+    if (newPassword.length < 6) {
+        errorBox.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Password must be at least 6 characters.';
+        errorBox.style.display = "flex";
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        errorBox.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Passwords do not match.';
+        errorBox.style.display = "flex";
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/staff/${encodeURIComponent(setPasswordStaffId)}/password`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ new_password: newPassword })
+        });
+
+        if (!response.ok) {
+            const message = await response.text();
+            errorBox.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${escapeHtml(message)}`;
+            errorBox.style.display = "flex";
+            return;
+        }
+
+        modal.style.display = "none";
+        document.documentElement.classList.remove("no-scroll");
+        notify("Password updated successfully.", "success");
+    } catch (error) {
+        errorBox.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${escapeHtml(error.message || "Could not reach the server.")}`;
+        errorBox.style.display = "flex";
+    }
 }
 
 function applySearch() {

@@ -40,6 +40,17 @@ impl DoctorDashboardService {
             .map_err(Self::map_repository_error)
     }
 
+    pub async fn extend_consultation(
+        &self,
+        firebase_uid: &str,
+        appointment_id: &str,
+    ) -> Result<(), DoctorDashboardError> {
+        self.repository
+            .extend_consultation(firebase_uid, appointment_id)
+            .await
+            .map_err(Self::map_repository_error)
+    }
+
     pub async fn complete_consultation(
         &self,
         firebase_uid: &str,

@@ -116,6 +116,75 @@ impl FirebaseAdmin {
         }
     }
 
+    // Keeps the Firebase Auth login email in sync with the staff record.
+    // Without this, editing a staff member's email only changes Supabase —
+    // the account still signs in with whatever email it was created under.
+    pub async fn update_email(&self, uid: &str, new_email: &str) -> Result<(), String> {
+        let token = self.access_token().await?;
+        let url = format!(
+            "https://identitytoolkit.googleapis.com/v1/accounts:update?key={}",
+            self.api_key
+        );
+        let response = self
+            .client
+            .post(url)
+            .bearer_auth(token)
+            .json(&json!({ "localId": uid, "email": new_email.trim() }))
+            .send()
+            .await
+            .map_err(|_| "Could not contact Firebase Authentication".to_string())?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(firebase_error(response).await)
+        }
+    }
+
+    // Lets an admin set a user's password directly
+    pub async fn set_password(&self, uid: &str, new_password: &str) -> Result<(), String> {
+        let token = self.access_token().await?;
+        let url = format!(
+            "https://identitytoolkit.googleapis.com/v1/accounts:update?key={}",
+            self.api_key
+        );
+        let response = self
+            .client
+            .post(url)
+            .bearer_auth(token)
+            .json(&json!({ "localId": uid, "password": new_password }))
+            .send()
+            .await
+            .map_err(|_| "Could not contact Firebase Authentication".to_string())?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(firebase_error(response).await)
+        }
+    }
+
+    // Used to offboard a doctor: the account is kept (for audit/history) but
+    // can no longer sign in, unlike delete_user which removes it entirely.
+    pub async fn disable_user(&self, uid: &str) -> Result<(), String> {
+        let token = self.access_token().await?;
+        let url = format!(
+            "https://identitytoolkit.googleapis.com/v1/accounts:update?key={}",
+            self.api_key
+        );
+        let response = self
+            .client
+            .post(url)
+            .bearer_auth(token)
+            .json(&json!({ "localId": uid, "disableUser": true }))
+            .send()
+            .await
+            .map_err(|_| "Could not contact Firebase Authentication".to_string())?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(firebase_error(response).await)
+        }
+    }
+
     pub async fn save_staff_profile(
         &self,
         uid: &str,

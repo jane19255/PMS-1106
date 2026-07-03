@@ -1,5 +1,5 @@
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveTime, Utc, Weekday};
 use firebase_auth::FirebaseAuth;
 use serde_json::{json, Value};
 use tera::{Context, Tera};
@@ -7,7 +7,8 @@ use uuid::Uuid;
 
 use crate::appointments::interval::AppointmentInterval;
 use crate::appointments::scheduler::AppointmentScheduler;
-use crate::db::{singapore_today, FirebaseRestDb, SupabaseRestDb};
+use crate::db::{singapore_offset, singapore_today, FirebaseRestDb, SupabaseRestDb};
+use crate::doctors::models::{DayOfWeek, DoctorSchedule, DoctorStatus};
 use crate::doctors::service::DoctorService;
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
 
@@ -67,13 +68,13 @@ pub async fn appointments_page(
 
 // ── Shared validation/conflict logic ─────────────────────────────────────────
 
-enum AppointmentError {
+pub(crate) enum AppointmentError {
     BadRequest(String),
     Conflict(Vec<(DateTime<Utc>, DateTime<Utc>)>),
     ServerError(String),
 }
 
-async fn validate_and_check_conflict(
+pub(crate) async fn validate_and_check_conflict(
     db: &SupabaseRestDb,
     doctor_service: &DoctorService,
     mut appointment: Value,
@@ -92,9 +93,12 @@ async fn validate_and_check_conflict(
         ));
     };
 
-    if doctor_service.find_doctor(&doctor_id).await.is_err() {
+    let doctor = doctor_service.find_doctor(&doctor_id).await.map_err(|_| {
+        AppointmentError::BadRequest("Selected doctor does not exist".to_string())
+    })?;
+    if doctor.status != DoctorStatus::Available {
         return Err(AppointmentError::BadRequest(
-            "Selected doctor does not exist".to_string(),
+            "Selected doctor is not currently available".to_string(),
         ));
     }
 
@@ -141,7 +145,7 @@ async fn validate_and_check_conflict(
             ))
         }
     };
-    if requested_start.date_naive() < singapore_today() {
+    if requested_start < Utc::now() {
         return Err(AppointmentError::BadRequest(
             "Appointments cannot be scheduled in the past".to_string(),
         ));
@@ -154,6 +158,16 @@ async fn validate_and_check_conflict(
     if !(5..=480).contains(&duration) {
         return Err(AppointmentError::BadRequest(
             "duration_minutes must be between 5 and 480".to_string(),
+        ));
+    }
+
+    let schedules = doctor_service
+        .list_schedules(&doctor_id)
+        .await
+        .map_err(|_| AppointmentError::ServerError("Could not load doctor schedule".to_string()))?;
+    if !appointment_fits_schedule(requested_start, duration, &schedules) {
+        return Err(AppointmentError::BadRequest(
+            "Selected time is outside the doctor's working schedule".to_string(),
         ));
     }
 
@@ -212,12 +226,70 @@ async fn validate_and_check_conflict(
     let requested = AppointmentInterval::new(requested_start, duration);
 
     if scheduler.has_conflict(&requested) {
-        return Err(AppointmentError::Conflict(
-            scheduler.suggest_slots(duration),
-        ));
+        let suggestions = scheduler
+            .suggest_slots(duration)
+            .into_iter()
+            .filter(|(start, _)| appointment_fits_schedule(*start, duration, &schedules))
+            .collect();
+        return Err(AppointmentError::Conflict(suggestions));
     }
 
     Ok(appointment)
+}
+
+fn appointment_fits_schedule(
+    start_utc: DateTime<Utc>,
+    duration_minutes: i64,
+    schedules: &[DoctorSchedule],
+) -> bool {
+    let local_start = start_utc.with_timezone(&singapore_offset());
+    let local_end = local_start + Duration::minutes(duration_minutes);
+
+    // Doctors without a custom schedule use the clinic's normal opening hours.
+    if schedules.is_empty() {
+        let morning_start = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+        let morning_end = NaiveTime::from_hms_opt(12, 0, 0).unwrap();
+        let afternoon_start = NaiveTime::from_hms_opt(13, 0, 0).unwrap();
+        let clinic_close = NaiveTime::from_hms_opt(19, 0, 0).unwrap();
+        return local_start.date_naive() == local_end.date_naive()
+            && ((local_start.time() >= morning_start && local_end.time() <= morning_end)
+                || (local_start.time() >= afternoon_start && local_end.time() <= clinic_close));
+    }
+
+    // A booking must start and finish within one configured working period.
+    schedules.iter().any(|schedule| {
+        if weekday_for_schedule(&schedule.day_of_week) != local_start.weekday() {
+            return false;
+        }
+        let Some(schedule_start) = parse_schedule_time(&schedule.start_time) else {
+            return false;
+        };
+        let Some(schedule_end) = parse_schedule_time(&schedule.end_time) else {
+            return false;
+        };
+
+        local_start.date_naive() == local_end.date_naive()
+            && local_start.time() >= schedule_start
+            && local_end.time() <= schedule_end
+    })
+}
+
+fn parse_schedule_time(value: &str) -> Option<NaiveTime> {
+    NaiveTime::parse_from_str(value, "%H:%M:%S")
+        .or_else(|_| NaiveTime::parse_from_str(value, "%H:%M"))
+        .ok()
+}
+
+fn weekday_for_schedule(day: &DayOfWeek) -> Weekday {
+    match day {
+        DayOfWeek::Monday => Weekday::Mon,
+        DayOfWeek::Tuesday => Weekday::Tue,
+        DayOfWeek::Wednesday => Weekday::Wed,
+        DayOfWeek::Thursday => Weekday::Thu,
+        DayOfWeek::Friday => Weekday::Fri,
+        DayOfWeek::Saturday => Weekday::Sat,
+        DayOfWeek::Sunday => Weekday::Sun,
+    }
 }
 
 fn appointment_blocks_time_slot(appointment: &Value) -> bool {
@@ -493,9 +565,11 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        appointment_blocks_time_slot, is_database_schedule_conflict,
+        appointment_blocks_time_slot, appointment_fits_schedule, is_database_schedule_conflict,
         normalize_appointment_payload, NON_CANCELLABLE_STATUSES,
     };
+    use crate::doctors::models::{DayOfWeek, DoctorSchedule};
+    use chrono::{DateTime, Utc};
 
     #[test]
     fn cancelled_and_no_show_appointments_do_not_block_slots() {
@@ -546,5 +620,42 @@ mod tests {
     #[test]
     fn appointments_with_vitals_cannot_be_cancelled() {
         assert!(NON_CANCELLABLE_STATUSES.contains(&"Vitals Recorded"));
+    }
+
+    #[test]
+    fn appointment_must_fit_inside_doctor_schedule() {
+        let schedule = DoctorSchedule {
+            id: "S-1".to_string(),
+            doctor_id: "D-1".to_string(),
+            day_of_week: DayOfWeek::Monday,
+            start_time: "09:00".to_string(),
+            end_time: "12:00".to_string(),
+        };
+        let inside = DateTime::parse_from_rfc3339("2026-07-06T10:00:00+08:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        let too_late = DateTime::parse_from_rfc3339("2026-07-06T11:45:00+08:00")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        assert!(appointment_fits_schedule(
+            inside,
+            30,
+            std::slice::from_ref(&schedule)
+        ));
+        assert!(!appointment_fits_schedule(too_late, 30, &[schedule]));
+    }
+
+    #[test]
+    fn doctor_without_schedule_uses_default_clinic_hours() {
+        let morning = DateTime::parse_from_rfc3339("2026-07-06T09:00:00+08:00")
+            .unwrap()
+            .with_timezone(&Utc);
+        let lunch = DateTime::parse_from_rfc3339("2026-07-06T12:00:00+08:00")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        assert!(appointment_fits_schedule(morning, 30, &[]));
+        assert!(!appointment_fits_schedule(lunch, 30, &[]));
     }
 }

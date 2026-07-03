@@ -1,6 +1,6 @@
 use super::models::DoctorQueueAppointment;
-use crate::db::singapore_today;
-use chrono::{DateTime, NaiveDate, Timelike, Utc};
+use crate::db::{singapore_day_bounds, singapore_offset, singapore_today};
+use chrono::{DateTime, NaiveDate, SecondsFormat, Timelike, Utc};
 use reqwest::{Client, Response};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -29,6 +29,12 @@ pub trait DoctorDashboardRepository: Send + Sync {
         appointment_id: &str,
     ) -> RepositoryFuture<'_, ()>;
 
+    fn extend_consultation(
+        &self,
+        firebase_uid: &str,
+        appointment_id: &str,
+    ) -> RepositoryFuture<'_, ()>;
+
     fn complete_consultation(
         &self,
         firebase_uid: &str,
@@ -49,6 +55,14 @@ impl DoctorDashboardRepository for InMemoryDoctorDashboardRepository {
     }
 
     fn start_consultation(
+        &self,
+        _firebase_uid: &str,
+        _appointment_id: &str,
+    ) -> RepositoryFuture<'_, ()> {
+        Box::pin(async { Ok(()) })
+    }
+
+    fn extend_consultation(
         &self,
         _firebase_uid: &str,
         _appointment_id: &str,
@@ -101,16 +115,18 @@ impl SupabaseDoctorDashboardRepository {
     }
 
     fn appointments_url(&self, doctor_id: &str, date: NaiveDate) -> String {
-        let next_day = date.succ_opt().unwrap_or(date);
-        let select = "id,patient_id,scheduled_at,patients(id,first_name,last_name),patient_queue(status,priority)";
+        let (start, end) = singapore_day_bounds(date);
+        let start = start.to_rfc3339_opts(SecondsFormat::Secs, true);
+        let end = end.to_rfc3339_opts(SecondsFormat::Secs, true);
+        let select = "id,patient_id,scheduled_at,consultation_deadline,patients(id,first_name,last_name),patient_queue(status,priority)";
         // Today's list also includes older patients whose visit is still unfinished.
         let date_filter = if date == singapore_today() {
             format!(
-                "or=(and(scheduled_at.gte.{date}T00:00:00Z,scheduled_at.lt.{next_day}T00:00:00Z),and(scheduled_at.lt.{date}T00:00:00Z,status.in.(Checked%20In,Vitals%20Recorded,In%20Consultation)))"
+                "or=(and(scheduled_at.gte.{start},scheduled_at.lt.{end}),and(scheduled_at.lt.{start},status.in.(Checked%20In,Vitals%20Recorded,In%20Consultation)))"
             )
         } else {
             format!(
-                "scheduled_at=gte.{date}T00:00:00Z&scheduled_at=lt.{next_day}T00:00:00Z"
+                "scheduled_at=gte.{start}&scheduled_at=lt.{end}"
             )
         };
 
@@ -265,6 +281,40 @@ impl DoctorDashboardRepository for SupabaseDoctorDashboardRepository {
         })
     }
 
+    fn extend_consultation(
+        &self,
+        firebase_uid: &str,
+        appointment_id: &str,
+    ) -> RepositoryFuture<'_, ()> {
+        let firebase_uid = firebase_uid.to_string();
+        let appointment_id = appointment_id.to_string();
+
+        Box::pin(async move {
+            let doctor_response = self
+                .request(self.client.get(self.staff_doctor_url(&firebase_uid)))
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+            let doctor_id = Self::decode_doctor_id(doctor_response).await?;
+
+            let payload = json!({
+                "p_appointment_id": appointment_id,
+                "p_doctor_id": doctor_id,
+            });
+            let response = self
+                .request(
+                    self.client
+                        .post(format!("{}/rest/v1/rpc/extend_consultation", self.url)),
+                )
+                .json(&payload)
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            Self::ensure_success(response).await
+        })
+    }
+
     fn complete_consultation(
         &self,
         firebase_uid: &str,
@@ -310,6 +360,7 @@ struct DatabaseAppointment {
     id: String,
     patient_id: String,
     scheduled_at: DateTime<Utc>,
+    consultation_deadline: Option<DateTime<Utc>>,
     patients: DatabasePatient,
     patient_queue: Option<Value>,
 }
@@ -331,10 +382,15 @@ impl From<DatabaseAppointment> for DoctorQueueAppointment {
             patient_name: format!("{} {}", row.patients.first_name, row.patients.last_name)
                 .trim()
                 .to_string(),
-            appointment_date: row.scheduled_at.format("%Y-%m-%d").to_string(),
+            appointment_date: row
+                .scheduled_at
+                .with_timezone(&singapore_offset())
+                .format("%Y-%m-%d")
+                .to_string(),
             appointment_time: format_time(row.scheduled_at),
             queue_status,
             priority,
+            consultation_deadline: row.consultation_deadline.map(|value| value.to_rfc3339()),
         }
     }
 }
@@ -378,8 +434,9 @@ fn queue_priority_from_value(value: Option<&Value>) -> String {
 }
 
 fn format_time(value: DateTime<Utc>) -> String {
-    let hour = value.hour();
-    let minute = value.minute();
+    let local = value.with_timezone(&singapore_offset());
+    let hour = local.hour();
+    let minute = local.minute();
     let suffix = if hour < 12 { "AM" } else { "PM" };
     let hour_12 = match hour % 12 {
         0 => 12,

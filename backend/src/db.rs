@@ -1,11 +1,28 @@
-use chrono::{FixedOffset, NaiveDate, Utc};
+use chrono::{DateTime, FixedOffset, NaiveDate, TimeZone, Utc};
 use reqwest::Client;
 use serde_json::Value;
 
+pub fn singapore_offset() -> FixedOffset {
+    FixedOffset::east_opt(8 * 60 * 60).expect("Singapore offset is valid")
+}
+
+pub fn singapore_now() -> DateTime<FixedOffset> {
+    Utc::now().with_timezone(&singapore_offset())
+}
+
 pub fn singapore_today() -> NaiveDate {
     // Clinic dates must follow Singapore time instead of the server's UTC date.
-    let singapore = FixedOffset::east_opt(8 * 60 * 60).expect("Singapore offset is valid");
-    Utc::now().with_timezone(&singapore).date_naive()
+    singapore_now().date_naive()
+}
+
+pub fn singapore_day_bounds(date: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
+    // Supabase stores UTC instants, so Singapore midnight is 16:00 UTC the day before.
+    let start = singapore_offset()
+        .from_local_datetime(&date.and_hms_opt(0, 0, 0).expect("midnight is valid"))
+        .single()
+        .expect("Singapore has no daylight-saving ambiguity")
+        .with_timezone(&Utc);
+    (start, start + chrono::Duration::days(1))
 }
 
 #[derive(Clone)]
@@ -118,21 +135,37 @@ impl SupabaseRestDb {
         appointment_id: Option<&str>,
     ) -> Result<String, String> {
         let encoded_patient_id = urlencoding::encode(patient_id);
-        let mut query = format!(
+        let patient_only_query = format!(
             "medical_records?patient_id=eq.{}&select=*&order=recorded_at.desc.nullslast&limit=1",
             encoded_patient_id
         );
 
         if let Some(appointment_id) = appointment_id.filter(|id| !id.trim().is_empty()) {
-            query = format!(
+            let query = format!(
                 "medical_records?patient_id=eq.{}&appointment_id=eq.{}&select=*&order=recorded_at.desc.nullslast&limit=1",
                 encoded_patient_id,
                 urlencoding::encode(appointment_id)
             );
+            let response = self
+                .authed(self.http_client.get(self.rest_url(&query)))
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
+            let body = Self::read_response(response).await?;
+
+            // Records aren't always saved with an appointment link, so an
+            // exact match here isn't reliable — fall back to the patient's
+            // most recent record rather than reporting nothing found.
+            let has_match = serde_json::from_str::<Vec<Value>>(&body)
+                .map(|rows| !rows.is_empty())
+                .unwrap_or(false);
+            if has_match {
+                return Ok(body);
+            }
         }
 
         let response = self
-            .authed(self.http_client.get(self.rest_url(&query)))
+            .authed(self.http_client.get(self.rest_url(&patient_only_query)))
             .send()
             .await
             .map_err(|e| e.to_string())?;

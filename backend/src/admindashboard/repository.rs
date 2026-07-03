@@ -1,5 +1,5 @@
-use crate::db::SupabaseRestDb;
-use chrono::NaiveDate;
+use crate::db::{singapore_day_bounds, SupabaseRestDb};
+use chrono::{NaiveDate, SecondsFormat};
 use serde_json::json;
 
 const APPOINTMENT_SELECT: &str =
@@ -10,16 +10,18 @@ pub async fn get_appointments_by_date(
     target_date: NaiveDate,
     today: NaiveDate,
 ) -> Result<String, String> {
-    let next_day = target_date.succ_opt().unwrap();
+    let (start, end) = singapore_day_bounds(target_date);
+    let start = start.to_rfc3339_opts(SecondsFormat::Secs, true);
+    let end = end.to_rfc3339_opts(SecondsFormat::Secs, true);
 
     let filter = if target_date == today {
         // Today's dashboard also carries forward patients who already checked in.
         format!(
-            "{APPOINTMENT_SELECT}&or=(and(scheduled_at.gte.{target_date}T00:00:00Z,scheduled_at.lt.{next_day}T00:00:00Z),and(scheduled_at.lt.{target_date}T00:00:00Z,status.in.(Checked%20In,Vitals%20Recorded,In%20Consultation)))&order=scheduled_at.asc"
+            "{APPOINTMENT_SELECT}&or=(and(scheduled_at.gte.{start},scheduled_at.lt.{end}),and(scheduled_at.lt.{start},status.in.(Checked%20In,Vitals%20Recorded,In%20Consultation)))&order=scheduled_at.asc"
         )
     } else {
         format!(
-            "{APPOINTMENT_SELECT}&scheduled_at=gte.{target_date}T00:00:00Z&scheduled_at=lt.{next_day}T00:00:00Z&order=scheduled_at.asc"
+            "{APPOINTMENT_SELECT}&scheduled_at=gte.{start}&scheduled_at=lt.{end}&order=scheduled_at.asc"
         )
     };
 

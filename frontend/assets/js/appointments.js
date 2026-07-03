@@ -1,7 +1,10 @@
 let appointmentsData = [];
 let doctorsData = [];
 let patientsData = [];
+const doctorSchedules = new Map();
 let currentEditId = null;
+const CLINIC_TIME_ZONE = "Asia/Singapore";
+const APPOINTMENT_DURATION_MINUTES = 30;
 
 const pagination = new Pagination({
     data: appointmentsData,
@@ -33,14 +36,39 @@ function patientLabel(id) {
 }
 
 function splitScheduledAt(iso) {
-    // scheduled_at is stored as literal clock digits tagged UTC (no real timezone math elsewhere in this app), so read it back with the UTC getters.
     const dt = new Date(iso);
-    const date = iso.split("T")[0];
-    let hours = dt.getUTCHours();
-    const minutes = String(dt.getUTCMinutes()).padStart(2, "0");
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: CLINIC_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+    }).formatToParts(dt).reduce((result, part) => {
+        result[part.type] = part.value;
+        return result;
+    }, {});
+    const date = `${parts.year}-${parts.month}-${parts.day}`;
+    const time24 = `${parts.hour}:${parts.minute}`;
+    let hours = Number(parts.hour);
+    const minutes = parts.minute;
     const ampm = hours >= 12 ? "PM" : "AM";
     hours = hours % 12 || 12;
-    return { date, time24: `${String(dt.getUTCHours()).padStart(2, "0")}:${minutes}`, timeDisplay: `${hours}:${minutes} ${ampm}` };
+    return { date, time24, timeDisplay: `${hours}:${minutes} ${ampm}` };
+}
+
+function clinicDateString(date = new Date()) {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: CLINIC_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).format(date);
+}
+
+function singaporeTimestamp(date, time) {
+    return `${date}T${time}:00+08:00`;
 }
 
 function renderAppointmentRow(item) {
@@ -74,17 +102,15 @@ function renderAppointmentRow(item) {
 }
 
 function parseDate(dateStr) {
-    return new Date(dateStr);
+    return new Date(`${dateStr}T00:00:00+08:00`);
 }
 
 function filterByDateRange(list, dateRange) {
     if (!dateRange || dateRange === "") return list;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const oneWeekLater = new Date(today);
-    oneWeekLater.setDate(today.getDate() + 7);
+    const todayString = clinicDateString();
+    const today = parseDate(todayString);
+    const oneWeekLater = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     return list.filter(item => {
         const apptDate = parseDate(splitScheduledAt(item.scheduled_at).date);
@@ -96,7 +122,7 @@ function filterByDateRange(list, dateRange) {
             case "thisweek":
                 return apptDate >= today && apptDate < oneWeekLater;
             case "thismonth":
-                return apptDate.getMonth() === today.getMonth() && apptDate.getFullYear() === today.getFullYear();
+                return splitScheduledAt(item.scheduled_at).date.slice(0, 7) === todayString.slice(0, 7);
             default:
                 return true;
         }
@@ -141,7 +167,7 @@ function refreshAppointmentList() {
 }
 
 function updateStatCards() {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = clinicDateString();
     const now = new Date();
 
     const todayCount = appointmentsData.filter(a => splitScheduledAt(a.scheduled_at).date === todayStr).length;
@@ -151,8 +177,7 @@ function updateStatCards() {
     ).length;
     const completedThisMonth = appointmentsData.filter(a => {
         if (a.status !== "Completed") return false;
-        const d = new Date(a.scheduled_at);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        return splitScheduledAt(a.scheduled_at).date.slice(0, 7) === todayStr.slice(0, 7);
     }).length;
     const cancelledCount = appointmentsData.filter(a => a.status === "Cancelled").length;
 
@@ -208,6 +233,16 @@ async function loadDoctors() {
     }
 
     const bookableDoctors = doctorsData.filter(d => d.status === "Available");
+
+    doctorSchedules.clear();
+    await Promise.all(doctorsData.map(async doctor => {
+        try {
+            const response = await fetch(`/api/doctors/${encodeURIComponent(doctor.id)}/schedules`);
+            doctorSchedules.set(doctor.id, response.ok ? await response.json() : []);
+        } catch (_error) {
+            doctorSchedules.set(doctor.id, []);
+        }
+    }));
 
     const addSelect = document.getElementById("doctorList");
     if (addSelect) {
@@ -271,6 +306,29 @@ function computeBookedRanges(doctorId, excludeId) {
         });
 }
 
+function slotFitsDoctorSchedule(doctorId, dateValue, time) {
+    const schedules = doctorSchedules.get(doctorId) || [];
+    const start = new Date(singaporeTimestamp(dateValue, time));
+    const end = new Date(start.getTime() + APPOINTMENT_DURATION_MINUTES * 60000);
+    const dayName = new Intl.DateTimeFormat("en-US", {
+        timeZone: CLINIC_TIME_ZONE,
+        weekday: "long"
+    }).format(start);
+    const endTime = splitScheduledAt(end.toISOString()).time24;
+
+    // Use the standard clinic hours until a custom doctor schedule is created.
+    if (schedules.length === 0) {
+        return (time >= "08:00" && endTime <= "12:00")
+            || (time >= "13:00" && endTime <= "19:00");
+    }
+
+    return schedules.some(schedule => {
+        const scheduleStart = schedule.start_time.slice(0, 5);
+        const scheduleEnd = schedule.end_time.slice(0, 5);
+        return schedule.day_of_week === dayName && time >= scheduleStart && endTime <= scheduleEnd;
+    });
+}
+
 function refreshSlotAvailability(modal, dateInputId, doctorSelectId, excludeId) {
     const dateValue = document.getElementById(dateInputId)?.value;
     const doctorId = document.getElementById(doctorSelectId)?.value;
@@ -281,10 +339,13 @@ function refreshSlotAvailability(modal, dateInputId, doctorSelectId, excludeId) 
     // Disable any displayed slot that falls inside an existing booking.
     modal.querySelectorAll(".timeslot .slot").forEach(slot => {
         const time = slot.dataset.time;
-        const slotStart = new Date(`${dateValue}T${time}:00Z`);
+        const slotStart = new Date(singaporeTimestamp(dateValue, time));
         const isBooked = booked.some(range => slotStart >= range.start && slotStart < range.end);
-        slot.classList.toggle("disable", isBooked);
-        if (isBooked) slot.classList.remove("selected");
+        const isPast = slotStart <= new Date();
+        const isOutsideSchedule = !slotFitsDoctorSchedule(doctorId, dateValue, time);
+        const disabled = isBooked || isPast || isOutsideSchedule;
+        slot.classList.toggle("disable", disabled);
+        if (disabled) slot.classList.remove("selected");
     });
 }
 
@@ -546,8 +607,8 @@ async function submitNewAppointment(button) {
     const payload = {
         patient_id: patientId,
         doctor_id: doctorId,
-        scheduled_at: `${dateValue}T${time}:00Z`,
-        duration_minutes: 30,
+        scheduled_at: singaporeTimestamp(dateValue, time),
+        duration_minutes: APPOINTMENT_DURATION_MINUTES,
         reason: document.getElementById('appointmentReason').value.trim(),
         notes: document.getElementById('appointmentNotes').value.trim() || null,
     };
@@ -568,7 +629,7 @@ async function submitNewAppointment(button) {
         } else if (res.status === 409) {
             const data = await res.json();
             const suggestionText = (data.suggestions || [])
-                .map(s => `${new Date(s.start).toLocaleString()} – ${new Date(s.end).toLocaleTimeString()}`)
+                .map(s => `${new Date(s.start).toLocaleString("en-SG", { timeZone: CLINIC_TIME_ZONE })} – ${new Date(s.end).toLocaleTimeString("en-SG", { timeZone: CLINIC_TIME_ZONE })}`)
                 .join('; ');
             goToStep(modal, 1);
             const box = modal.querySelector('.step-content[data-step="1"] .error-box');
@@ -594,8 +655,8 @@ async function submitEditAppointment(button) {
     const payload = {
         patient_id: document.getElementById('editPatientsList').value,
         doctor_id: doctorId,
-        scheduled_at: `${dateValue}T${time}:00Z`,
-        duration_minutes: 30,
+        scheduled_at: singaporeTimestamp(dateValue, time),
+        duration_minutes: APPOINTMENT_DURATION_MINUTES,
         reason: document.getElementById('editAppointmentReason').value.trim(),
         notes: document.getElementById('editAppointmentNotes').value.trim() || null,
     };
@@ -615,7 +676,7 @@ async function submitEditAppointment(button) {
         } else if (res.status === 409) {
             const data = await res.json();
             const suggestionText = (data.suggestions || [])
-                .map(s => `${new Date(s.start).toLocaleString()} – ${new Date(s.end).toLocaleTimeString()}`)
+                .map(s => `${new Date(s.start).toLocaleString("en-SG", { timeZone: CLINIC_TIME_ZONE })} – ${new Date(s.end).toLocaleTimeString("en-SG", { timeZone: CLINIC_TIME_ZONE })}`)
                 .join('; ');
             goToStep(modal, 1);
             const box = modal.querySelector('.step-content[data-step="1"] .error-box');
