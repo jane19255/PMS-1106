@@ -5,6 +5,188 @@ const doctorSchedules = new Map();
 let currentEditId = null;
 const CLINIC_TIME_ZONE = "Asia/Singapore";
 const APPOINTMENT_DURATION_MINUTES = 30;
+let pendingNewPatientId = null;
+const APPOINTMENT_NATIONALITIES = [
+    "Singapore",
+    "Malaysia",
+    "Thailand",
+    "Indonesia",
+    "Afghan",
+    "Albanian",
+    "Algerian",
+    "American",
+    "Andorran",
+    "Angolan",
+    "Argentine",
+    "Armenian",
+    "Australian",
+    "Austrian",
+    "Azerbaijani",
+    "Bahraini",
+    "Bangladeshi",
+    "Barbadian",
+    "Belarusian",
+    "Belgian",
+    "Belizean",
+    "Beninese",
+    "Bhutanese",
+    "Bolivian",
+    "Bosnian",
+    "Botswanan",
+    "Brazilian",
+    "British",
+    "Bruneian",
+    "Bulgarian",
+    "Burkinabe",
+    "Burmese",
+    "Burundian",
+    "Cambodian",
+    "Cameroonian",
+    "Canadian",
+    "Cape Verdean",
+    "Central African",
+    "Chadian",
+    "Chilean",
+    "Chinese",
+    "Colombian",
+    "Comoran",
+    "Congolese",
+    "Costa Rican",
+    "Croatian",
+    "Cuban",
+    "Cypriot",
+    "Czech",
+    "Danish",
+    "Djiboutian",
+    "Dominican",
+    "Dutch",
+    "East Timorese",
+    "Ecuadorian",
+    "Egyptian",
+    "Emirian",
+    "Equatorial Guinean",
+    "Eritrean",
+    "Estonian",
+    "Ethiopian",
+    "Fijian",
+    "Filipino",
+    "Finnish",
+    "French",
+    "Gabonese",
+    "Gambian",
+    "Georgian",
+    "German",
+    "Ghanaian",
+    "Greek",
+    "Grenadian",
+    "Guatemalan",
+    "Guinean",
+    "Guyanese",
+    "Haitian",
+    "Honduran",
+    "Hungarian",
+    "Icelandic",
+    "Indian",
+    "Iranian",
+    "Iraqi",
+    "Irish",
+    "Israeli",
+    "Italian",
+    "Ivorian",
+    "Jamaican",
+    "Japanese",
+    "Jordanian",
+    "Kazakhstani",
+    "Kenyan",
+    "Kuwaiti",
+    "Kyrgyz",
+    "Laotian",
+    "Latvian",
+    "Lebanese",
+    "Liberian",
+    "Libyan",
+    "Liechtenstein",
+    "Lithuanian",
+    "Luxembourg",
+    "Macedonian",
+    "Malagasy",
+    "Malawian",
+    "Maldivian",
+    "Maltese",
+    "Marshallese",
+    "Mauritanian",
+    "Mauritian",
+    "Mexican",
+    "Micronesian",
+    "Moldovan",
+    "Monacan",
+    "Mongolian",
+    "Montenegrin",
+    "Moroccan",
+    "Mozambican",
+    "Namibian",
+    "Nepalese",
+    "New Zealander",
+    "Nicaraguan",
+    "Nigerian",
+    "Nigerien",
+    "North Korean",
+    "Norwegian",
+    "Omani",
+    "Pakistani",
+    "Palauan",
+    "Panamanian",
+    "Paraguayan",
+    "Peruvian",
+    "Polish",
+    "Portuguese",
+    "Qatari",
+    "Romanian",
+    "Russian",
+    "Rwandan",
+    "Saint Lucian",
+    "Salvadoran",
+    "Samoan",
+    "Sao Tomean",
+    "Saudi",
+    "Scottish",
+    "Senegalese",
+    "Serbian",
+    "Seychellois",
+    "Sierra Leonean",
+    "Slovak",
+    "Slovenian",
+    "Solomon Islander",
+    "Somali",
+    "South African",
+    "South Korean",
+    "Spanish",
+    "Sri Lankan",
+    "Sudanese",
+    "Surinamese",
+    "Swazi",
+    "Swedish",
+    "Swiss",
+    "Syrian",
+    "Taiwanese",
+    "Tajik",
+    "Tanzanian",
+    "Togolese",
+    "Tongan",
+    "Trinidadian",
+    "Tunisian",
+    "Turkish",
+    "Tuvaluan",
+    "Ugandan",
+    "Ukrainian",
+    "Uruguayan",
+    "Uzbek",
+    "Venezuelan",
+    "Vietnamese",
+    "Yemeni",
+    "Zambian",
+    "Zimbabwean",
+];
 
 const pagination = new Pagination({
     data: appointmentsData,
@@ -424,12 +606,15 @@ function fillEditData(item) {
 function showAddPatientTab(cb) {
     const tab = document.getElementById("addNewPatientTab");
     const inputs = tab.querySelectorAll('input, textarea, select');
-    tab.classList.toggle('show');
+    // Explicitly show/hide the new patient panel based on checkbox state
+    tab.classList.toggle('show', cb.checked);
 
     inputs.forEach(input => {
         if (!cb.checked) {
             if (input.type === 'checkbox' || input.type === 'radio') {
                 input.checked = false;
+            } else if (input.tagName === 'SELECT') {
+                input.selectedIndex = 0;
             } else {
                 input.value = '';
             }
@@ -440,7 +625,10 @@ function showAddPatientTab(cb) {
     });
 
     const patientSelect = document.getElementById("patientsList");
-    if (patientSelect) patientSelect.required = !cb.checked;
+    if (patientSelect) {
+        patientSelect.required = !cb.checked;
+        patientSelect.disabled = cb.checked; // prevent selecting an existing patient when creating a new one
+    }
 }
 
 function goToStep(modal, targetStep) {
@@ -584,6 +772,22 @@ async function createNewPatientIfNeeded() {
     if (!res.ok) {
         const text = await res.text();
         throw new Error(text || 'Failed to register new patient');
+    }
+
+    // Refresh local patient list so UI reflects created patient immediately
+    try {
+        await loadPatients();
+        const patientSelect = document.getElementById('patientsList');
+        if (patientSelect) {
+            // Select the newly created patient if present
+            const normalized = nric;
+            const option = Array.from(patientSelect.options).find(o => o.value === normalized);
+            if (option) {
+                patientSelect.value = normalized;
+            }
+        }
+    } catch (e) {
+        // ignore; we've already created the patient on the backend
     }
 
     return nric;
@@ -731,4 +935,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Initialize the "Next" button handlers for step 1 on first load
     goToStep(document.getElementById('addAppointmentModal'), 1);
     goToStep(document.getElementById('editModal'), 1);
+
+    // Populate nationality datalist for add-patient in appointments modal
+    const dl = document.getElementById('appointmentNationalityList');
+    if (dl) {
+        APPOINTMENT_NATIONALITIES.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n;
+            dl.appendChild(opt);
+        });
+    }
 });

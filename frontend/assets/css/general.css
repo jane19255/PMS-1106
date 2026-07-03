@@ -150,6 +150,8 @@ button:disabled {
     gap: 8px;
     margin-bottom: 16px;
     display: none;
+    position: relative;
+    z-index: 10001;
 }
 
 .navigation {
@@ -271,6 +273,7 @@ input.password+i {
     width: 100%;
     position: relative;
     padding: 0;
+    z-index: 10000;
 }
 
 .modal-content {
