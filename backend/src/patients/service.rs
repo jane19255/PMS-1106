@@ -1,3 +1,8 @@
+//! This module contains the service functions for patient-related operations in the web application.
+//! It provides functions to validate and normalize patient data, as well as to construct payloads for database operations.
+//! 
+//! It is different from the handlers and the repository module, as it focuses on data validation and normalization.
+
 use chrono::NaiveDate;
 use serde_json::{json, Value};
 

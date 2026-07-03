@@ -8,11 +8,11 @@ use firebase_auth::FirebaseAuth;
 use serde_json::json;
 use tera::{Context, Tera};
 
+use super::repository;
 use super::service::{
     normalize_identifier, patient_nric, patient_payload, patient_status, validate_new_patient,
     validate_updated_patient,
 };
-use super::repository;
 
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
@@ -66,7 +66,6 @@ pub async fn list_patients(
         return rejection;
     }
 
-    // Use the repository function to list patients from Supabase
     match repository::list_patients(&supabase_db).await {
         Ok(patients) => HttpResponse::Ok().json(patients),
         Err(error) => {
