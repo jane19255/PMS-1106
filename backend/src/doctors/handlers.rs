@@ -49,6 +49,8 @@ pub fn routes(config: &mut web::ServiceConfig) {
             "/api/doctors/{doctor_id}/reassign",
             web::post().to(reassign_doctor_api),
         )
+        // Doctor availability is represented by doctor schedule routes.
+        // Appointment booking reads these schedules before accepting a time slot.
         .route(
             "/api/doctors/{doctor_id}/schedules",
             web::get().to(list_schedules_api),

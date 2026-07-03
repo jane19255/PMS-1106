@@ -11,6 +11,51 @@ use firebase_auth::FirebaseAuth;
 use std::collections::{HashMap, HashSet};
 use tera::{Context, Tera};
 
+/// Registers billing page and billing action routes under `/billing`.
+///
+/// Keeping these route definitions in the billing module makes billing follow
+/// the same module-owned routing pattern as appointments, doctors, staff, and
+/// medical records.
+pub fn routes(config: &mut web::ServiceConfig) {
+
+    // Billing routes
+    config.service(
+        web::scope("/billing")
+            .route("", web::get().to(list_invoices))
+            .route(
+                "/billable-appointments",
+                web::get().to(list_billable_appointments),
+            )
+            .route(
+                "/invoices",
+                web::post().to(create_invoice),
+            )
+            .route(
+                "/invoices/{invoice_id}",
+                web::get().to(show_invoice),
+            )
+            .route(
+                "/invoices/{invoice_id}/payments",
+                web::post().to(record_payment),
+            )
+            .route(
+                "/invoices/{invoice_id}/cancel",
+                web::post().to(cancel_invoice),
+            )
+            .route(
+                "/invoices/{invoice_id}/report",
+                web::get().to(show_medical_report),
+            )
+            .route(
+                "/invoices/{invoice_id}/report.pdf",
+                web::get().to(download_medical_report_pdf),
+            ),
+    );
+
+    // Doctor availability is exposed through the existing doctor schedule API:
+    // GET/POST /api/doctors/{doctor_id}/schedules.
+}
+
 pub async fn list_invoices(
     req: HttpRequest,
     billing_service: web::Data<BillingService>,
