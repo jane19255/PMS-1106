@@ -35,19 +35,45 @@ use prescriptions::service::PrescriptionService;
 use staff::repository::{InMemoryStaffRepository, StaffRepository, SupabaseStaffRepository};
 use staff::service::StaffService;
 use std::sync::Arc;
-use std::time::Duration;
 use tera::Tera;
 
+// Used for periodic background tasks, such as appointment reconciliation
+use std::time::Duration;
+use futures::FutureExt; // For .catch_unwind()
+use tracing::{error, info}; // For structured logging
+
+/// Starts a background task that checks and update the status of overdue appointments to "no-show" (in the database) every 5 minutes
 fn start_appointment_reconciliation(db: db::SupabaseRestDb) {
-    // Keep appointment states current even when nobody has opened a dashboard.
+    
+    // Spawn an async thread managed by Actix Web's runtime to prevent blocking the main thread
     actix_web::rt::spawn(async move {
+        // Log a status message indicating that the background worker has started
+        info!("Background appointment reconciliation worker started.");
+
+        // Keep the background task running indefinitely, looping every 5 minutes
         loop {
-            if let Err(error) = db
-                .reconcile_overdue_appointments(db::singapore_today())
-                .await
-            {
-                eprintln!("Appointment reconciliation failed: {error}");
+            // Catch panics during async operations with assert
+            let outcome = FutureExt::catch_unwind(std::panic::AssertUnwindSafe(async {
+                // Call database method to set appointment status to "no-show".
+                db.reconcile_overdue_appointments(db::singapore_today()).await
+            })).await;
+
+            // Handle success, failure, or panic outcomes
+            match outcome {
+                // No panic + No database errors
+                Ok(Ok(_)) => {
+                    info!("Appointment reconciliation completed successfully.");
+                }
+                // No panic + expected database errors (like database is offline)
+                Ok(Err(error)) => {
+                    error!("Appointment reconciliation failed: {error}");
+                }
+                // Panic in database call (like out-of-memory error) but loop will continue to run
+                Err(panic) => {
+                    error!("Appointment reconciliation panicked: {:?}. Retrying in 5 minutes.", panic);
+                }
             }
+
             actix_web::rt::time::sleep(Duration::from_secs(300)).await;
         }
     });
