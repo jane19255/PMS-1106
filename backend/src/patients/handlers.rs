@@ -1,3 +1,8 @@
+//! This module contains the HTTP handlers for patient-related operations in the web application.
+//! It decides the HTTP responses based on the results of service and repository functions.
+//! 
+//! It is different from the repository module, which handles direct database interactions.
+
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
 use serde_json::json;
@@ -7,9 +12,11 @@ use super::service::{
     normalize_identifier, patient_nric, patient_payload, patient_status, validate_new_patient,
     validate_updated_patient,
 };
+use super::repository;
+
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::handlers::auth::{require_auth_and_permission, AppAction};
-use crate::models::{Patient, PatientView, SupabasePatientRow, UpdatePatient};
+use crate::models::{Patient, UpdatePatient};
 
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/patients", web::get().to(patients_page));
@@ -59,19 +66,11 @@ pub async fn list_patients(
         return rejection;
     }
 
-    match supabase_db.list_patients().await {
-        Ok(body) => match serde_json::from_str::<Vec<SupabasePatientRow>>(&body) {
-            Ok(rows) => {
-                let patients: Vec<PatientView> = rows.into_iter().map(PatientView::from).collect();
-                HttpResponse::Ok().json(patients)
-            }
-            Err(e) => {
-                eprintln!("Failed to parse Supabase patient rows: {e} | Body: {body}");
-                HttpResponse::InternalServerError().body("Failed to parse patients from database.")
-            }
-        },
-        Err(e) => {
-            eprintln!("Failed to list patients from Supabase: {e}");
+    // Use the repository function to list patients from Supabase
+    match repository::list_patients(&supabase_db).await {
+        Ok(patients) => HttpResponse::Ok().json(patients),
+        Err(error) => {
+            eprintln!("Failed to list patients from Supabase: {error}");
             HttpResponse::InternalServerError().body("Failed to load patients from database.")
         }
     }
@@ -92,19 +91,11 @@ pub async fn get_patient_by_id(
     }
 
     let patient_id = path.into_inner();
-    match supabase_db.get_patient(&patient_id).await {
-        Ok(body) => match serde_json::from_str::<Vec<SupabasePatientRow>>(&body) {
-            Ok(rows) => match rows.into_iter().next().map(PatientView::from) {
-                Some(patient) => HttpResponse::Ok().json(patient),
-                None => HttpResponse::NotFound().body("Patient not found"),
-            },
-            Err(e) => {
-                eprintln!("Failed to parse patient {patient_id}: {e}");
-                HttpResponse::InternalServerError().body("Failed to parse patient")
-            }
-        },
-        Err(e) => {
-            eprintln!("Failed to fetch patient {patient_id}: {e}");
+    match repository::get_patient(&supabase_db, &patient_id).await {
+        Ok(Some(patient)) => HttpResponse::Ok().json(patient),
+        Ok(None) => HttpResponse::NotFound().body("Patient not found"),
+        Err(error) => {
+            eprintln!("Failed to fetch patient {patient_id}: {error}");
             HttpResponse::InternalServerError().body("Failed to load patient")
         }
     }
@@ -136,7 +127,7 @@ pub async fn create_patient(
     let patient_id = patient_nric(&validated).to_string();
     let payload = patient_payload(&validated, Some(&patient_id), Some("Active"));
 
-    match supabase_db.create_patient(&payload).await {
+    match repository::create_patient(&supabase_db, &payload).await {
         Ok(_) => {
             println!(
                 "Successfully registered patient in Supabase: {}",
@@ -183,7 +174,7 @@ pub async fn update_patient(
 
     let payload = patient_payload(&validated, None, patient_status(&validated));
 
-    match supabase_db.update_patient(&patient_id, &payload).await {
+    match repository::update_patient(&supabase_db, &patient_id, &payload).await {
         Ok(_) => HttpResponse::Ok().json(json!({ "status": "success" })),
         Err(e) => {
             eprintln!("Failed to update patient in Supabase: {e}");
@@ -211,7 +202,7 @@ pub async fn delete_patient(
     }
 
     let patient_id = path.into_inner();
-    match supabase_db.delete_patient(&patient_id).await {
+    match repository::delete_patient(&supabase_db, &patient_id).await {
         Ok(_) => HttpResponse::Ok().json(json!({ "status": "success" })),
         Err(e) => {
             eprintln!("Failed to delete patient in Supabase: {e}");
