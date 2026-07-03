@@ -223,6 +223,16 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
+    /// Reconciles overdue appointments by marking them as "no-show" in the database.
+    ///
+    /// This invokes a RPC on the Supabase database to bulk-update all appointments with dates set before the provided date accordingly.
+    /// 
+    /// ### Arguments
+    /// * `today` - The calendar date used as the cut-off boundary to determine appointments as "no-show"
+    /// 
+    /// ### Returns
+    /// * `Ok(String)` - A success message or confirmation payload from the Supabase database
+    /// * `Err(String)` - An error message regarding the network or API failure
     pub async fn reconcile_overdue_appointments(
         &self,
         today: NaiveDate,
