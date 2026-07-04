@@ -260,11 +260,14 @@
                                 <select id="patientsList" required></select>
                             </div>
                         </div>
-
-                        <div class="field">
-                            <input type="checkbox" id="addNewPatient" name="addNewPatient" value="addNewPatient"
-                                onchange="showAddPatientTab(this)">
-                            <label for="addNewPatient">New Patient (Enable to register)</label>
+                        <div class="field new-patient-switch-field">
+                            <label class="switch-label" for="addNewPatient">
+                                <span>New Patient (Enable to register)</span>
+                                <button type="button" id="addNewPatient" class="switch-toggle" aria-pressed="false"
+                                    onclick="showAddPatientTab(this)" aria-label="New Patient (Enable to register)">
+                                    <span class="switch-thumb"></span>
+                                </button>
+                            </label>
                         </div>
 
                         <div class="card row-section" id="addNewPatientTab">

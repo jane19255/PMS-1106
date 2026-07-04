@@ -199,3 +199,41 @@
         padding-top: 90px;
     }
 }
+.new-patient-switch-field {
+    margin-top: 4px;
+}
+
+.switch-label {
+    width: fit-content;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text);
+}
+
+.switch-toggle {
+    width: 44px;
+    height: 24px;
+    padding: 2px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.switch-toggle[aria-pressed="true"] {
+    background: var(--success);
+    border-color: var(--success);
+    justify-content: flex-end;
+}
+
+.switch-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}

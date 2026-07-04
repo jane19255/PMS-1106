@@ -532,8 +532,10 @@ function applySearch() {
   return patients.filter(
     (p) =>
       p.id.toLowerCase().includes(keyword) ||
+      (p.nric || "").toLowerCase().includes(keyword) ||
       p.firstName.toLowerCase().includes(keyword) ||
       p.lastName.toLowerCase().includes(keyword) ||
+      (p.email || "").toLowerCase().includes(keyword) ||
       p.phone.includes(keyword),
   );
 }
@@ -702,11 +704,12 @@ async function submitNewPatient(button) {
       clearInput(button);
       loadData();
     } else {
-      showToast("Error saving patient.");
+      const message = await response.text();
+      showToast(message || "Error saving patient.", "error");
     }
   } catch (error) {
     console.error("Failed to submit patient:", error);
-    showToast("Network error.");
+    showToast("Network error.", "error");
   }
 }
 

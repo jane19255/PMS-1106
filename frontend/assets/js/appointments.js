@@ -383,7 +383,30 @@ async function loadAppointments() {
     refreshAppointmentList();
 }
 
-async function loadPatients() {
+function cacheCreatedPatient(patientId, payload) {
+    const cachedPatient = {
+        id: patientId,
+        firstName: payload.first_name,
+        lastName: payload.last_name,
+        dob: payload.dob,
+        gender: payload.gender,
+        nric: payload.nric,
+        nationality: payload.nationality,
+        phone: payload.phone,
+        email: payload.email,
+        status: "Active"
+    };
+
+    const existingIndex = patientsData.findIndex(patient => patient.id === patientId);
+    if (existingIndex >= 0) {
+        patientsData[existingIndex] = { ...patientsData[existingIndex], ...cachedPatient };
+    } else {
+        patientsData.unshift(cachedPatient);
+    }
+}
+async function loadPatients(selectedPatientId = null) {
+    const previousAddValue = selectedPatientId || document.getElementById("patientsList")?.value || "";
+    const previousEditValue = document.getElementById("editPatientsList")?.value || "";
     try {
         const res = await fetch("/api/patients");
         if (!res.ok) throw new Error(`Patients API returned ${res.status}`);
@@ -398,10 +421,16 @@ async function loadPatients() {
         .join("");
 
     const addSelect = document.getElementById("patientsList");
-    if (addSelect) addSelect.innerHTML = options;
+    if (addSelect) {
+        addSelect.innerHTML = options;
+        if (previousAddValue) addSelect.value = previousAddValue;
+    }
 
     const editSelect = document.getElementById("editPatientsList");
-    if (editSelect) editSelect.innerHTML = options;
+    if (editSelect) {
+        editSelect.innerHTML = options;
+        if (previousEditValue) editSelect.value = previousEditValue;
+    }
 }
 
 async function loadDoctors() {
@@ -603,32 +632,83 @@ function fillEditData(item) {
     setSelectedSlot(modal, time24);
 }
 
-function showAddPatientTab(cb) {
+function setAddPatientMode(enabled, options = {}) {
+    const { clearFields = false } = options;
+    const toggle = document.getElementById("addNewPatient");
     const tab = document.getElementById("addNewPatientTab");
-    const inputs = tab.querySelectorAll('input, textarea, select');
-    // Explicitly show/hide the new patient panel based on checkbox state
-    tab.classList.toggle('show', cb.checked);
+    const patientSelect = document.getElementById("patientsList");
+    const patientField = patientSelect?.closest(".field");
+    if (!toggle || !tab) return;
 
-    inputs.forEach(input => {
-        if (!cb.checked) {
-            if (input.type === 'checkbox' || input.type === 'radio') {
+    toggle.setAttribute("aria-pressed", String(enabled));
+    toggle.classList.toggle("active", enabled);
+    tab.classList.toggle("show", enabled);
+
+    tab.querySelectorAll("input, textarea, select").forEach(input => {
+        input.disabled = !enabled;
+        input.required = enabled;
+        if (clearFields && !enabled) {
+            if (input.type === "checkbox" || input.type === "radio") {
                 input.checked = false;
-            } else if (input.tagName === 'SELECT') {
+            } else if (input.tagName === "SELECT") {
                 input.selectedIndex = 0;
             } else {
-                input.value = '';
+                input.value = "";
             }
-            input.required = false;
-        } else {
-            input.required = true;
         }
     });
 
-    const patientSelect = document.getElementById("patientsList");
     if (patientSelect) {
-        patientSelect.required = !cb.checked;
-        patientSelect.disabled = cb.checked; // prevent selecting an existing patient when creating a new one
+        patientSelect.disabled = enabled;
+        patientSelect.required = !enabled;
+        if (enabled) patientSelect.value = "";
     }
+
+    if (patientField) {
+        patientField.style.display = enabled ? "none" : "";
+    }
+
+    if (!enabled) pendingNewPatientId = null;
+}
+
+function isAddPatientMode() {
+    return document.getElementById("addNewPatient")?.getAttribute("aria-pressed") === "true";
+}
+
+function showAddPatientTab(toggle) {
+    const enabled = toggle.getAttribute("aria-pressed") !== "true";
+    setAddPatientMode(enabled, { clearFields: !enabled });
+}
+
+function showAppointmentStepError(modal, step, message) {
+    goToStep(modal, step);
+    const errorBox = modal.querySelector(`.step-content[data-step="${step}"] .error-box`);
+    if (errorBox) {
+        errorBox.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${message}`;
+        errorBox.style.display = "flex";
+    } else {
+        showToast(message, "error");
+    }
+}
+
+function populateAppointmentNationalityDropdown() {
+    const input = document.getElementById("newPatientNationality");
+    if (!input) return;
+
+    let list = document.getElementById("appointmentNationalityList");
+    if (!list) {
+        list = document.createElement("datalist");
+        list.id = "appointmentNationalityList";
+        input.insertAdjacentElement("afterend", list);
+    }
+
+    input.setAttribute("list", list.id);
+    list.innerHTML = "";
+    APPOINTMENT_NATIONALITIES.forEach(nationality => {
+        const option = document.createElement("option");
+        option.value = nationality;
+        list.appendChild(option);
+    });
 }
 
 function goToStep(modal, targetStep) {
@@ -684,7 +764,7 @@ function validateStep(modal, step) {
     }
 
     if (step === 2 && modal.id === 'addAppointmentModal') {
-        const addingNew = document.getElementById('addNewPatient').checked;
+        const addingNew = isAddPatientMode();
         const patientSelect = document.getElementById('patientsList');
         if (!addingNew && !patientSelect.value) {
             const errorBox = modal.querySelector('.step-content[data-step="2"] .error-box');
@@ -705,7 +785,7 @@ function fillSummary(modal) {
     const time = getSelectedSlot(modal) || '—';
 
     let patientLabelText;
-    if (!isEdit && document.getElementById('addNewPatient').checked) {
+    if (!isEdit && isAddPatientMode()) {
         const fn = document.getElementById('newPatientFirstName').value.trim();
         const ln = document.getElementById('newPatientLastName').value.trim();
         patientLabelText = `${fn} ${ln} (new patient)`;
@@ -743,12 +823,24 @@ function resetStepper(modal) {
     goToStep(modal, 1);
     modal.querySelectorAll(".step-item").forEach(step => step.classList.remove("completed"));
     modal.querySelectorAll(".timeslot .slot").forEach(slot => slot.classList.remove("selected", "disable"));
+    modal.querySelectorAll(".error-box").forEach(box => {
+        box.innerHTML = "";
+        box.style.display = "none";
+    });
+
+    if (modal.id === "addAppointmentModal") {
+        setAddPatientMode(false, { clearFields: true });
+    }
 }
 
 async function createNewPatientIfNeeded() {
-    const addingNew = document.getElementById('addNewPatient').checked;
+    const addingNew = isAddPatientMode();
     if (!addingNew) {
         return document.getElementById('patientsList').value;
+    }
+
+    if (pendingNewPatientId) {
+        return pendingNewPatientId;
     }
 
     const nric = document.getElementById('newPatientNric').value.trim().toUpperCase();
@@ -774,22 +866,9 @@ async function createNewPatientIfNeeded() {
         throw new Error(text || 'Failed to register new patient');
     }
 
-    // Refresh local patient list so UI reflects created patient immediately
-    try {
-        await loadPatients();
-        const patientSelect = document.getElementById('patientsList');
-        if (patientSelect) {
-            // Select the newly created patient if present
-            const normalized = nric;
-            const option = Array.from(patientSelect.options).find(o => o.value === normalized);
-            if (option) {
-                patientSelect.value = normalized;
-            }
-        }
-    } catch (e) {
-        // ignore; we've already created the patient on the backend
-    }
-
+    pendingNewPatientId = nric;
+    cacheCreatedPatient(nric, payload);
+    await loadPatients(nric);
     return nric;
 }
 
@@ -800,7 +879,7 @@ async function submitNewAppointment(button) {
     try {
         patientId = await createNewPatientIfNeeded();
     } catch (error) {
-        showToast(error.message, 'error');
+        showToast(error.message || 'Failed to register new patient', 'error');
         return;
     }
 
@@ -827,8 +906,9 @@ async function submitNewAppointment(button) {
         if (res.ok) {
             showToast('New appointment created!', 'success');
             closeModal(button);
-            resetStepper(modal);
             clearInput(button);
+            resetStepper(modal);
+            await loadPatients(patientId);
             await loadAppointments();
         } else if (res.status === 409) {
             const data = await res.json();
@@ -896,6 +976,8 @@ async function submitEditAppointment(button) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+    populateAppointmentNationalityDropdown();
+    setAddPatientMode(false, { clearFields: true });
     await Promise.all([loadDoctors(), loadPatients()]);
     await loadAppointments();
 
@@ -936,13 +1018,4 @@ document.addEventListener("DOMContentLoaded", async () => {
     goToStep(document.getElementById('addAppointmentModal'), 1);
     goToStep(document.getElementById('editModal'), 1);
 
-    // Populate nationality datalist for add-patient in appointments modal
-    const dl = document.getElementById('appointmentNationalityList');
-    if (dl) {
-        APPOINTMENT_NATIONALITIES.forEach(n => {
-            const opt = document.createElement('option');
-            opt.value = n;
-            dl.appendChild(opt);
-        });
-    }
 });

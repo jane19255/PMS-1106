@@ -136,8 +136,8 @@ pub async fn create_patient(
         }
         Err(e) => {
             eprintln!("Failed to create patient in Supabase: {e}");
-            if e.contains("duplicate key") || e.contains("23505") {
-                HttpResponse::Conflict().body("A patient with this NRIC/FIN already exists.")
+            if let Some(message) = duplicate_patient_message(&e) {
+                HttpResponse::Conflict().body(message)
             } else {
                 HttpResponse::InternalServerError().body("Failed to save patient to database.")
             }
@@ -145,6 +145,17 @@ pub async fn create_patient(
     }
 }
 
+fn duplicate_patient_message(error: &str) -> Option<&'static str> {
+    if !(error.contains("duplicate key") || error.contains("23505")) {
+        return None;
+    }
+
+    if error.contains("patients_email_lower_uidx") || error.contains("lower(email)") {
+        Some("A patient with this email already exists.")
+    } else {
+        Some("A patient with this NRIC/FIN already exists.")
+    }
+}
 pub async fn update_patient(
     req: HttpRequest,
     path: web::Path<String>,
