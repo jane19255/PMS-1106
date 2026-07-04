@@ -1,3 +1,7 @@
+//! Admin dashboard service functions.
+//!
+//! Validates dashboard actions and coordinates repository updates for patient arrival
+//! and vitals workflows.
 use crate::admindashboard::models::{MarkArrivedPayload, SaveVitalPayload};
 use crate::admindashboard::repository;
 use crate::db::{singapore_offset, SupabaseRestDb};

@@ -1,3 +1,7 @@
+//! Admin dashboard request models.
+//!
+//! Defines payloads submitted by receptionist workflows when patients arrive, vitals
+//! are saved, or patients are sent to consultation rooms.
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]

@@ -1,3 +1,7 @@
+//! Firebase Admin REST client helpers.
+//!
+//! The backend uses this module when staff management needs privileged Firebase
+//! operations that are separate from normal request authentication.
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};

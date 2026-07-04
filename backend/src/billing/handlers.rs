@@ -1,3 +1,7 @@
+//! Billing HTTP handlers.
+//!
+//! This module serves the billing page and exposes invoice, payment, billable
+//! appointment, and medical report endpoints.
 use super::models::{ClinicalSummary, CreateInvoiceForm, PaymentStatus, RecordPaymentForm};
 use super::pdf::render_medical_report_pdf;
 use super::service::{BillingError, BillingService};

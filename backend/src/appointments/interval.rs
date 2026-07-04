@@ -1,3 +1,7 @@
+//! Appointment interval value type.
+//!
+//! Represents a booked time range so the scheduler can compare appointment overlaps
+//! without depending on HTTP request data.
 use chrono::{DateTime, Duration, Utc};
 
 #[derive(Clone, Debug)]

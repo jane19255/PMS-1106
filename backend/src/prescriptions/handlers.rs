@@ -1,3 +1,7 @@
+//! Prescription HTTP handlers.
+//!
+//! Serves prescription pages and APIs for creating, updating, dispensing, cancelling,
+//! and listing prescriptions.
 use super::service::{
     CreatePrescriptionForm, PrescriptionError, PrescriptionService, UpdatePrescriptionForm,
 };

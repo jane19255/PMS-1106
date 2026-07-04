@@ -1,3 +1,7 @@
+//! Doctor dashboard service layer.
+//!
+//! Applies consultation workflow rules before repository calls change appointment or
+//! queue state.
 use super::models::DoctorQueueAppointment;
 use super::repository::{DoctorDashboardRepository, RepositoryError};
 use chrono::NaiveDate;

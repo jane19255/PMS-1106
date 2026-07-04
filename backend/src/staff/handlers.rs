@@ -1,3 +1,7 @@
+//! Staff management HTTP handlers.
+//!
+//! Exposes APIs for listing staff, creating staff profiles, updating staff details,
+//! deleting staff records, and setting Firebase-linked passwords.
 use super::service::{StaffError, StaffForm, StaffService};
 use crate::db::FirebaseRestDb;
 use crate::doctors::service::{DoctorError, DoctorService};

@@ -1,3 +1,7 @@
+//! Doctor service layer.
+//!
+//! Validates doctor forms, protects doctor status rules, and coordinates doctor and
+//! schedule operations with the repository.
 use super::models::{DayOfWeek, Doctor, DoctorSchedule, DoctorStatus};
 use super::repository::{DoctorRepository, RepositoryError};
 use serde::Deserialize;

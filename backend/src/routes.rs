@@ -1,3 +1,7 @@
+//! Central route registration for the Actix application.
+//!
+//! Each feature module owns its own route setup, and this file combines those modules
+//! into the final server configuration used by `main`.
 use crate::appointments::handlers as appointment_handlers;
 use crate::billing::handlers as billing_handlers;
 use crate::doctors::handlers as doctor_handlers;

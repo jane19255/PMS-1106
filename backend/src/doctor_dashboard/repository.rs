@@ -1,3 +1,6 @@
+//! Doctor dashboard repository implementations.
+//!
+//! Provides queue and appointment status persistence for doctor dashboard workflows.
 use super::models::DoctorQueueAppointment;
 use crate::db::{singapore_day_bounds, singapore_offset, singapore_today};
 use chrono::{DateTime, NaiveDate, SecondsFormat, Timelike, Utc};

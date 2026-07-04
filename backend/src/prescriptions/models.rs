@@ -1,3 +1,7 @@
+//! Prescription data models.
+//!
+//! Defines prescription records and status values used by pharmacy and clinical
+//! workflows.
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

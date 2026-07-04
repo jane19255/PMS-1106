@@ -1,3 +1,7 @@
+//! Admin dashboard HTTP handlers.
+//!
+//! Serves the dashboard page and APIs for calendar appointments, patient arrival,
+//! vitals capture, room assignment, and room status polling.
 use crate::admindashboard::models::{
     MarkArrivedPayload,
     SaveVitalPayload,

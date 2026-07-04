@@ -1,3 +1,7 @@
+//! Medical record repository implementations.
+//!
+//! Provides medical record persistence and patient timeline loading through in-memory
+//! and Supabase-backed repositories.
 use super::models::MedicalRecord;
 use reqwest::Client;
 use serde::Deserialize;

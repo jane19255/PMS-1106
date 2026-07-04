@@ -1,3 +1,7 @@
+//! Prescription repository implementations.
+//!
+//! Provides prescription persistence through in-memory test storage and Supabase-backed
+//! runtime storage.
 use super::models::{Prescription, PrescriptionStatus};
 use reqwest::{Client, Response};
 use serde::Deserialize;

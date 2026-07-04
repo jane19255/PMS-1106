@@ -1,3 +1,7 @@
+//! Application entry point for the patient management backend.
+//!
+//! This file wires shared services into Actix, registers all route modules, and starts
+//! the background appointment reconciliation task before serving HTTP requests.
 mod billing;
 mod db;
 mod doctors;

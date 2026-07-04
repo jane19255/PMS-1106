@@ -1,3 +1,7 @@
+//! Doctor dashboard data models.
+//!
+//! Defines queue appointment rows and action payloads exchanged by doctor dashboard
+//! endpoints.
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

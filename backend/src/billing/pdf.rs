@@ -1,3 +1,7 @@
+//! Medical report PDF rendering.
+//!
+//! Converts a billing medical report into a downloadable PDF document for receptionist
+//! and patient-facing billing workflows.
 use super::models::{ClinicalSummary, MedicalReport};
 use crate::patients::models::PatientView;
 use printpdf::{

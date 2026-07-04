@@ -1,3 +1,7 @@
+//! Shared database and time utilities.
+//!
+//! This module contains lightweight REST clients for Firebase and Supabase plus
+//! Singapore time helpers used by appointment and dashboard workflows.
 use chrono::{DateTime, FixedOffset, NaiveDate, TimeZone, Utc};
 use reqwest::Client;
 use serde_json::Value;

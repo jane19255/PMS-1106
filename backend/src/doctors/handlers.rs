@@ -1,3 +1,7 @@
+//! Doctor management HTTP handlers.
+//!
+//! Serves doctor pages and APIs for doctor profiles, schedules, and safe doctor
+//! offboarding with future appointment reassignment.
 use super::models::DoctorStatus;
 use super::service::{
     CreateDoctorForm, CreateDoctorScheduleForm, DoctorError, DoctorService, UpdateDoctorForm,

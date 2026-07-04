@@ -1,3 +1,7 @@
+//! Prescription service layer.
+//!
+//! Validates prescription forms and enforces prescription status transitions before
+//! changes are persisted.
 use super::models::{Prescription, PrescriptionStatus};
 use super::repository::{PrescriptionRepository, RepositoryError};
 use chrono::Utc;

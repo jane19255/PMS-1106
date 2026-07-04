@@ -1,3 +1,6 @@
+//! Staff data models.
+//!
+//! Defines staff records and related serialized shapes used by staff management APIs.
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -1,3 +1,7 @@
+//! Medical record HTTP handlers.
+//!
+//! Serves medical record pages and APIs for creating, viewing, updating, deleting, and
+//! listing patient timeline entries.
 use super::models::PatientTimelineEntry;
 use super::service::{
     CreateMedicalRecordForm, MedicalRecordError, MedicalRecordService, UpdateMedicalRecordForm,

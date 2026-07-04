@@ -1,3 +1,7 @@
+//! Appointment HTTP handlers and scheduling validation.
+//!
+//! This module serves the appointments page and exposes the JSON APIs used to list,
+//! create, update, and cancel appointments.
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, Datelike, Duration, NaiveTime, Utc, Weekday};
 use firebase_auth::FirebaseAuth;

@@ -1,3 +1,7 @@
+//! Billing data models.
+//!
+//! Defines invoices, invoice items, payments, form payloads, and medical report shapes
+//! shared by billing handlers and services.
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 

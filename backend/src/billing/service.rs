@@ -1,3 +1,7 @@
+//! Billing service layer.
+//!
+//! Enforces invoice business rules such as totals, payment state transitions, and
+//! cancellation behavior before data reaches the repository.
 use super::models::{
     CreateInvoiceForm, Invoice, InvoiceItem, InvoiceItemType, MedicalReport, MedicineOption,
     Payment, PaymentStatus, RecordPaymentForm,
