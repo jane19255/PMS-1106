@@ -5,10 +5,11 @@
 use super::models::{ClinicalSummary, CreateInvoiceForm, PaymentStatus, RecordPaymentForm};
 use super::pdf::render_medical_report_pdf;
 use super::service::{BillingError, BillingService};
+use crate::auth::{require_auth_and_permission, AppAction};
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::doctors::service::DoctorService;
-use crate::auth::{require_auth_and_permission, AppAction};
-use crate::patients::models::{PatientView, SupabasePatientRow};
+use crate::patients::models::PatientView;
+use crate::patients::repository as patient_repository;
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
@@ -21,7 +22,6 @@ use tera::{Context, Tera};
 /// the same module-owned routing pattern as appointments, doctors, staff, and
 /// medical records.
 pub fn routes(config: &mut web::ServiceConfig) {
-
     // Billing routes
     config.service(
         web::scope("/billing")
@@ -30,14 +30,8 @@ pub fn routes(config: &mut web::ServiceConfig) {
                 "/billable-appointments",
                 web::get().to(list_billable_appointments),
             )
-            .route(
-                "/invoices",
-                web::post().to(create_invoice),
-            )
-            .route(
-                "/invoices/{invoice_id}",
-                web::get().to(show_invoice),
-            )
+            .route("/invoices", web::post().to(create_invoice))
+            .route("/invoices/{invoice_id}", web::get().to(show_invoice))
             .route(
                 "/invoices/{invoice_id}/payments",
                 web::post().to(record_payment),
@@ -167,7 +161,10 @@ pub async fn list_billable_appointments(
         return rejection;
     }
 
-    let patient_id = query.get("patient_id").map(|value| value.trim()).unwrap_or("");
+    let patient_id = query
+        .get("patient_id")
+        .map(|value| value.trim())
+        .unwrap_or("");
     if patient_id.is_empty() {
         return HttpResponse::BadRequest().body("Patient ID is required");
     }
@@ -234,7 +231,9 @@ async fn validate_billable_appointment(
     })?;
 
     // Stop users from attaching another patient's appointment to this invoice.
-    if appointment.get("patient_id").and_then(serde_json::Value::as_str)
+    if appointment
+        .get("patient_id")
+        .and_then(serde_json::Value::as_str)
         != Some(form.patient_id.trim())
     {
         return Err(BillingError::InvalidInput(
@@ -242,7 +241,11 @@ async fn validate_billable_appointment(
         ));
     }
     // Appointment charges should only be billed after the visit is finished.
-    if appointment.get("status").and_then(serde_json::Value::as_str) != Some("Completed") {
+    if appointment
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        != Some("Completed")
+    {
         return Err(BillingError::InvalidInput(
             "The appointment must be completed before an invoice is created.".to_string(),
         ));
@@ -441,12 +444,10 @@ pub async fn download_medical_report_pdf(
 }
 
 async fn find_patient(database: &SupabaseRestDb, patient_id: &str) -> Option<PatientView> {
-    let body = database.get_patient(patient_id).await.ok()?;
-    serde_json::from_str::<Vec<SupabasePatientRow>>(&body)
-        .ok()?
-        .into_iter()
-        .next()
-        .map(PatientView::from)
+    patient_repository::get_patient(database, patient_id)
+        .await
+        .ok()
+        .flatten()
 }
 
 async fn find_clinical_summary(

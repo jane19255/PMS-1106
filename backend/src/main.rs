@@ -13,6 +13,7 @@ mod patients;
 mod medical_records;
 mod prescriptions;
 mod routes;
+mod time;
 mod staff;
 mod appointments;
 

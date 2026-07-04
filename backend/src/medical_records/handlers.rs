@@ -6,17 +6,19 @@ use super::models::PatientTimelineEntry;
 use super::service::{
     CreateMedicalRecordForm, MedicalRecordError, MedicalRecordService, UpdateMedicalRecordForm,
 };
+use crate::auth::{require_auth_and_permission, AppAction};
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::doctors::service::DoctorService;
-use crate::auth::{require_auth_and_permission, AppAction};
-use crate::patients::models::{PatientView, SupabasePatientRow};
+use crate::patients::models::PatientView;
+use crate::patients::repository as patient_repository;
+use crate::time::{singapore_day_bounds, singapore_today};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
+use chrono::SecondsFormat;
 use firebase_auth::FirebaseAuth;
 use serde::Deserialize;
 use std::collections::HashMap;
 use tera::{Context, Tera};
-use chrono::SecondsFormat;
 
 pub fn routes(config: &mut web::ServiceConfig) {
     config
@@ -24,8 +26,14 @@ pub fn routes(config: &mut web::ServiceConfig) {
         .route("/medical-records", web::get().to(list_records_page))
         .route("/medical-records/new", web::get().to(new_record_page))
         .route("/medical-records", web::post().to(create_record_form))
-        .route("/medical-records/{record_id}", web::get().to(show_record_page))
-        .route("/medical-records/{record_id}", web::post().to(update_record_form))
+        .route(
+            "/medical-records/{record_id}",
+            web::get().to(show_record_page),
+        )
+        .route(
+            "/medical-records/{record_id}",
+            web::post().to(update_record_form),
+        )
         .route(
             "/medical-records/{record_id}/delete",
             web::post().to(delete_record_form),
@@ -286,7 +294,10 @@ pub async fn patient_timeline_page(
 
 // The record only stores doctor_id — resolve a display name for each entry,
 // caching by id since a patient's visits often share the same doctor.
-async fn resolve_doctor_names(entries: &mut [PatientTimelineEntry], doctor_service: &DoctorService) {
+async fn resolve_doctor_names(
+    entries: &mut [PatientTimelineEntry],
+    doctor_service: &DoctorService,
+) {
     let mut names: HashMap<String, String> = HashMap::new();
     for entry in entries.iter_mut() {
         let Some(doctor_id) = entry.record.doctor_id.clone() else {
@@ -487,8 +498,8 @@ pub async fn today_appointment_api(
         return HttpResponse::BadRequest().body("Patient ID is required");
     }
 
-    let today = crate::db::singapore_today();
-    let (start, end) = crate::db::singapore_day_bounds(today);
+    let today = singapore_today();
+    let (start, end) = singapore_day_bounds(today);
     let start = start.to_rfc3339_opts(SecondsFormat::Secs, true);
     let end = end.to_rfc3339_opts(SecondsFormat::Secs, true);
 
@@ -534,13 +545,11 @@ pub struct TodayAppointmentQuery {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-async fn fetch_patient(
-    supabase_db: &SupabaseRestDb,
-    patient_id: &str,
-) -> Result<PatientView, ()> {
-    let body = supabase_db.get_patient(patient_id).await.map_err(|_| ())?;
-    let rows: Vec<SupabasePatientRow> = serde_json::from_str(&body).map_err(|_| ())?;
-    rows.into_iter().next().map(PatientView::from).ok_or(())
+async fn fetch_patient(supabase_db: &SupabaseRestDb, patient_id: &str) -> Result<PatientView, ()> {
+    patient_repository::get_patient(supabase_db, patient_id)
+        .await
+        .map_err(|_| ())?
+        .ok_or(())
 }
 
 async fn require_records_permission(

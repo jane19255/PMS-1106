@@ -1,33 +1,12 @@
-//! Shared database and time utilities.
+//! Shared database clients.
 //!
-//! This module contains lightweight REST clients for Firebase and Supabase plus
-//! Singapore time helpers used by appointment and dashboard workflows.
-use chrono::{DateTime, FixedOffset, NaiveDate, TimeZone, Utc};
+//! This module contains lightweight REST clients for Firebase and Supabase. Feature
+//! repositories build on these clients for table-specific database operations.
+use chrono::NaiveDate;
 use reqwest::Client;
 use serde_json::Value;
 
-pub fn singapore_offset() -> FixedOffset {
-    FixedOffset::east_opt(8 * 60 * 60).expect("Singapore offset is valid")
-}
-
-pub fn singapore_now() -> DateTime<FixedOffset> {
-    Utc::now().with_timezone(&singapore_offset())
-}
-
-pub fn singapore_today() -> NaiveDate {
-    // Clinic dates must follow Singapore time instead of the server's UTC date.
-    singapore_now().date_naive()
-}
-
-pub fn singapore_day_bounds(date: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
-    // Supabase stores UTC instants, so Singapore midnight is 16:00 UTC the day before.
-    let start = singapore_offset()
-        .from_local_datetime(&date.and_hms_opt(0, 0, 0).expect("midnight is valid"))
-        .single()
-        .expect("Singapore has no daylight-saving ambiguity")
-        .with_timezone(&Utc);
-    (start, start + chrono::Duration::days(1))
-}
+pub use crate::time::{singapore_day_bounds, singapore_offset, singapore_today};
 
 #[derive(Clone)]
 pub struct FirebaseRestDb {
@@ -112,27 +91,6 @@ impl SupabaseRestDb {
         }
     }
 
-    pub async fn list_patients(&self) -> Result<String, String> {
-        let url = self.rest_url("patients?select=*&order=created_at.desc.nullslast");
-        let response = self
-            .authed(self.http_client.get(url))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        Self::read_response(response).await
-    }
-
-    pub async fn get_patient(&self, patient_id: &str) -> Result<String, String> {
-        let encoded_id = urlencoding::encode(patient_id);
-        let url = self.rest_url(&format!("patients?id=eq.{}&select=*&limit=1", encoded_id));
-        let response = self
-            .authed(self.http_client.get(url))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        Self::read_response(response).await
-    }
-
     pub async fn get_latest_medical_record(
         &self,
         patient_id: &str,
@@ -176,46 +134,6 @@ impl SupabaseRestDb {
         Self::read_response(response).await
     }
 
-    pub async fn create_patient(&self, payload: &Value) -> Result<String, String> {
-        let url = self.rest_url("patients");
-        let response = self
-            .authed(self.http_client.post(url))
-            .header("Prefer", "return=representation")
-            .json(payload)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        Self::read_response(response).await
-    }
-
-    pub async fn update_patient(
-        &self,
-        patient_id: &str,
-        payload: &Value,
-    ) -> Result<String, String> {
-        let encoded_id = urlencoding::encode(patient_id);
-        let url = self.rest_url(&format!("patients?id=eq.{}", encoded_id));
-        let response = self
-            .authed(self.http_client.patch(url))
-            .header("Prefer", "return=representation")
-            .json(payload)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        Self::read_response(response).await
-    }
-
-    pub async fn delete_patient(&self, patient_id: &str) -> Result<String, String> {
-        let encoded_id = urlencoding::encode(patient_id);
-        let url = self.rest_url(&format!("patients?id=eq.{}", encoded_id));
-        let response = self
-            .authed(self.http_client.delete(url))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        Self::read_response(response).await
-    }
-
     // Appointment Scheduling methods
     pub async fn list_appointments(&self) -> Result<String, String> {
         let url = self.rest_url("appointments?select=*&order=scheduled_at");
@@ -230,17 +148,14 @@ impl SupabaseRestDb {
     /// Reconciles overdue appointments by marking them as "no-show" in the database.
     ///
     /// This invokes a RPC on the Supabase database to bulk-update all appointments with dates set before the provided date accordingly.
-    /// 
+    ///
     /// ### Arguments
     /// * `today` - The calendar date used as the cut-off boundary to determine appointments as "no-show"
-    /// 
+    ///
     /// ### Returns
     /// * `Ok(String)` - A success message or confirmation payload from the Supabase database
     /// * `Err(String)` - An error message regarding the network or API failure
-    pub async fn reconcile_overdue_appointments(
-        &self,
-        today: NaiveDate,
-    ) -> Result<String, String> {
+    pub async fn reconcile_overdue_appointments(&self, today: NaiveDate) -> Result<String, String> {
         // The database marks old untouched bookings as no-shows in one update.
         let url = self.rest_url("rpc/reconcile_overdue_appointments");
         let response = self
