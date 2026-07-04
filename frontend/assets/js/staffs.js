@@ -104,10 +104,11 @@ function staffPayload(prefix) {
 
 async function saveNewStaff(button) {
     const isDoctor = document.getElementById("add-role").value === "Doctor";
+    const doctorLicense = document.getElementById("add-doctorLicense").value.trim();
+    const doctorSpecialization = document.getElementById("add-doctorSpecialization").value.trim();
+
     if (isDoctor) {
-        const license = document.getElementById("add-doctorLicense").value.trim();
-        const specialization = document.getElementById("add-doctorSpecialization").value.trim();
-        if (!license || !specialization) {
+        if (!doctorLicense || !doctorSpecialization) {
             notify("License number and specialization are required for doctors", "error");
             return;
         }
@@ -129,9 +130,9 @@ async function saveNewStaff(button) {
                 headers: { "Content-Type": "application/json", Accept: "application/json" },
                 body: JSON.stringify({
                     staff_id: staff.id,
-                    license_number: document.getElementById("add-doctorLicense").value.trim(),
+                    license_number: doctorLicense,
                     name: `${staff.firstName} ${staff.lastName}`.trim(),
-                    specialization: document.getElementById("add-doctorSpecialization").value.trim(),
+                    specialization: doctorSpecialization,
                     contact_number: staff.phone,
                     email: staff.email,
                 }),
@@ -187,14 +188,16 @@ async function saveStaffChanges(button) {
     const staffId = document.getElementById("edit-id").value;
     const existingDoctor = doctorForStaff(staffId);
     const isDoctor = document.getElementById("edit-role").value === "Doctor";
+    const doctorLicense = document.getElementById("edit-doctorLicense").value.trim();
+    const doctorSpecialization = document.getElementById("edit-doctorSpecialization").value.trim();
+    const doctorAvailability = document.getElementById("edit-doctorAvailability").value;
+
     if (existingDoctor && !isDoctor) {
         notify("A linked doctor must keep the Doctor role", "error");
         return;
     }
     if (isDoctor) {
-        const license = document.getElementById("edit-doctorLicense").value.trim();
-        const specialization = document.getElementById("edit-doctorSpecialization").value.trim();
-        if (!license || !specialization) {
+        if (!doctorLicense || !doctorSpecialization) {
             notify("License number and specialization are required for doctors", "error");
             return;
         }
@@ -213,14 +216,14 @@ async function saveStaffChanges(button) {
         if (isDoctor) {
             const doctorPayload = {
                 staff_id: updated.id,
-                license_number: document.getElementById("edit-doctorLicense").value.trim(),
+                license_number: doctorLicense,
                 name: `${updated.firstName} ${updated.lastName}`.trim(),
-                specialization: document.getElementById("edit-doctorSpecialization").value.trim(),
+                specialization: doctorSpecialization,
                 contact_number: updated.phone,
                 email: updated.email,
             };
             if (existingDoctor) {
-                doctorPayload.status = document.getElementById("edit-doctorAvailability").value;
+                doctorPayload.status = doctorAvailability;
             }
 
             const doctorResponse = await fetch(
@@ -240,6 +243,7 @@ async function saveStaffChanges(button) {
         staffs = staffs.map((staff) => staff.id === updated.id ? updated : staff);
         refreshStaffList();
         notify("Changes saved!", "success");
+        closeModal(button);
         return true;
     } catch (error) {
         notify(error.message || "Staff changes could not be saved", "error");
