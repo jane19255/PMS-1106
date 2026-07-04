@@ -3,7 +3,7 @@
 {% block title %}Prescriptions{% endblock title %}
 
 {% block styles %}
-<link rel="stylesheet" href="/assets/css/prescriptions.css?v=7">
+<link rel="stylesheet" href="/assets/css/prescriptions.css?v=8">
 {% endblock styles %}
 
 {% block content %}
@@ -59,9 +59,17 @@
                         </datalist>
                     </div>
                     <div class="field">
-                        <label>Medical record ID</label>
-                        <input type="text" name="medical_record_id" placeholder="Medical record ID"
+                        <label>Medical record</label>
+                        <input class="lookup-input" id="prescription-record-search" type="text"
+                            list="prescription-record-options" placeholder="Search record ID or diagnosis" autocomplete="off">
+                        <input id="prescription-record-id" type="hidden" name="medical_record_id"
                             value="{{ form_medical_record_id | default(value="") }}">
+                        <datalist id="prescription-record-options">
+                            {% for record in medical_records | default(value=[]) %}
+                            <option value="{{ record.id }} - {{ record.patient_id }}{% if record.diagnosis %} ({{ record.diagnosis }}){% endif %}"
+                                data-id="{{ record.id }}"></option>
+                            {% endfor %}
+                        </datalist>
                     </div>
                     <div class="field">
                         <label>Medication name</label>
@@ -162,6 +170,12 @@
                         </a>
                         <span class="tooltip-text">View Details</span>
                     </div>
+                    <form class="inline-delete" action="/prescriptions/{{ prescription.id }}/delete" method="post"
+                        onsubmit="return confirm('Delete this prescription record permanently?')">
+                        <button class="btn danger" type="submit">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}
@@ -189,6 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     bindLookup("prescription-patient-search", "prescription-patient-id", "prescription-patient-options");
     bindLookup("prescription-doctor-search", "prescription-doctor-id", "prescription-doctor-options");
+    bindLookup("prescription-record-search", "prescription-record-id", "prescription-record-options");
 
     const medicationInput = document.getElementById("prescription-medication-name");
     const medicationOptions = document.getElementById("prescription-medication-options");

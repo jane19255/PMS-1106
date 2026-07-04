@@ -107,3 +107,20 @@ span.status.Cancelled {
 #prescription-dosage::placeholder {
     color: rgb(100 116 139 / 80%);
 }
+
+.inline-delete {
+    display: inline-flex;
+    margin: 0;
+}
+
+.btn.danger,
+button.danger {
+    background: var(--danger);
+    color: white;
+}
+
+.action {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+}
