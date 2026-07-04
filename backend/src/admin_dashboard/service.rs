@@ -2,8 +2,8 @@
 //!
 //! Validates dashboard actions and coordinates repository updates for patient arrival
 //! and vitals workflows.
-use crate::admindashboard::models::{MarkArrivedPayload, SaveVitalPayload};
-use crate::admindashboard::repository;
+use crate::admin_dashboard::models::{MarkArrivedPayload, SaveVitalPayload};
+use crate::admin_dashboard::repository;
 use crate::db::{singapore_offset, SupabaseRestDb};
 use chrono::{DateTime, NaiveDate};
 use serde_json::{from_str, Value};

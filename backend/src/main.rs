@@ -6,7 +6,7 @@ mod billing;
 mod db;
 mod doctors;
 mod firebase_admin;
-mod admindashboard;
+mod admin_dashboard;
 mod doctor_dashboard;
 mod auth;
 mod patients;

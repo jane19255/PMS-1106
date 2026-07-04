@@ -5,7 +5,7 @@
 use crate::appointments::handlers as appointment_handlers;
 use crate::billing::handlers as billing_handlers;
 use crate::doctors::handlers as doctor_handlers;
-use crate::admindashboard::handlers as admindashboard_handlers; // To rename to admin_dashboard_handlers when safe
+use crate::admin_dashboard::handlers as admin_dashboard_handlers;
 use crate::doctor_dashboard::handlers as doctor_dashboard_handlers;
 use crate::patients::handlers as patient_handlers;
 use crate::medical_records::handlers as medical_record_handlers;
@@ -27,7 +27,7 @@ pub fn configure(config: &mut actix_web::web::ServiceConfig) {
     config.configure(prescription_handlers::routes);
     config.configure(staff_handlers::routes);
 
-    config.configure(admindashboard_handlers::routes);
+    config.configure(admin_dashboard_handlers::routes);
     config.configure(appointment_handlers::routes);
 
     config.configure(billing_handlers::routes);
