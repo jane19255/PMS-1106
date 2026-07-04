@@ -18,6 +18,7 @@ pub type RepositoryFuture<'a, T> =
 pub enum RepositoryError {
     InvalidEmail,
     InvalidPhone,
+    EnumCaseMismatch,
     DuplicateEmail,
     DuplicateFirebaseUid,
     ReferencedByDoctor,
@@ -137,6 +138,8 @@ impl SupabaseStaffRepository {
             RepositoryError::InvalidPhone
         } else if body.contains("staff_email_check") {
             RepositoryError::InvalidEmail
+        } else if body.contains("staff_role_check") || body.contains("staff_status_check") {
+            RepositoryError::EnumCaseMismatch
         } else if body.contains("staff_email_key") || body.contains("staff_email_lower_uidx") {
             RepositoryError::DuplicateEmail
         } else if body.contains("staff_firebase_uid_key") {
@@ -152,14 +155,13 @@ impl SupabaseStaffRepository {
 impl StaffRepository for SupabaseStaffRepository {
     fn create(&self, staff: StaffMember) -> RepositoryFuture<'_, StaffMember> {
         Box::pin(async move {
-            let response = self
-                .request(self.client.post(self.staff_url("select=*")))
-                .header("Prefer", "return=representation")
-                .json(&database_payload(&staff))
-                .send()
-                .await
-                .map_err(|_| RepositoryError::StorageUnavailable)?;
-            let mut rows = Self::decode_rows(response).await?;
+            let mut rows = match self.create_with_payload(&database_payload(&staff)).await {
+                Ok(rows) => rows,
+                Err(RepositoryError::EnumCaseMismatch) => {
+                    self.create_with_payload(&legacy_database_payload(&staff)).await?
+                }
+                Err(error) => return Err(error),
+            };
             rows.pop()
                 .map(StaffMember::from)
                 .ok_or(RepositoryError::StorageUnavailable)
@@ -184,17 +186,17 @@ impl StaffRepository for SupabaseStaffRepository {
     fn update(&self, staff: StaffMember) -> RepositoryFuture<'_, StaffMember> {
         Box::pin(async move {
             let encoded_id = urlencoding::encode(&staff.id);
-            let response = self
-                .request(
-                    self.client
-                        .patch(self.staff_url(&format!("id=eq.{encoded_id}&select=*"))),
-                )
-                .header("Prefer", "return=representation")
-                .json(&database_payload(&staff))
-                .send()
+            let mut rows = match self
+                .update_with_payload(&encoded_id, &database_payload(&staff))
                 .await
-                .map_err(|_| RepositoryError::StorageUnavailable)?;
-            let mut rows = Self::decode_rows(response).await?;
+            {
+                Ok(rows) => rows,
+                Err(RepositoryError::EnumCaseMismatch) => {
+                    self.update_with_payload(&encoded_id, &legacy_database_payload(&staff))
+                        .await?
+                }
+                Err(error) => return Err(error),
+            };
             rows.pop()
                 .map(StaffMember::from)
                 .ok_or(RepositoryError::NotFound)
@@ -229,6 +231,39 @@ impl StaffRepository for SupabaseStaffRepository {
     }
 }
 
+impl SupabaseStaffRepository {
+    async fn create_with_payload(
+        &self,
+        payload: &serde_json::Value,
+    ) -> Result<Vec<DatabaseStaff>, RepositoryError> {
+        let response = self
+            .request(self.client.post(self.staff_url("select=*")))
+            .header("Prefer", "return=representation")
+            .json(payload)
+            .send()
+            .await
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+        Self::decode_rows(response).await
+    }
+
+    async fn update_with_payload(
+        &self,
+        encoded_id: &str,
+        payload: &serde_json::Value,
+    ) -> Result<Vec<DatabaseStaff>, RepositoryError> {
+        let response = self
+            .request(
+                self.client
+                    .patch(self.staff_url(&format!("id=eq.{encoded_id}&select=*"))),
+            )
+            .header("Prefer", "return=representation")
+            .json(payload)
+            .send()
+            .await
+            .map_err(|_| RepositoryError::StorageUnavailable)?;
+        Self::decode_rows(response).await
+    }
+}
 #[derive(Deserialize)]
 struct DatabaseStaff {
     id: String,
@@ -267,6 +302,14 @@ impl From<DatabaseStaff> for StaffMember {
 }
 
 fn database_payload(staff: &StaffMember) -> serde_json::Value {
+    database_payload_with_enum_case(staff, true)
+}
+
+fn legacy_database_payload(staff: &StaffMember) -> serde_json::Value {
+    database_payload_with_enum_case(staff, false)
+}
+
+fn database_payload_with_enum_case(staff: &StaffMember, lowercase_enums: bool) -> serde_json::Value {
     json!({
         "id": staff.id,
         "firebase_uid": staff.firebase_uid,
@@ -276,8 +319,8 @@ fn database_payload(staff: &StaffMember) -> serde_json::Value {
         "nric": optional_text(&staff.nric),
         "email": staff.email,
         "phone": if staff.phone.trim().is_empty() { None } else { Some(staff.phone.trim()) },
-        "role": database_role(&staff.role),
-        "status": database_status(&staff.status),
+        "role": if lowercase_enums { database_role(&staff.role) } else { display_role(&staff.role) },
+        "status": if lowercase_enums { database_status(&staff.status) } else { display_status(&staff.status) },
         "address": optional_text(&staff.address),
         "emergency_contact": optional_text(&staff.emergency),
     })
