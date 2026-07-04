@@ -31,16 +31,32 @@
 
                 <div class="row-section">
                     <div class="field">
-                        <label>Patient ID</label>
-                        <input class="{% if invalid_patient_id | default(value=false) %}is-invalid{% endif %}"
-                            type="text" name="patient_id" placeholder="Patient ID"
+                        <label>Patient</label>
+                        <input class="lookup-input {% if invalid_patient_id | default(value=false) %}is-invalid{% endif %}"
+                            id="prescription-patient-search" type="text" list="prescription-patient-options"
+                            placeholder="Search patient name or NRIC" autocomplete="off">
+                        <input id="prescription-patient-id" type="hidden" name="patient_id"
                             value="{{ form_patient_id | default(value="") }}">
+                        <datalist id="prescription-patient-options">
+                            {% for patient in patients | default(value=[]) %}
+                            <option value="{{ patient.firstName }} {{ patient.lastName }} - {{ patient.id }}"
+                                data-id="{{ patient.id }}"></option>
+                            {% endfor %}
+                        </datalist>
                     </div>
                     <div class="field">
-                        <label>Doctor ID</label>
-                        <input class="{% if invalid_doctor_id | default(value=false) %}is-invalid{% endif %}"
-                            type="text" name="doctor_id" placeholder="Doctor ID"
+                        <label>Doctor</label>
+                        <input class="lookup-input {% if invalid_doctor_id | default(value=false) %}is-invalid{% endif %}"
+                            id="prescription-doctor-search" type="text" list="prescription-doctor-options"
+                            placeholder="Search doctor name or specialty" autocomplete="off">
+                        <input id="prescription-doctor-id" type="hidden" name="doctor_id"
                             value="{{ form_doctor_id | default(value="") }}">
+                        <datalist id="prescription-doctor-options">
+                            {% for doctor in doctors | default(value=[]) %}
+                            <option value="{{ doctor.name }} - {{ doctor.id }}{% if doctor.specialization %} ({{ doctor.specialization }}){% endif %}"
+                                data-id="{{ doctor.id }}"></option>
+                            {% endfor %}
+                        </datalist>
                     </div>
                     <div class="field">
                         <label>Medical record ID</label>
@@ -50,13 +66,21 @@
                     <div class="field">
                         <label>Medication name</label>
                         <input class="{% if invalid_medication_name | default(value=false) %}is-invalid{% endif %}"
-                            type="text" name="medication_name" placeholder="Medication name"
-                            value="{{ form_medication_name | default(value="") }}">
+                            id="prescription-medication-name" type="text" name="medication_name"
+                            list="prescription-medication-options" placeholder="Search or enter medication name"
+                            value="{{ form_medication_name | default(value="") }}" autocomplete="off">
+                        <datalist id="prescription-medication-options">
+                            {% for medication in medication_options | default(value=[]) %}
+                            <option value="{{ medication.name }}" data-dosage="{{ medication.dosage }}"
+                                data-unit-cost="{{ medication.unit_cost }}"></option>
+                            {% endfor %}
+                        </datalist>
                     </div>
                     <div class="field">
-                        <label>Dosage</label>
+                        <label>Dosage amount</label>
                         <input class="{% if invalid_dosage | default(value=false) %}is-invalid{% endif %}" type="text"
-                            name="dosage" placeholder="Dosage" value="{{ form_dosage | default(value="") }}">
+                            inputmode="decimal" id="prescription-dosage" name="dosage" placeholder="e.g. 500"
+                            value="{{ form_dosage | default(value="") }}">
                     </div>
                     <div class="field">
                         <label>Frequency</label>
@@ -78,7 +102,7 @@
                     <div class="field">
                         <label>Unit cost</label>
                         <input class="{% if invalid_unit_cost | default(value=false) %}is-invalid{% endif %}"
-                            type="number" name="unit_cost" placeholder="Unit cost" min="0" step="0.01"
+                            type="number" id="prescription-unit-cost" name="unit_cost" placeholder="Unit cost" min="0" step="0.01"
                             value="{{ form_unit_cost | default(value="") }}">
                     </div>
                 </div>
@@ -105,8 +129,8 @@
         <thead>
             <tr>
                 <th>Medication</th>
-                <th>Patient ID</th>
-                <th>Doctor ID</th>
+                <th>Patient</th>
+                <th>Doctor</th>
                 <th>Dosage</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -120,11 +144,11 @@
             </tr>
             {% endif %}
 
-            {% for prescription in prescriptions %}
+            {% for prescription in prescription_rows %}
             <tr>
                 <td>{{ prescription.medication_name }}</td>
-                <td>{{ prescription.patient_id }}</td>
-                <td>{{ prescription.doctor_id }}</td>
+                <td><strong>{{ prescription.patient_label }}</strong><br><span class="description">{{ prescription.patient_id }}</span></td>
+                <td><strong>{{ prescription.doctor_label }}</strong><br><span class="description">{{ prescription.doctor_id }}</span></td>
                 <td>{{ prescription.dosage }}</td>
                 <td>
                     <span class="status {{ prescription.status }}">
@@ -145,3 +169,39 @@
     </table>
 </div>
 {% endblock content %}
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    function bindLookup(searchId, hiddenId, listId) {
+        const search = document.getElementById(searchId);
+        const hidden = document.getElementById(hiddenId);
+        const list = document.getElementById(listId);
+        if (!search || !hidden || !list) return;
+
+        const optionById = Array.from(list.options).find(option => option.dataset.id === hidden.value);
+        if (optionById) search.value = optionById.value;
+
+        search.addEventListener("input", () => {
+            const selected = Array.from(list.options).find(option => option.value === search.value);
+            hidden.value = selected ? selected.dataset.id : search.value.trim();
+        });
+    }
+
+    bindLookup("prescription-patient-search", "prescription-patient-id", "prescription-patient-options");
+    bindLookup("prescription-doctor-search", "prescription-doctor-id", "prescription-doctor-options");
+
+    const medicationInput = document.getElementById("prescription-medication-name");
+    const medicationOptions = document.getElementById("prescription-medication-options");
+    const dosageInput = document.getElementById("prescription-dosage");
+    const unitCostInput = document.getElementById("prescription-unit-cost");
+
+    medicationInput?.addEventListener("input", () => {
+        const selected = Array.from(medicationOptions?.options || [])
+            .find(option => option.value === medicationInput.value);
+        if (!selected) return;
+        if (dosageInput && !dosageInput.value) dosageInput.value = selected.dataset.dosage || "";
+        if (unitCostInput && !unitCostInput.value) unitCostInput.value = selected.dataset.unitCost || "";
+    });
+});
+</script>
+{% endblock scripts %}

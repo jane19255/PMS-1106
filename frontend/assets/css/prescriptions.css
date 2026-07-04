@@ -97,3 +97,13 @@ span.status.Cancelled {
     background-color: rgb(from var(--danger) r g b / 10%);
     color: var(--danger);
 }
+.custom-table .description {
+    color: var(--secondary);
+    font-size: 12px;
+}
+
+.lookup-input::placeholder,
+#prescription-medication-name::placeholder,
+#prescription-dosage::placeholder {
+    color: rgb(100 116 139 / 80%);
+}

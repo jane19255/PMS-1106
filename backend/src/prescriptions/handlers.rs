@@ -5,12 +5,15 @@
 use super::service::{
     CreatePrescriptionForm, PrescriptionError, PrescriptionService, UpdatePrescriptionForm,
 };
-use crate::db::FirebaseRestDb;
+use crate::db::{FirebaseRestDb, SupabaseRestDb};
+use crate::doctors::service::DoctorService;
+use crate::patients::{models::PatientView, repository as patient_repository};
 use crate::auth::{require_auth_and_permission, AppAction};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use tera::{Context, Tera};
 
 pub fn routes(config: &mut web::ServiceConfig) {
@@ -59,9 +62,11 @@ pub fn routes(config: &mut web::ServiceConfig) {
 pub async fn prescriptions_page(
     req: HttpRequest,
     prescription_service: web::Data<PrescriptionService>,
+    doctor_service: web::Data<DoctorService>,
     templates: web::Data<Tera>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
 ) -> impl Responder {
     if let Err(rejection) = require_prescription_permission(
         &req,
@@ -75,7 +80,15 @@ pub async fn prescriptions_page(
     }
 
     match prescription_service.list_prescriptions().await {
-        Ok(prescriptions) => render_prescriptions_page(&templates, prescriptions, None, None),
+        Ok(prescriptions) => {
+            let options = load_prescription_form_options(
+                supabase_db.get_ref(),
+                doctor_service.get_ref(),
+                &prescriptions,
+            )
+            .await;
+            render_prescriptions_page(&templates, prescriptions, None, None, options)
+        }
         Err(error) => render_error(&templates, error),
     }
 }
@@ -112,10 +125,12 @@ pub async fn show_prescription(
 pub async fn create_prescription_form(
     req: HttpRequest,
     prescription_service: web::Data<PrescriptionService>,
+    doctor_service: web::Data<DoctorService>,
     templates: web::Data<Tera>,
     form: web::Form<CreatePrescriptionForm>,
     firebase_auth: web::Data<FirebaseAuth>,
     firestore_db: web::Data<FirebaseRestDb>,
+    supabase_db: web::Data<SupabaseRestDb>,
 ) -> impl Responder {
     if let Err(rejection) = require_prescription_permission(
         &req,
@@ -133,12 +148,21 @@ pub async fn create_prescription_form(
     match prescription_service.create_prescription(submitted_form.clone()).await {
         Ok(_) => redirect_to("/prescriptions"),
         Err(error @ PrescriptionError::InvalidInput(_)) => match prescription_service.list_prescriptions().await {
-            Ok(prescriptions) => render_prescriptions_page(
-                &templates,
-                prescriptions,
-                Some(&submitted_form),
-                Some(error),
-            ),
+            Ok(prescriptions) => {
+                let options = load_prescription_form_options(
+                    supabase_db.get_ref(),
+                    doctor_service.get_ref(),
+                    &prescriptions,
+                )
+                .await;
+                render_prescriptions_page(
+                    &templates,
+                    prescriptions,
+                    Some(&submitted_form),
+                    Some(error),
+                    options,
+                )
+            }
             Err(error) => render_error(&templates, error),
         },
         Err(error) => render_error(&templates, error),
@@ -392,14 +416,124 @@ async fn require_prescription_permission(
     require_auth_and_permission(req, firebase_auth, firestore_db, action).await
 }
 
+#[derive(Serialize)]
+struct MedicationSuggestion {
+    name: String,
+    dosage: String,
+    unit_cost: String,
+}
+
+#[derive(Default, Serialize)]
+struct PrescriptionFormOptions {
+    patients: Vec<PatientView>,
+    doctors: Vec<crate::doctors::models::Doctor>,
+    medications: Vec<MedicationSuggestion>,
+}
+
+#[derive(Serialize)]
+struct PrescriptionRow {
+    id: String,
+    medication_name: String,
+    patient_id: String,
+    patient_label: String,
+    doctor_id: String,
+    doctor_label: String,
+    dosage: String,
+    status: String,
+}
+
+async fn load_prescription_form_options(
+    supabase_db: &SupabaseRestDb,
+    doctor_service: &DoctorService,
+    prescriptions: &[super::models::Prescription],
+) -> PrescriptionFormOptions {
+    let patients = patient_repository::list_patients(supabase_db)
+        .await
+        .unwrap_or_default();
+    let doctors = doctor_service.list_doctors().await.unwrap_or_default();
+    let medications = medication_suggestions_from(prescriptions);
+
+    PrescriptionFormOptions {
+        patients,
+        doctors,
+        medications,
+    }
+}
+
+fn medication_suggestions_from(
+    prescriptions: &[super::models::Prescription],
+) -> Vec<MedicationSuggestion> {
+    let mut suggestions = BTreeMap::new();
+    for prescription in prescriptions {
+        suggestions.entry((
+            prescription.medication_name.clone(),
+            prescription.dosage.clone(),
+        )).or_insert_with(|| format!("{:.2}", prescription.unit_cost));
+    }
+
+    suggestions
+        .into_iter()
+        .map(|((name, dosage), unit_cost)| MedicationSuggestion {
+            name,
+            dosage,
+            unit_cost,
+        })
+        .collect()
+}
+
+fn prescription_rows(
+    prescriptions: &[super::models::Prescription],
+    patients: &[PatientView],
+    doctors: &[crate::doctors::models::Doctor],
+) -> Vec<PrescriptionRow> {
+    let patient_labels: BTreeMap<String, String> = patients
+        .iter()
+        .map(|patient| {
+            (
+                patient.id.clone(),
+                format!("{} {}", patient.first_name, patient.last_name).trim().to_string(),
+            )
+        })
+        .collect();
+    let doctor_labels: BTreeMap<String, String> = doctors
+        .iter()
+        .map(|doctor| (doctor.id.clone(), doctor.name.clone()))
+        .collect();
+
+    prescriptions
+        .iter()
+        .map(|prescription| PrescriptionRow {
+            id: prescription.id.clone(),
+            medication_name: prescription.medication_name.clone(),
+            patient_id: prescription.patient_id.clone(),
+            patient_label: patient_labels
+                .get(&prescription.patient_id)
+                .cloned()
+                .unwrap_or_else(|| prescription.patient_id.clone()),
+            doctor_id: prescription.doctor_id.clone(),
+            doctor_label: doctor_labels
+                .get(&prescription.doctor_id)
+                .cloned()
+                .unwrap_or_else(|| prescription.doctor_id.clone()),
+            dosage: prescription.dosage.clone(),
+            status: format!("{:?}", prescription.status),
+        })
+        .collect()
+}
 fn render_prescriptions_page(
     templates: &Tera,
     prescriptions: Vec<super::models::Prescription>,
     form: Option<&CreatePrescriptionForm>,
     error: Option<PrescriptionError>,
+    options: PrescriptionFormOptions,
 ) -> HttpResponse {
+    let rows = prescription_rows(&prescriptions, &options.patients, &options.doctors);
     let mut context = Context::new();
     context.insert("prescriptions", &prescriptions);
+    context.insert("prescription_rows", &rows);
+    context.insert("patients", &options.patients);
+    context.insert("doctors", &options.doctors);
+    context.insert("medication_options", &options.medications);
 
     if let Some(form) = form {
         context.insert("form_patient_id", &form.patient_id);
