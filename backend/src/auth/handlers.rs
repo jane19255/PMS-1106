@@ -1,3 +1,8 @@
+//! Login, session, and role-based authorization handlers.
+//!
+//! This module owns the authentication routes plus reusable permission helpers used by
+//! feature modules before serving protected pages or API endpoints.
+
 use actix_web::cookie::{time::Duration, Cookie};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
@@ -6,22 +11,26 @@ use tera::{Context, Tera};
 
 use crate::db::FirebaseRestDb;
 
+/// Form payload submitted by the login page after Firebase client authentication.
 #[derive(Deserialize)]
 pub struct SessionForm {
     pub id_token: String,
     pub remember: Option<String>,
 }
 
+/// Form payload used to request a Firebase password reset email.
 #[derive(Deserialize)]
 pub struct ForgotPasswordForm {
     pub email: String,
 }
 
+/// Minimal Firebase token claims needed by the backend after verification.
 #[derive(Deserialize)]
 pub struct FirebaseClaims {
     pub sub: String,
 }
 
+/// Application actions used by role-based permission checks.
 #[derive(Clone, Copy)]
 pub enum AppAction {
     ViewPatient,
@@ -50,6 +59,7 @@ pub enum AppAction {
     GenerateBillingReport,
 }
 
+/// Registers authentication, session, and current-user routes.
 pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route("/login", web::get().to(login_page));
     cfg.route("/doctor-dashboard", web::get().to(doctor_dashboard_page));
@@ -290,6 +300,11 @@ pub async fn forgot_password(form: web::Form<ForgotPasswordForm>) -> impl Respon
     }
 }
 
+/// Verifies the Firebase session cookie and returns the authenticated user's
+/// Firebase UID.
+///
+/// Page handlers use this to redirect unauthenticated users back to `/login`,
+/// while API handlers build stricter permission checks on top of it.
 pub async fn require_auth(
     req: &HttpRequest,
     firebase_auth: &FirebaseAuth,
@@ -311,6 +326,7 @@ pub async fn require_auth(
     }
 }
 
+/// Loads the active staff profile linked to a Firebase UID.
 pub async fn get_staff_profile(
     firestore_db: &FirebaseRestDb,
     uid: &str,
@@ -342,12 +358,20 @@ pub async fn get_staff_profile(
     }
 }
 
+/// Looks up the active staff role associated with a Firebase UID.
+///
+/// Firebase proves who the user is; this staff profile decides what the user is
+/// allowed to do inside the PMS.
 pub async fn get_staff_role(firestore_db: &FirebaseRestDb, uid: &str) -> Option<String> {
     get_staff_profile(firestore_db, uid)
         .await
         .map(|(_, role)| role)
 }
 
+/// Combines Firebase authentication with application role authorization.
+///
+/// Protected handlers call this before doing work so direct API requests follow
+/// the same role rules as the visible navigation.
 pub async fn require_auth_and_permission(
     req: &HttpRequest,
     firebase_auth: &FirebaseAuth,
@@ -372,6 +396,10 @@ pub async fn require_auth_and_permission(
     }
 }
 
+/// Central role-permission matrix for the application.
+///
+/// Keeping this in one function prevents each handler from inventing its own
+/// version of the access rules.
 pub fn has_permission(role: &str, action: AppAction) -> bool {
     // Keep the role rules in one place so the frontend and API do not disagree.
     let normalized_role = role.trim().to_lowercase();
@@ -441,6 +469,7 @@ fn render_template(tera: &Tera, template_name: &str) -> HttpResponse {
     }
 }
 
+/// Inserts Firebase client configuration into a Tera template context.
 pub fn insert_firebase_config(ctx: &mut Context) {
     ctx.insert(
         "firebase_api_key",

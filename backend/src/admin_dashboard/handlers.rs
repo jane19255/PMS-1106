@@ -1,12 +1,16 @@
-use crate::admindashboard::models::{
+//! Admin dashboard HTTP handlers.
+//!
+//! Serves the dashboard page and APIs for calendar appointments, patient arrival,
+//! vitals capture, room assignment, and room status polling.
+use crate::admin_dashboard::models::{
     MarkArrivedPayload,
     SaveVitalPayload,
     SendToRoomPayload,
 };
-use crate::admindashboard::repository;
-use crate::admindashboard::service;
+use crate::admin_dashboard::repository;
+use crate::admin_dashboard::service;
 use crate::db::{singapore_today, FirebaseRestDb, SupabaseRestDb};
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use chrono::NaiveDate;
 use firebase_auth::FirebaseAuth;

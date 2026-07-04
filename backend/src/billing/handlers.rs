@@ -1,15 +1,58 @@
+//! Billing HTTP handlers.
+//!
+//! This module serves the billing page and exposes invoice, payment, billable
+//! appointment, and medical report endpoints.
 use super::models::{ClinicalSummary, CreateInvoiceForm, PaymentStatus, RecordPaymentForm};
 use super::pdf::render_medical_report_pdf;
 use super::service::{BillingError, BillingService};
+use crate::auth::{require_auth_and_permission, AppAction};
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::doctors::service::DoctorService;
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
-use crate::models::{PatientView, SupabasePatientRow};
+use crate::patients::models::PatientView;
+use crate::patients::repository as patient_repository;
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
 use std::collections::{HashMap, HashSet};
 use tera::{Context, Tera};
+
+/// Registers billing page and billing action routes under `/billing`.
+///
+/// Keeping these route definitions in the billing module makes billing follow
+/// the same module-owned routing pattern as appointments, doctors, staff, and
+/// medical records.
+pub fn routes(config: &mut web::ServiceConfig) {
+    // Billing routes
+    config.service(
+        web::scope("/billing")
+            .route("", web::get().to(list_invoices))
+            .route(
+                "/billable-appointments",
+                web::get().to(list_billable_appointments),
+            )
+            .route("/invoices", web::post().to(create_invoice))
+            .route("/invoices/{invoice_id}", web::get().to(show_invoice))
+            .route(
+                "/invoices/{invoice_id}/payments",
+                web::post().to(record_payment),
+            )
+            .route(
+                "/invoices/{invoice_id}/cancel",
+                web::post().to(cancel_invoice),
+            )
+            .route(
+                "/invoices/{invoice_id}/report",
+                web::get().to(show_medical_report),
+            )
+            .route(
+                "/invoices/{invoice_id}/report.pdf",
+                web::get().to(download_medical_report_pdf),
+            ),
+    );
+
+    // Doctor availability is exposed through the existing doctor schedule API:
+    // GET/POST /api/doctors/{doctor_id}/schedules.
+}
 
 pub async fn list_invoices(
     req: HttpRequest,
@@ -93,6 +136,12 @@ pub async fn create_invoice(
     }
 }
 
+/// Returns completed appointments for a patient that do not already have an
+/// active invoice.
+///
+/// The billing page uses this endpoint when a receptionist selects a patient,
+/// so invoices can be tied to the correct completed consultation without
+/// accidentally billing the same appointment twice.
 pub async fn list_billable_appointments(
     req: HttpRequest,
     billing_service: web::Data<BillingService>,
@@ -112,7 +161,10 @@ pub async fn list_billable_appointments(
         return rejection;
     }
 
-    let patient_id = query.get("patient_id").map(|value| value.trim()).unwrap_or("");
+    let patient_id = query
+        .get("patient_id")
+        .map(|value| value.trim())
+        .unwrap_or("");
     if patient_id.is_empty() {
         return HttpResponse::BadRequest().body("Patient ID is required");
     }
@@ -149,6 +201,11 @@ pub async fn list_billable_appointments(
     HttpResponse::Ok().json(appointments)
 }
 
+/// Confirms that an invoice's optional appointment belongs to the same patient
+/// and is in a completed state.
+///
+/// This server-side check is kept separate from the frontend dropdown because a
+/// user could still submit a forged appointment id manually.
 async fn validate_billable_appointment(
     db: &SupabaseRestDb,
     form: &CreateInvoiceForm,
@@ -174,7 +231,9 @@ async fn validate_billable_appointment(
     })?;
 
     // Stop users from attaching another patient's appointment to this invoice.
-    if appointment.get("patient_id").and_then(serde_json::Value::as_str)
+    if appointment
+        .get("patient_id")
+        .and_then(serde_json::Value::as_str)
         != Some(form.patient_id.trim())
     {
         return Err(BillingError::InvalidInput(
@@ -182,7 +241,11 @@ async fn validate_billable_appointment(
         ));
     }
     // Appointment charges should only be billed after the visit is finished.
-    if appointment.get("status").and_then(serde_json::Value::as_str) != Some("Completed") {
+    if appointment
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        != Some("Completed")
+    {
         return Err(BillingError::InvalidInput(
             "The appointment must be completed before an invoice is created.".to_string(),
         ));
@@ -381,12 +444,10 @@ pub async fn download_medical_report_pdf(
 }
 
 async fn find_patient(database: &SupabaseRestDb, patient_id: &str) -> Option<PatientView> {
-    let body = database.get_patient(patient_id).await.ok()?;
-    serde_json::from_str::<Vec<SupabasePatientRow>>(&body)
-        .ok()?
-        .into_iter()
-        .next()
-        .map(PatientView::from)
+    patient_repository::get_patient(database, patient_id)
+        .await
+        .ok()
+        .flatten()
 }
 
 async fn find_clinical_summary(

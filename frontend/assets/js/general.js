@@ -83,6 +83,14 @@ function closeModal(button) {
 function showToast(msg, condition) {
     const toast = document.getElementById('toast');
     if (!toast) return false;
+    if (toast.parentElement !== document.body) {
+        document.body.appendChild(toast);
+    }
+    toast.style.position = "fixed";
+    toast.style.zIndex = "2147483647";
+    toast.style.top = "120px";
+    toast.style.left = "50%";
+    toast.style.transform = "translateX(-50%)";
     toast.className = "toast card show"; 
 
     const icons = {

@@ -1,3 +1,7 @@
+//! Interval tree used for appointment conflict checks.
+//!
+//! Stores scheduled appointment ranges and answers overlap queries efficiently when
+//! validating whether a doctor can accept another appointment.
 use chrono::{DateTime, Utc};
 
 use super::interval::AppointmentInterval;

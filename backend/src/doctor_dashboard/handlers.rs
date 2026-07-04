@@ -1,7 +1,11 @@
+//! Doctor dashboard HTTP handlers.
+//!
+//! Exposes APIs used by doctors to view their queue, start consultations, extend
+//! consultations, and complete consultations.
 use super::models::AppointmentActionPayload;
 use super::service::{DoctorDashboardError, DoctorDashboardService};
 use crate::db::{singapore_today, FirebaseRestDb};
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;
 use serde_json::json;

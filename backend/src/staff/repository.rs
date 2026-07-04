@@ -1,3 +1,7 @@
+//! Staff repository implementations.
+//!
+//! Provides staff persistence behind a common interface for Supabase-backed runtime
+//! storage and in-memory testing.
 use super::models::StaffMember;
 use reqwest::{Client, Response};
 use serde::Deserialize;

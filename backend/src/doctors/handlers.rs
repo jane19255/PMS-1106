@@ -1,3 +1,7 @@
+//! Doctor management HTTP handlers.
+//!
+//! Serves doctor pages and APIs for doctor profiles, schedules, and safe doctor
+//! offboarding with future appointment reassignment.
 use super::models::DoctorStatus;
 use super::service::{
     CreateDoctorForm, CreateDoctorScheduleForm, DoctorError, DoctorService, UpdateDoctorForm,
@@ -5,7 +9,7 @@ use super::service::{
 use crate::appointments::handlers::validate_and_check_conflict;
 use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::firebase_admin::FirebaseAdmin;
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 use crate::staff::service::{StaffForm, StaffService};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
@@ -14,6 +18,11 @@ use serde::Deserialize;
 use serde_json::json;
 use tera::{Context, Tera};
 
+/// Registers doctor management pages and doctor JSON API routes.
+///
+/// The page routes support normal form navigation under `/doctors`, while the
+/// `/api/doctors...` routes are used by dynamic screens such as appointments,
+/// staff management, and dashboard workflows.
 pub fn routes(config: &mut web::ServiceConfig) {
     config
         .route("/doctors", web::get().to(doctors_page))
@@ -44,6 +53,8 @@ pub fn routes(config: &mut web::ServiceConfig) {
             "/api/doctors/{doctor_id}/reassign",
             web::post().to(reassign_doctor_api),
         )
+        // Doctor availability is represented by doctor schedule routes.
+        // Appointment booking reads these schedules before accepting a time slot.
         .route(
             "/api/doctors/{doctor_id}/schedules",
             web::get().to(list_schedules_api),
@@ -370,6 +381,12 @@ pub struct ReassignDoctorForm {
 }
 
 #[allow(clippy::too_many_arguments)]
+/// Reassigns a doctor's future scheduled appointments before deactivating the
+/// doctor account.
+///
+/// This is the safer offboarding route: historical consultations remain linked
+/// to the original doctor, while upcoming work is moved to another available
+/// doctor.
 pub async fn reassign_doctor_api(
     req: HttpRequest,
     doctor_service: web::Data<DoctorService>,

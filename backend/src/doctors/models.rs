@@ -1,3 +1,7 @@
+//! Doctor data models.
+//!
+//! Defines doctors, doctor statuses, schedules, and weekday values used by doctor and
+//! appointment workflows.
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

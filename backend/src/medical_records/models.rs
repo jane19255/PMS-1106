@@ -1,3 +1,7 @@
+//! Medical record data models.
+//!
+//! Defines clinical record rows and patient timeline entries shared between handlers,
+//! services, and repository code.
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

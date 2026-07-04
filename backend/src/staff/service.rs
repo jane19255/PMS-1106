@@ -1,3 +1,7 @@
+//! Staff service layer.
+//!
+//! Validates staff forms and coordinates staff repository operations before handlers
+//! translate outcomes into HTTP responses.
 use super::models::StaffMember;
 use super::repository::{RepositoryError, StaffRepository};
 use crate::db::singapore_today;

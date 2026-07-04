@@ -1,3 +1,7 @@
+//! Admin dashboard repository functions.
+//!
+//! Contains Supabase calls for appointment lookup, queue insertion, vitals storage,
+//! consultation room assignment, and room status loading.
 use crate::db::{singapore_day_bounds, SupabaseRestDb};
 use chrono::{NaiveDate, SecondsFormat};
 use serde_json::json;

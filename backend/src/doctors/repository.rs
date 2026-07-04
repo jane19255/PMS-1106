@@ -1,3 +1,7 @@
+//! Doctor repository implementations.
+//!
+//! Provides doctor and schedule persistence through a common interface for both tests
+//! and the Supabase-backed application.
 use super::models::{DayOfWeek, Doctor, DoctorSchedule, DoctorStatus};
 use reqwest::{Client, Response};
 use serde::Deserialize;

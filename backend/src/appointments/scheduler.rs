@@ -1,3 +1,7 @@
+//! Appointment scheduler conflict helper.
+//!
+//! Builds on the interval tree to keep doctor appointment checks focused on time-slot
+//! availability instead of route or database concerns.
 use chrono::{DateTime, Duration, Utc};
 
 use super::interval::AppointmentInterval;

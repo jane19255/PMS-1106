@@ -1,3 +1,7 @@
+//! Billing repository implementations.
+//!
+//! Provides invoice persistence behind a common interface, including an in-memory
+//! repository for tests and a Supabase-backed repository for the running app.
 use super::models::{Invoice, InvoiceItem, Payment, PaymentStatus};
 use chrono::{DateTime, Utc};
 use reqwest::{Client, Response};

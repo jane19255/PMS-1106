@@ -1,8 +1,12 @@
+//! Prescription HTTP handlers.
+//!
+//! Serves prescription pages and APIs for creating, updating, dispensing, cancelling,
+//! and listing prescriptions.
 use super::service::{
     CreatePrescriptionForm, PrescriptionError, PrescriptionService, UpdatePrescriptionForm,
 };
 use crate::db::FirebaseRestDb;
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::auth::{require_auth_and_permission, AppAction};
 use actix_web::http::header;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use firebase_auth::FirebaseAuth;

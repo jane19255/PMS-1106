@@ -1,3 +1,7 @@
+//! Appointment HTTP handlers and scheduling validation.
+//!
+//! This module serves the appointments page and exposes the JSON APIs used to list,
+//! create, update, and cancel appointments.
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, Datelike, Duration, NaiveTime, Utc, Weekday};
 use firebase_auth::FirebaseAuth;
@@ -7,11 +11,18 @@ use uuid::Uuid;
 
 use crate::appointments::interval::AppointmentInterval;
 use crate::appointments::scheduler::AppointmentScheduler;
-use crate::db::{singapore_offset, singapore_today, FirebaseRestDb, SupabaseRestDb};
+use crate::auth::{require_auth_and_permission, AppAction};
+use crate::db::{FirebaseRestDb, SupabaseRestDb};
 use crate::doctors::models::{DayOfWeek, DoctorSchedule, DoctorStatus};
 use crate::doctors::service::DoctorService;
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
+use crate::patients::repository as patient_repository;
+use crate::time::{singapore_offset, singapore_today};
 
+/// Registers the appointment page and appointment JSON API routes.
+///
+/// `/appointments` serves the server-rendered page shell, while
+/// `/api/appointments...` is used by the frontend JavaScript for listing,
+/// creating, updating, and cancelling appointments.
 pub fn routes(cfg: &mut web::ServiceConfig) {
     // SSR page shell — the appointment list/table, stat cards, and modals are
     // populated client-side from the JSON API below (see assets/js/appointments.js).
@@ -74,6 +85,11 @@ pub(crate) enum AppointmentError {
     ServerError(String),
 }
 
+/// Validates an appointment request before it is inserted or updated.
+///
+/// This is the core scheduling guard: it confirms that the doctor and patient
+/// exist, the doctor is available, the requested time fits the doctor's weekly
+/// schedule, and the slot does not overlap another active appointment.
 pub(crate) async fn validate_and_check_conflict(
     db: &SupabaseRestDb,
     doctor_service: &DoctorService,
@@ -93,9 +109,10 @@ pub(crate) async fn validate_and_check_conflict(
         ));
     };
 
-    let doctor = doctor_service.find_doctor(&doctor_id).await.map_err(|_| {
-        AppointmentError::BadRequest("Selected doctor does not exist".to_string())
-    })?;
+    let doctor = doctor_service
+        .find_doctor(&doctor_id)
+        .await
+        .map_err(|_| AppointmentError::BadRequest("Selected doctor does not exist".to_string()))?;
     if doctor.status != DoctorStatus::Available {
         return Err(AppointmentError::BadRequest(
             "Selected doctor is not currently available".to_string(),
@@ -114,14 +131,12 @@ pub(crate) async fn validate_and_check_conflict(
         ));
     };
 
-    match db.get_patient(&patient_id).await {
-        Ok(body) => {
-            let rows: Vec<Value> = serde_json::from_str(&body).unwrap_or_default();
-            if rows.is_empty() {
-                return Err(AppointmentError::BadRequest(
-                    "Selected patient does not exist".to_string(),
-                ));
-            }
+    match patient_repository::get_patient(db, &patient_id).await {
+        Ok(Some(_patient)) => {}
+        Ok(None) => {
+            return Err(AppointmentError::BadRequest(
+                "Selected patient does not exist".to_string(),
+            ));
         }
         Err(e) => return Err(AppointmentError::ServerError(e)),
     }

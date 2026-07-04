@@ -1,14 +1,19 @@
+//! Application entry point for the patient management backend.
+//!
+//! This file wires shared services into Actix, registers all route modules, and starts
+//! the background appointment reconciliation task before serving HTTP requests.
 mod billing;
 mod db;
 mod doctors;
 mod firebase_admin;
-mod admindashboard;
+mod admin_dashboard;
 mod doctor_dashboard;
-mod handlers;
+mod auth;
+mod patients;
 mod medical_records;
-mod models;
 mod prescriptions;
 mod routes;
+mod time;
 mod staff;
 mod appointments;
 
@@ -35,19 +40,53 @@ use prescriptions::service::PrescriptionService;
 use staff::repository::{InMemoryStaffRepository, StaffRepository, SupabaseStaffRepository};
 use staff::service::StaffService;
 use std::sync::Arc;
-use std::time::Duration;
 use tera::Tera;
 
+// Used for periodic background tasks, such as appointment reconciliation
+use std::time::Duration;
+use futures::FutureExt; // For .catch_unwind()
+use tracing::{error, info}; // For structured logging
+
+/// Starts an indefinite, async background task that checks and update the status of overdue 
+/// appointments in the database every 5 minutes.
+///
+/// This function uses `actix_web::rt::spawn` to avoid blocking the main HTTP server thread
+///
+/// ### Error Handling
+/// * **Database Failure:** If Supabase REST API is unreachable, log the errors and restart the 5 minute loop
+/// * **Panics:** If unexpected panic occurs inside the async block, it is logged and safely recovered to
+/// resume the next 5 minute loop
 fn start_appointment_reconciliation(db: db::SupabaseRestDb) {
-    // Keep appointment states current even when nobody has opened a dashboard.
+    
+    // Spawn an async thread managed by Actix Web's runtime to prevent blocking the main thread
     actix_web::rt::spawn(async move {
+        // Log a status message indicating that the background worker has started
+        info!("Background appointment reconciliation worker started.");
+
+        // Keep the background task running indefinitely, looping every 5 minutes
         loop {
-            if let Err(error) = db
-                .reconcile_overdue_appointments(db::singapore_today())
-                .await
-            {
-                eprintln!("Appointment reconciliation failed: {error}");
+            // Catch panics during async operations with assert
+            let outcome = FutureExt::catch_unwind(std::panic::AssertUnwindSafe(async {
+                // Call database method to set appointment status to "no-show".
+                db.reconcile_overdue_appointments(db::singapore_today()).await
+            })).await;
+
+            // Handle success, failure, or panic outcomes
+            match outcome {
+                // No panic + No database errors
+                Ok(Ok(_)) => {
+                    info!("Appointment reconciliation completed successfully.");
+                }
+                // No panic + expected database errors (like database is offline)
+                Ok(Err(error)) => {
+                    error!("Appointment reconciliation failed: {error}");
+                }
+                // Panic in database call (like out-of-memory error) but loop will continue to run
+                Err(panic) => {
+                    error!("Appointment reconciliation panicked: {:?}. Retrying in 5 minutes.", panic);
+                }
             }
+
             actix_web::rt::time::sleep(Duration::from_secs(300)).await;
         }
     });
@@ -55,11 +94,12 @@ fn start_appointment_reconciliation(db: db::SupabaseRestDb) {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    dotenv().ok();
+    dotenv().ok(); // Load .env in cwd if exists
 
     let templates = Tera::new("templates/**/*.html")
         .expect("templates directory should contain valid Tera templates");
 
+    // Load values from .env, required for Firebase and Supabase configuration
     let firebase_project_id =
         std::env::var("FIREBASE_PROJECT_ID").expect("FIREBASE_PROJECT_ID must be set in .env");
 
@@ -71,6 +111,9 @@ async fn main() -> std::io::Result<()> {
     let firestore_db = db::FirebaseRestDb::new(firebase_project_id.clone());
     let supabase_db = db::SupabaseRestDb::from_env();
 
+    // Repositories are decoupled via traits and wrapped in Arc<dyn Trait>
+    // This allows runtime polymorphism and to be toggled between in-memory and Supabase PostgreSQL implementations
+    // At the same time, Arc is used to ensure that the repository instances can be shared across multiple threads safely
     let invoice_repository: Arc<dyn InvoiceRepository> =
         match std::env::var("BILLING_STORAGE").as_deref() {
             Ok("supabase") => {
@@ -85,6 +128,10 @@ async fn main() -> std::io::Result<()> {
                 Arc::new(InMemoryInvoiceRepository::default())
             }
         };
+
+    // Wrap services in web::Data
+    // Actix Web clones app state per worker thread
+    // web::Data uses Arc again to ensure threads share the same service instances without duplicating resources or memory allocations
     let billing_service = web::Data::new(BillingService::new(invoice_repository));
     let doctor_repository: Arc<dyn DoctorRepository> =
         match std::env::var("DOCTOR_STORAGE").as_deref() {
@@ -167,6 +214,8 @@ async fn main() -> std::io::Result<()> {
 
     println!("Server running at http://127.0.0.1:8080");
 
+    // Use HttpServer::new to spawn multiple worker threads, each running an instance of the HTTP server
+    // We use `move` and `.clone()` to ensure that each worker thread has its own copy of the shared server state
     HttpServer::new(move || {
         App::new()
             .app_data(billing_service.clone())
@@ -180,7 +229,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(firebase_admin.clone())
             .app_data(web::Data::new(firestore_db.clone()))
             .app_data(web::Data::new(supabase_db.clone()))
-            .app_data(web::FormConfig::default().limit(32_768))
+            .app_data(web::FormConfig::default().limit(32_768)) // Set max form size to 32KB
             .service(Files::new("/assets", "../frontend/assets"))
             .route(
                 "/",

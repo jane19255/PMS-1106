@@ -1,63 +1,34 @@
+//! Central route registration for the Actix application.
+//!
+//! Each feature module owns its own route setup, and this file combines those modules
+//! into the final server configuration used by `main`.
 use crate::appointments::handlers as appointment_handlers;
 use crate::billing::handlers as billing_handlers;
 use crate::doctors::handlers as doctor_handlers;
-use crate::admindashboard::handlers as admindashboard_handlers;
+use crate::admin_dashboard::handlers as admin_dashboard_handlers;
 use crate::doctor_dashboard::handlers as doctor_dashboard_handlers;
-use crate::handlers::{auth, patients};
+use crate::patients::handlers as patient_handlers;
 use crate::medical_records::handlers as medical_record_handlers;
 use crate::prescriptions::handlers as prescription_handlers;
 use crate::staff::handlers as staff_handlers;
-use actix_web::web;
 
-pub fn configure(config: &mut web::ServiceConfig) {
+use crate::auth::handlers as auth_handlers;
+
+/// Registers each feature module's route group with the Actix application.
+pub fn configure(config: &mut actix_web::web::ServiceConfig) {
     // Authentication routes
-    config.configure(auth::routes);
+    config.configure(auth_handlers::routes);
 
     // Patient management routes
-    config.configure(patients::routes);
+    config.configure(patient_handlers::routes);
     config.configure(doctor_handlers::routes);
     config.configure(doctor_dashboard_handlers::routes);
     config.configure(medical_record_handlers::routes);
     config.configure(prescription_handlers::routes);
     config.configure(staff_handlers::routes);
 
-    config.configure(admindashboard_handlers::routes);
+    config.configure(admin_dashboard_handlers::routes);
     config.configure(appointment_handlers::routes);
 
-    // Billing routes
-    config.service(
-        web::scope("/billing")
-            .route("", web::get().to(billing_handlers::list_invoices))
-            .route(
-                "/billable-appointments",
-                web::get().to(billing_handlers::list_billable_appointments),
-            )
-            .route(
-                "/invoices",
-                web::post().to(billing_handlers::create_invoice),
-            )
-            .route(
-                "/invoices/{invoice_id}",
-                web::get().to(billing_handlers::show_invoice),
-            )
-            .route(
-                "/invoices/{invoice_id}/payments",
-                web::post().to(billing_handlers::record_payment),
-            )
-            .route(
-                "/invoices/{invoice_id}/cancel",
-                web::post().to(billing_handlers::cancel_invoice),
-            )
-            .route(
-                "/invoices/{invoice_id}/report",
-                web::get().to(billing_handlers::show_medical_report),
-            )
-            .route(
-                "/invoices/{invoice_id}/report.pdf",
-                web::get().to(billing_handlers::download_medical_report_pdf),
-            ),
-    );
-
-    // Doctor availability is exposed through the existing doctor schedule API:
-    // GET/POST /api/doctors/{doctor_id}/schedules.
+    config.configure(billing_handlers::routes);
 }

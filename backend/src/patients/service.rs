@@ -1,18 +1,19 @@
-use actix_web::{web, HttpRequest, HttpResponse, Responder};
-use chrono::NaiveDate;
-use firebase_auth::FirebaseAuth;
-use serde_json::{json, Value};
-use tera::{Context, Tera};
+//! This module contains the service functions for patient-related operations in the web application.
+//! It provides functions to validate and normalize patient data, as well as to construct payloads for database operations.
+//! 
+//! It is different from the handlers and the repository module, as it focuses on data validation and normalization.
 
-use crate::db::{singapore_today, FirebaseRestDb, SupabaseRestDb};
-use crate::handlers::auth::{require_auth_and_permission, AppAction};
-use crate::models::{Patient, PatientView, SupabasePatientRow, UpdatePatient};
+use chrono::NaiveDate;
+use serde_json::{json, Value};
+
+use crate::db::singapore_today;
+use super::models::{Patient, UpdatePatient};
 
 const VALID_GENDERS: [&str; 2] = ["Male", "Female"];
 const VALID_PATIENT_STATUSES: [&str; 2] = ["Active", "Inactive"];
 
 #[derive(Debug, Clone)]
-struct ValidatedPatient {
+pub(crate) struct ValidatedPatient {
     first_name: String,
     last_name: String,
     dob: String,
@@ -30,188 +31,15 @@ struct ValidatedPatient {
     status: Option<String>,
 }
 
-pub fn routes(cfg: &mut web::ServiceConfig) {
-    cfg.route("/patients", web::get().to(patients_page));
-    cfg.route("/api/patients", web::get().to(list_patients));
-    cfg.route("/api/patients/new", web::post().to(create_patient));
-    cfg.route("/api/patients/{id}", web::get().to(get_patient_by_id));
-    cfg.route("/api/patients/{id}", web::put().to(update_patient));
-    cfg.route("/api/patients/{id}", web::delete().to(delete_patient));
+pub(crate) fn patient_nric(patient: &ValidatedPatient) -> &str {
+    &patient.nric
 }
 
-pub async fn patients_page(
-    req: HttpRequest,
-    tera: web::Data<Tera>,
-    firebase_auth: web::Data<FirebaseAuth>,
-    firestore_db: web::Data<FirebaseRestDb>,
-) -> impl Responder {
-    if let Err(rejection) =
-        require_auth_and_permission(&req, &firebase_auth, &firestore_db, AppAction::ViewPatient)
-            .await
-    {
-        return rejection;
-    }
-
-    let ctx = Context::new();
-
-    match tera.render("Patients.html", &ctx) {
-        Ok(html) => HttpResponse::Ok()
-            .content_type("text/html; charset=utf-8")
-            .body(html),
-        Err(e) => {
-            eprintln!("Template error: {e}");
-            HttpResponse::InternalServerError().body("Template rendering failed")
-        }
-    }
+pub(crate) fn patient_status(patient: &ValidatedPatient) -> Option<&str> {
+    patient.status.as_deref()
 }
 
-pub async fn list_patients(
-    req: HttpRequest,
-    firebase_auth: web::Data<FirebaseAuth>,
-    firestore_db: web::Data<FirebaseRestDb>,
-    supabase_db: web::Data<SupabaseRestDb>,
-) -> impl Responder {
-    if let Err(rejection) =
-        require_auth_and_permission(&req, &firebase_auth, &firestore_db, AppAction::ViewPatient)
-            .await
-    {
-        return rejection;
-    }
-
-    match supabase_db.list_patients().await {
-        Ok(body) => match serde_json::from_str::<Vec<SupabasePatientRow>>(&body) {
-            Ok(rows) => {
-                let patients: Vec<PatientView> = rows.into_iter().map(PatientView::from).collect();
-                HttpResponse::Ok().json(patients)
-            }
-            Err(e) => {
-                eprintln!("Failed to parse Supabase patient rows: {e} | Body: {body}");
-                HttpResponse::InternalServerError().body("Failed to parse patients from database.")
-            }
-        },
-        Err(e) => {
-            eprintln!("Failed to list patients from Supabase: {e}");
-            HttpResponse::InternalServerError().body("Failed to load patients from database.")
-        }
-    }
-}
-
-pub async fn get_patient_by_id(
-    req: HttpRequest,
-    firebase_auth: web::Data<FirebaseAuth>,
-    firestore_db: web::Data<FirebaseRestDb>,
-    supabase_db: web::Data<SupabaseRestDb>,
-    path: web::Path<String>,
-) -> impl Responder {
-    if let Err(rejection) =
-        require_auth_and_permission(&req, &firebase_auth, &firestore_db, AppAction::ViewPatient)
-            .await
-    {
-        return rejection;
-    }
-
-    let patient_id = path.into_inner();
-    match supabase_db.get_patient(&patient_id).await {
-        Ok(body) => match serde_json::from_str::<Vec<SupabasePatientRow>>(&body) {
-            Ok(rows) => match rows.into_iter().next().map(PatientView::from) {
-                Some(patient) => HttpResponse::Ok().json(patient),
-                None => HttpResponse::NotFound().body("Patient not found"),
-            },
-            Err(e) => {
-                eprintln!("Failed to parse patient {patient_id}: {e}");
-                HttpResponse::InternalServerError().body("Failed to parse patient")
-            }
-        },
-        Err(e) => {
-            eprintln!("Failed to fetch patient {patient_id}: {e}");
-            HttpResponse::InternalServerError().body("Failed to load patient")
-        }
-    }
-}
-
-pub async fn create_patient(
-    req: HttpRequest,
-    patient_data: web::Json<Patient>,
-    firebase_auth: web::Data<FirebaseAuth>,
-    firestore_db: web::Data<FirebaseRestDb>,
-    supabase_db: web::Data<SupabaseRestDb>,
-) -> impl Responder {
-    if let Err(rejection) = require_auth_and_permission(
-        &req,
-        &firebase_auth,
-        &firestore_db,
-        AppAction::CreatePatient,
-    )
-    .await
-    {
-        return rejection;
-    }
-
-    let validated = match validate_new_patient(&patient_data) {
-        Ok(patient) => patient,
-        Err(message) => return HttpResponse::BadRequest().body(message),
-    };
-
-    let patient_id = validated.nric.clone();
-    let payload = patient_payload(&validated, Some(&patient_id), Some("Active"));
-
-    match supabase_db.create_patient(&payload).await {
-        Ok(_) => {
-            println!(
-                "Successfully registered patient in Supabase: {}",
-                patient_id
-            );
-            HttpResponse::Ok().json(json!({ "status": "success" }))
-        }
-        Err(e) => {
-            eprintln!("Failed to create patient in Supabase: {e}");
-            if e.contains("duplicate key") || e.contains("23505") {
-                HttpResponse::Conflict().body("A patient with this NRIC/FIN already exists.")
-            } else {
-                HttpResponse::InternalServerError().body("Failed to save patient to database.")
-            }
-        }
-    }
-}
-
-pub async fn update_patient(
-    req: HttpRequest,
-    path: web::Path<String>,
-    patient_data: web::Json<UpdatePatient>,
-    firebase_auth: web::Data<FirebaseAuth>,
-    firestore_db: web::Data<FirebaseRestDb>,
-    supabase_db: web::Data<SupabaseRestDb>,
-) -> impl Responder {
-    if let Err(rejection) =
-        require_auth_and_permission(&req, &firebase_auth, &firestore_db, AppAction::EditPatient)
-            .await
-    {
-        return rejection;
-    }
-
-    let patient_id = normalize_identifier(&path.into_inner());
-    let validated = match validate_updated_patient(&patient_data) {
-        Ok(patient) => patient,
-        Err(message) => return HttpResponse::BadRequest().body(message),
-    };
-
-    if validated.nric != patient_id {
-        return HttpResponse::BadRequest()
-            .body("Patient NRIC/FIN cannot be changed after registration.");
-    }
-
-    let payload = patient_payload(&validated, None, validated.status.as_deref());
-
-    match supabase_db.update_patient(&patient_id, &payload).await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "status": "success" })),
-        Err(e) => {
-            eprintln!("Failed to update patient in Supabase: {e}");
-            HttpResponse::InternalServerError().body("Failed to update patient.")
-        }
-    }
-}
-
-fn validate_new_patient(patient: &Patient) -> Result<ValidatedPatient, String> {
+pub(crate) fn validate_new_patient(patient: &Patient) -> Result<ValidatedPatient, String> {
     validate_patient_fields(
         &patient.first_name,
         &patient.last_name,
@@ -231,7 +59,7 @@ fn validate_new_patient(patient: &Patient) -> Result<ValidatedPatient, String> {
     )
 }
 
-fn validate_updated_patient(patient: &UpdatePatient) -> Result<ValidatedPatient, String> {
+pub(crate) fn validate_updated_patient(patient: &UpdatePatient) -> Result<ValidatedPatient, String> {
     validate_patient_fields(
         &patient.first_name,
         &patient.last_name,
@@ -310,7 +138,11 @@ fn validate_patient_fields(
     })
 }
 
-fn patient_payload(patient: &ValidatedPatient, id: Option<&str>, status: Option<&str>) -> Value {
+pub(crate) fn patient_payload(
+    patient: &ValidatedPatient,
+    id: Option<&str>,
+    status: Option<&str>,
+) -> Value {
     let mut payload = json!({
         "first_name": patient.first_name,
         "last_name": patient.last_name,
@@ -376,7 +208,7 @@ fn validate_dob(value: &str) -> Result<String, String> {
     }
 }
 
-fn normalize_identifier(value: &str) -> String {
+pub(crate) fn normalize_identifier(value: &str) -> String {
     value
         .chars()
         .filter(|character| !character.is_whitespace() && *character != '-')
@@ -447,34 +279,6 @@ fn validate_email(value: &str) -> Result<String, String> {
         Ok(email)
     } else {
         Err("Email must be a valid email address.".to_string())
-    }
-}
-
-pub async fn delete_patient(
-    req: HttpRequest,
-    path: web::Path<String>,
-    firebase_auth: web::Data<FirebaseAuth>,
-    firestore_db: web::Data<FirebaseRestDb>,
-    supabase_db: web::Data<SupabaseRestDb>,
-) -> impl Responder {
-    if let Err(rejection) = require_auth_and_permission(
-        &req,
-        &firebase_auth,
-        &firestore_db,
-        AppAction::DeletePatient,
-    )
-    .await
-    {
-        return rejection;
-    }
-
-    let patient_id = path.into_inner();
-    match supabase_db.delete_patient(&patient_id).await {
-        Ok(_) => HttpResponse::Ok().json(json!({ "status": "success" })),
-        Err(e) => {
-            eprintln!("Failed to delete patient in Supabase: {e}");
-            HttpResponse::InternalServerError().body("Failed to delete patient.")
-        }
     }
 }
 

@@ -1,3 +1,7 @@
+//! Medical record service layer.
+//!
+//! Validates clinical record form data and coordinates record lifecycle operations with
+//! the repository.
 use super::models::{MedicalRecord, PatientTimelineEntry};
 use super::repository::{MedicalRecordRepository, RepositoryError};
 use chrono::Utc;
