@@ -280,6 +280,7 @@ input.password+i {
     padding: 16px 16px 0 24px;
     max-height: 500px;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .modal-content .row-section {
@@ -609,6 +610,7 @@ span.status {
     font-size: 13px;
     font-weight: 500;
     border-radius: 4px;
+    white-space: pre;
 }
 
 span.status.active {
@@ -650,5 +652,9 @@ span.status.inactive {
 
     .page-title {
         margin-top: 0;
+    }
+
+    .table-list {
+        overflow-x: auto;
     }
 }

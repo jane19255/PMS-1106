@@ -61,6 +61,11 @@
     text-decoration: none;
 }
 
+.doctor-actions button:hover,
+.doctor-actions button:active {
+    background: transparent;
+}
+
 .doctor-actions button.delete-doctor {
     color: var(--danger);
     border-color: rgb(239 68 68 / 35%);

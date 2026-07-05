@@ -28,6 +28,7 @@ main {
 
 #noshow .icon,
 .status-noshow,
+.status-cancelled,
 .badge-emergency {
     background-color: rgb(from var(--danger) r g b / 10%);
     color: var(--danger);

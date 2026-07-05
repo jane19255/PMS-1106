@@ -151,7 +151,7 @@ main.container {
     padding: 0;
 }
 
-/* .table-scroll { overflow-x: auto; } */
+
 .table-list .action a {
     color: var(--primary-hover);
     font-weight: 600;
@@ -941,6 +941,8 @@ span.status.cancelled {
     .clinic-info-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .table-scroll { overflow-x: auto; }
 }
 
 @media only screen and (max-width: 620px) {
@@ -1016,6 +1018,8 @@ span.status.cancelled {
     .report-actions {
         flex-direction: column;
     }
+
+    .table-scroll { overflow-x: auto; }
 }
 
 @media print {
@@ -1106,3 +1110,4 @@ span.status.cancelled {
         -webkit-print-color-adjust: exact;
     }
 }
+

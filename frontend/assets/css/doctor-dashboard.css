@@ -209,11 +209,14 @@ td.empty-row {
     margin-right: 8px;
 }
 
-@media only screen and (max-width: 1300px) {
+@media only screen and (max-width: 1300px) and (min-width: 1000px) {
     main {
-        padding: 90px 80px 24px;
+        padding: 40px;
+        padding-top: 120px;
     }
+}
 
+@media only screen and (max-width: 1300px) {
     .container {
         grid-template-columns: auto;
     }

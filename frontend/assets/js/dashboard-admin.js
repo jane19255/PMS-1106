@@ -259,6 +259,18 @@ async function fetchAppointmentsByDate(dateStr) {
     }
 }
 
+function getDoctorRoom(doctorId) {
+    return globalRooms.find(room => room.doctorId === doctorId);
+}
+
+function isDoctorRoomAvailable(doctorId) {
+    const room = getDoctorRoom(doctorId);
+
+    return room
+        && room.roomStatus === "Available"
+        && !room.currentAppointmentId;
+}
+
 function renderAppointmentRow(app) {
     const status = getPatientStatus(app);
     const fullName = `${app.patient.firstName} ${app.patient.lastName}`;
@@ -269,7 +281,7 @@ function renderAppointmentRow(app) {
     const canEnterVitals = app.status === "Checked In";
     const canSendRoom = app.status === "Vitals Recorded"
         && app.queueStatus === "Waiting"
-        && app.roomStatus === "Available";
+        && isDoctorRoomAvailable(app.doctorId);
     const canArrive = isToday && app.status === "Scheduled";
     const priority = getPriorityBadge(app.priority);
     const displayedTime = isOverdue ? `${app.date} ${app.time}` : app.time;
@@ -549,7 +561,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             renderRoomTable();
         }
     });
+    await fetchRooms();
     await refreshAppointmentTable(todayStr);
+    renderRoomTable();
 
     // Refresh the queue so reception can see room and doctor delays promptly.
     setInterval(async () => {

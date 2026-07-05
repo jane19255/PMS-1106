@@ -43,6 +43,28 @@ function getPriorityBadge(priority) {
     }
 }
 
+function getPriorityRank(priority) {
+    switch (priority) {
+        case "Emergency": return 1;
+        case "Urgent": return 2;
+        case "Normal": return 3;
+        default: return 4;
+    }
+}
+
+function sortByPriorityThenTime(list) {
+    return [...list].sort((a, b) => {
+        const priorityDiff = getPriorityRank(a.priority) - getPriorityRank(b.priority);
+
+        if (priorityDiff !== 0) {
+            return priorityDiff;
+        }
+
+        return new Date(a.scheduledAt || a.raw?.scheduled_at || `${a.appointmentDate} ${a.appointmentTime}`)
+            - new Date(b.scheduledAt || b.raw?.scheduled_at || `${b.appointmentDate} ${b.appointmentTime}`);
+    });
+}
+
 function isConsultationTimeUp(app) {
     return app.queueStatus === "In Consultation"
         && !!app.consultationDeadline
@@ -111,7 +133,7 @@ async function refreshAppointmentTable(selectedDate) {
     currentSelectedDate = selectedDate;
     await loadDashboardAppointments(selectedDate);
 
-    pagination.data = appointments;
+    pagination.data = sortByPriorityThenTime(appointments);
     pagination.currentPage = 1;
     pagination.renderTable();
 
@@ -137,7 +159,7 @@ function applyAllFiltersAndRefresh() {
         filtered = filtered.filter(item => item.queueStatus === selectedQueueStatus);
     }
 
-    pagination.data = filtered;
+    pagination.data = sortByPriorityThenTime(filtered);
     pagination.currentPage = 1;
     pagination.renderTable();
 
@@ -168,7 +190,7 @@ async function loadDashboardAppointments(dateStr = currentSelectedDate) {
 
         if (!response.ok) throw new Error(`Dashboard API returned ${response.status}`);
 
-        appointments = await response.json();
+        appointments = sortByPriorityThenTime(await response.json());
     } catch (error) {
         console.warn("Could not load doctor dashboard appointments:", error);
         appointments = [];

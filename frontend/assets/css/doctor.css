@@ -41,6 +41,7 @@
 
 .page-title a {
     text-decoration: none;
+    color: var(--secondary);
 }
 
 .page-title div:has(button) {
