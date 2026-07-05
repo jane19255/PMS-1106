@@ -130,3 +130,11 @@ span.status.Cancelled {
 i.delete {
     color: var(--danger);
 }
+
+.prescription-custom-medication {
+    margin-top: 8px;
+}
+
+.prescription-custom-medication.is-hidden {
+    display: none;
+}
