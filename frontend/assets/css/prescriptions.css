@@ -22,7 +22,9 @@ td .fa-circle-info {
 }
 
 .page-title {
-    margin-bottom: 0
+    margin-bottom: 0;
+    gap: 12px;
+    justify-content: normal;
 }
 
 .page-title a {
@@ -33,6 +35,11 @@ td .fa-circle-info {
     display: flex;
     gap: 12px;
     align-items: center;
+    margin-left: auto;
+}
+
+.page-title button {
+    margin-left: auto;
 }
 
 .page-title button.cancel {
