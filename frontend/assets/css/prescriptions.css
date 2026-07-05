@@ -113,12 +113,29 @@ span.status.Cancelled {
     margin: 0;
 }
 
-.inline-delete button {
-    background: transparent;
+
+
+.custom-table .action .inline-delete button {
+    align-items: center;
+    background: transparent !important;
     border: 0;
+    box-shadow: none;
+    color: inherit;
     cursor: pointer;
+    display: inline-flex;
     font: inherit;
+    height: auto;
+    justify-content: center;
+    min-height: 0;
+    min-width: 0;
     padding: 0;
+}
+
+.custom-table .action .inline-delete button:hover,
+.custom-table .action .inline-delete button:active {
+    background: transparent !important;
+    box-shadow: none;
+    transform: none;
 }
 
 .action {
