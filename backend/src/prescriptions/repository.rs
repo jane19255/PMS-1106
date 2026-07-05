@@ -27,6 +27,7 @@ pub trait PrescriptionRepository: Send + Sync {
     fn list_by_patient(&self, patient_id: &str) -> RepositoryFuture<'_, Vec<Prescription>>;
     fn list_by_doctor(&self, doctor_id: &str) -> RepositoryFuture<'_, Vec<Prescription>>;
     fn update(&self, prescription: Prescription) -> RepositoryFuture<'_, Prescription>;
+    fn delete(&self, prescription_id: &str) -> RepositoryFuture<'_, ()>;
 }
 
 #[derive(Default)]
@@ -68,9 +69,9 @@ impl PrescriptionRepository for InMemoryPrescriptionRepository {
                 .lock()
                 .map_err(|_| RepositoryError::StorageUnavailable)?;
 
-            let mut prescription_list: Vec<Prescription> = prescriptions.values().cloned().collect();
-            prescription_list
-                .sort_by_key(|prescription| std::cmp::Reverse(prescription.issued_at));
+            let mut prescription_list: Vec<Prescription> =
+                prescriptions.values().cloned().collect();
+            prescription_list.sort_by_key(|prescription| std::cmp::Reverse(prescription.issued_at));
             Ok(prescription_list)
         })
     }
@@ -112,8 +113,22 @@ impl PrescriptionRepository for InMemoryPrescriptionRepository {
             Ok(prescription)
         })
     }
-}
 
+    fn delete(&self, prescription_id: &str) -> RepositoryFuture<'_, ()> {
+        let prescription_id = prescription_id.to_string();
+        Box::pin(async move {
+            let mut prescriptions = self
+                .prescriptions
+                .lock()
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            prescriptions
+                .remove(&prescription_id)
+                .map(|_| ())
+                .ok_or(RepositoryError::NotFound)
+        })
+    }
+}
 pub struct SupabasePrescriptionRepository {
     url: String,
     key: String,
@@ -170,7 +185,10 @@ impl SupabasePrescriptionRepository {
         RepositoryError::StorageUnavailable
     }
 
-    async fn ensure_medicine(&self, prescription: &Prescription) -> Result<String, RepositoryError> {
+    async fn ensure_medicine(
+        &self,
+        prescription: &Prescription,
+    ) -> Result<String, RepositoryError> {
         let medicine_id = medicine_id_for(&prescription.medication_name, &prescription.dosage);
         let response = self
             .request(self.client.post(self.medicines_url("on_conflict=id")))
@@ -346,7 +364,10 @@ impl PrescriptionRepository for SupabasePrescriptionRepository {
         Box::pin(async move {
             let encoded_id = urlencoding::encode(&prescription.id);
             let response = self
-                .request(self.client.patch(self.prescriptions_url(&format!("id=eq.{encoded_id}"))))
+                .request(
+                    self.client
+                        .patch(self.prescriptions_url(&format!("id=eq.{encoded_id}"))),
+                )
                 .header("Prefer", "return=minimal")
                 .json(&json!({
                     "patient_id": prescription.patient_id,
@@ -369,8 +390,41 @@ impl PrescriptionRepository for SupabasePrescriptionRepository {
             self.find_by_id(&prescription.id).await
         })
     }
-}
 
+    fn delete(&self, prescription_id: &str) -> RepositoryFuture<'_, ()> {
+        let prescription_id = prescription_id.to_string();
+        Box::pin(async move {
+            self.find_by_id(&prescription_id).await?;
+            let encoded_id = urlencoding::encode(&prescription_id);
+            let item_response = self
+                .request(self.client.delete(
+                    self.prescription_items_url(&format!("prescription_id=eq.{encoded_id}")),
+                ))
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            if !item_response.status().is_success() {
+                return Err(Self::response_error(item_response).await);
+            }
+
+            let prescription_response = self
+                .request(
+                    self.client
+                        .delete(self.prescriptions_url(&format!("id=eq.{encoded_id}"))),
+                )
+                .send()
+                .await
+                .map_err(|_| RepositoryError::StorageUnavailable)?;
+
+            if prescription_response.status().is_success() {
+                Ok(())
+            } else {
+                Err(Self::response_error(prescription_response).await)
+            }
+        })
+    }
+}
 #[derive(Deserialize)]
 struct DatabasePrescription {
     id: String,

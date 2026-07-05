@@ -222,6 +222,7 @@ impl StaffService {
             ),
             RepositoryError::ReferencedByDoctor => StaffError::StaffHasDoctorProfile,
             RepositoryError::NotFound => StaffError::StaffNotFound,
+            RepositoryError::EnumCaseMismatch => StaffError::StorageUnavailable,
             RepositoryError::StorageUnavailable => StaffError::StorageUnavailable,
         }
     }

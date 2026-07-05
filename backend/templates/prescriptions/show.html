@@ -3,7 +3,7 @@
 {% block title %}Prescription{% endblock title %}
 
 {% block styles %}
-<link rel="stylesheet" href="/assets/css/prescriptions.css?v=7">
+<link rel="stylesheet" href="/assets/css/prescriptions.css?v=8">
 {% endblock styles %}
 
 {% block content %}
@@ -20,6 +20,11 @@
             <button type="submit">Cancel Prescription</button>
         </form>
     </div>
+
+        <form action="/prescriptions/{{ prescription.id }}/delete" method="post"
+            onsubmit="return confirm('Delete this prescription record permanently?')">
+            <button class="danger" type="submit">Delete Record</button>
+        </form>
 </div>
 
 <h1 class="medicine-name">{{ prescription.medication_name }}</h1>
@@ -65,7 +70,7 @@
 
             <div class="field">
                 <label>Daily Frequency</label>
-                <input type="text" name="dosage" value="{{ prescription.frequency }}">
+                <input type="text" name="frequency" value="{{ prescription.frequency }}">
             </div>
 
             <div class="field">
