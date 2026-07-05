@@ -3,7 +3,7 @@
 {% block title %}Prescriptions{% endblock title %}
 
 {% block styles %}
-<link rel="stylesheet" href="/assets/css/prescriptions.css?v=8">
+<link rel="stylesheet" href="/assets/css/prescriptions.css?v=9">
 {% endblock styles %}
 
 {% block content %}
@@ -170,9 +170,9 @@
                     <div class="has-tooltip">
                         <form class="inline-delete" action="/prescriptions/{{ prescription.id }}/delete" method="post"
                             onsubmit="return confirm('Delete this prescription record permanently?')">
-                            <button type="submit" aria-label="Delete Prescription">
-                                <i class="delete fa-solid fa-trash"></i>
-                            </button>
+                            <i class="delete fa-solid fa-trash" role="button" tabindex="0" aria-label="Delete Prescription"
+                                onclick="this.closest('form').requestSubmit()"
+                                onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.closest('form').requestSubmit(); }"></i>
                         </form>
                         <span class="tooltip-text">Delete Prescription</span>
                     </div>
