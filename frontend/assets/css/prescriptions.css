@@ -113,14 +113,25 @@ span.status.Cancelled {
     margin: 0;
 }
 
-.btn.danger,
-button.danger {
-    background: var(--danger);
-    color: white;
-}
+
+
+
 
 .action {
     align-items: center;
     display: flex;
     gap: 8px;
+}
+
+i.delete {
+    color: var(--danger);
+    cursor: pointer;
+}
+
+.prescription-custom-medication {
+    margin-top: 8px;
+}
+
+.prescription-custom-medication.is-hidden {
+    display: none;
 }
