@@ -113,14 +113,20 @@ span.status.Cancelled {
     margin: 0;
 }
 
-.btn.danger,
-button.danger {
-    background: var(--danger);
-    color: white;
+.inline-delete button {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
 }
 
 .action {
     align-items: center;
     display: flex;
     gap: 8px;
+}
+
+i.delete {
+    color: var(--danger);
 }

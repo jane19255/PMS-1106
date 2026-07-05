@@ -170,12 +170,15 @@
                         </a>
                         <span class="tooltip-text">View Details</span>
                     </div>
-                    <form class="inline-delete" action="/prescriptions/{{ prescription.id }}/delete" method="post"
-                        onsubmit="return confirm('Delete this prescription record permanently?')">
-                        <button class="btn danger" type="submit">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </form>
+                    <div class="has-tooltip">
+                        <form class="inline-delete" action="/prescriptions/{{ prescription.id }}/delete" method="post"
+                            onsubmit="return confirm('Delete this prescription record permanently?')">
+                            <button type="submit" aria-label="Delete Prescription">
+                                <i class="delete fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                        <span class="tooltip-text">Delete Prescription</span>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
