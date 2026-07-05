@@ -243,6 +243,22 @@ impl PrescriptionService {
             .map_err(Self::map_repository_error)
     }
 
+    pub async fn delete_prescription(
+        &self,
+        prescription_id: &str,
+    ) -> Result<(), PrescriptionError> {
+        if prescription_id.trim().is_empty() {
+            return Err(PrescriptionError::InvalidInput(
+                "Prescription ID is required".to_string(),
+            ));
+        }
+
+        self.prescription_repository
+            .delete(prescription_id.trim())
+            .await
+            .map_err(Self::map_repository_error)
+    }
+
     async fn reject_duplicate_active_prescription(
         &self,
         patient_id: &str,
@@ -259,7 +275,10 @@ impl PrescriptionService {
 
         let duplicate_exists = prescriptions.iter().any(|prescription| {
             prescription.status == PrescriptionStatus::Active
-                && prescription.medication_name.trim().eq_ignore_ascii_case(&medication_name)
+                && prescription
+                    .medication_name
+                    .trim()
+                    .eq_ignore_ascii_case(&medication_name)
                 && prescription.dosage.trim().eq_ignore_ascii_case(&dosage)
         });
 
@@ -390,7 +409,10 @@ mod tests {
         let service = service();
         service.create_prescription(create_form()).await.unwrap();
 
-        let error = service.create_prescription(create_form()).await.unwrap_err();
+        let error = service
+            .create_prescription(create_form())
+            .await
+            .unwrap_err();
 
         assert_eq!(
             error,
@@ -404,7 +426,10 @@ mod tests {
         let service = service();
         let prescription = service.create_prescription(create_form()).await.unwrap();
 
-        let dispensed = service.dispense_prescription(&prescription.id).await.unwrap();
+        let dispensed = service
+            .dispense_prescription(&prescription.id)
+            .await
+            .unwrap();
 
         assert_eq!(dispensed.status, PrescriptionStatus::Dispensed);
         assert!(dispensed.dispensed_at.is_some());
@@ -414,9 +439,15 @@ mod tests {
     async fn rejects_cancel_after_dispense() {
         let service = service();
         let prescription = service.create_prescription(create_form()).await.unwrap();
-        service.dispense_prescription(&prescription.id).await.unwrap();
+        service
+            .dispense_prescription(&prescription.id)
+            .await
+            .unwrap();
 
-        let error = service.cancel_prescription(&prescription.id).await.unwrap_err();
+        let error = service
+            .cancel_prescription(&prescription.id)
+            .await
+            .unwrap_err();
 
         assert_eq!(
             error,
@@ -424,5 +455,19 @@ mod tests {
                 "Dispensed prescriptions cannot be cancelled".to_string()
             )
         );
+    }
+
+    #[actix_web::test]
+    async fn deletes_prescription() {
+        let service = service();
+        let prescription = service.create_prescription(create_form()).await.unwrap();
+
+        service.delete_prescription(&prescription.id).await.unwrap();
+
+        let error = service
+            .find_prescription(&prescription.id)
+            .await
+            .unwrap_err();
+        assert_eq!(error, PrescriptionError::PrescriptionNotFound);
     }
 }
